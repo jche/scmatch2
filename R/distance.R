@@ -1,0 +1,56 @@
+
+# functions for working with the distance metric
+
+
+
+#' Generate (#tx) by (#co) distance matrix
+#'
+#' @param df dataframe
+#' @param covs covariates; default all "X" variables
+#' @param treatment treatment variable; default "Z"
+#' @param scaling vector of scaling constants for covariates
+#' @param method distance metric to use
+#'
+#' @return (#tx) by (#co) distance matrix
+gen_dm <- function(df, 
+                   covs = starts_with("X"),
+                   treatment = Z,
+                   scaling = 1,
+                   method = c("maximum", "euclidean", "manhattan")) {
+  method <- match.arg(method)
+  
+  # pull out df with only covariates
+  covs <- df %>%
+    select({{covs}})
+  
+  # row numbers of each tx/co unit
+  tx_obs <- which(as.logical(pull(df, {{treatment}})))
+  co_obs <- which(as.logical(!pull(df, {{treatment}})))
+  
+  # if scaling is scalar c, scale all covariates by c
+  if (length(scaling) == 1) {
+    scaling <- rep(scaling, ncol(covs))
+  }
+  
+  # scale covariate df, according to implicit distance metric
+  #  - note: coerce non-numeric factor columns to integer values
+  #  - note: coerces T/F into 1/2 instead of 1/0, but this is ok
+  covs <- covs %>%
+    mutate(across(!where(is.numeric), ~as.numeric(as.factor(.)))) %>%
+    as.matrix() %*%
+    diag(scaling)
+  
+  # compute (#tx) x (#co) distance matrix
+  # TODO: any way to make this faster?
+  dm <- flexclust::dist2(covs[tx_obs,], covs[co_obs,], method = method)
+  rownames(dm) <- tx_obs
+  colnames(dm) <- co_obs
+  
+  return(dm)
+}
+
+
+
+
+
+
