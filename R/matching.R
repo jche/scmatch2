@@ -67,26 +67,10 @@ get_cal_matches <- function(df,
   
   ### use est_method: scm or average
   
-  if (est_method == "scm") {
-    # generate SCM matching formula
-    #  - NOTE: non-numeric columns crashed augsynth for some reason,
-    #          so I still don't mess with them here.
-    match_cols <- df %>%
-      select(starts_with("X") & where(is.numeric)) %>%
-      names()
-
-    scweights <- map(scmatches$matches, 
-                     ~gen_sc_weights(.x, match_cols, dist_scaling),
-                     .progress="Producing SCM units...")   # add progress bar
-  } else if (est_method == "average") {
-    scweights <- map(scmatches$matches,
-                     function(x) {
-                       x %>% 
-                         group_by(Z) %>% 
-                         mutate(weights = 1/n()) %>% 
-                         ungroup()
-                     })
-  }
+  scweights <- est_weights(df,
+                           matched_gps = scmatches$matches,
+                           dist_scaling = dist_scaling,
+                           est_method = est_method)
   
   ### use return: sc units, aggregated weights per control, all weights
   m.data <- switch(return,
@@ -227,6 +211,125 @@ gen_matches <- function(df,
               # num_matches = num_matches
               ))
 }
+
+
+
+
+# estimate within matched sets --------------------------------------------
+
+#' Generate weights for list of matched sets
+#'
+#' @param df full dataframe
+#' @param matched_gps list of matched sets: tx unit in first row
+#' @param dist_scaling tibble with scaling for each covariate
+#' @param est_method "scm" or "average"
+#'
+#' @return list of matched sets, with 'weights'
+est_weights <- function(df, 
+                        matched_gps, 
+                        dist_scaling,
+                        est_method = c("scm", "average")) {
+  est_method = match.arg(est_method)
+  
+  if (est_method == "scm") {
+    # generate SCM matching formula
+    #  - NOTE: non-numeric columns crashed augsynth for some reason,
+    #          so I still don't mess with them here.
+    match_cols <- df %>%
+      select(starts_with("X") & where(is.numeric)) %>%
+      names()
+    
+    scweights <- map(matched_gps, 
+                     ~gen_sc_weights(.x, match_cols, dist_scaling),
+                     .progress="Producing SCM units...")   # add progress bar
+  } else if (est_method == "average") {
+    scweights <- map(matched_gps,
+                     function(x) {
+                       x %>% 
+                         group_by(Z) %>% 
+                         mutate(weights = 1/n()) %>% 
+                         ungroup()
+                     })
+  }
+  return(scweights)
+}
+
+
+
+
+
+
+
+# CEM (for comparison) ----------------------------------------------------
+
+# TODO
+get_cem_matches <- function(
+    df, 
+    Z_FORMULA = as.formula(paste0("Z~", 
+                                  paste0(grep("^X", names(df), value=T), 
+                                         collapse="+"))),
+    num_bins,
+    method = c("average", "scm"),
+    return = c("sc_units", "agg_co_units", "all")) {
+  method <- match.arg(method)
+  return <- match.arg(return)
+  
+  m.out3 <- MatchIt::matchit(
+    Z_FORMULA,
+    data = df,
+    method = "cem",
+    estimand = "ATT",
+    grouping = NULL,   # exact match factor covariates
+    cutpoints = num_bins,
+    k2k = F)   # not 1:1 matching
+  m.data3 <- MatchIt::match.data(m.out3)
+  # print(glue("Number of tx units kept: {sum(m.data3$Z)}"))
+  
+  # transform m.data3 into our format
+  co_units <- m.data3 %>%
+    filter(Z == 0)
+  tx_units <- m.data3 %>%
+    filter(Z == 1) %>%
+    mutate(subclass_new = 1:n())  # give each tx unit its own subclass,
+                                  # instead of letting multiple tx units share subclass
+  
+  # generate list of dfs, tx unit in first row
+  # TODO: this is terribly slow, for no good reason...
+  cem_matched_gps <- tx_units %>%
+    split(f = ~subclass_new) %>%
+    map(function(d) {
+      d %>% 
+        bind_rows(
+          co_units %>%
+            filter(subclass == d$subclass) %>% 
+            mutate(subclass_new = d$subclass_new))
+    }) %>% 
+    map(~.x %>% 
+          mutate(subclass = subclass_new) %>% 
+          select(-subclass_new, -weights))
+  
+  # estimate outcomes within cells
+  scweights <- est_weights(df,
+                           matched_gps = cem_matched_gps,
+                           dist_scaling = df %>%
+                             summarize(across(starts_with("X"), 
+                                              function(x) {
+                                                if (is.numeric(x)) num_bins / (max(x) - min(x))
+                                                else 1000
+                                              })),
+                           est_method = method)
+  
+  # aggregate outcomes as desired
+  m.data <- switch(return,
+                   sc_units     = agg_sc_units(scweights),
+                   agg_co_units = agg_co_units(scweights),
+                   all          = bind_rows(scweights))
+  
+  return(m.data)
+}
+
+
+
 
 
 

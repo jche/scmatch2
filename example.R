@@ -6,6 +6,7 @@ require(tidyverse)
 source("R/distance.R")
 source("R/sc.R")
 source("R/matching.R")
+source("R/estimate.R")
 
 
 # NAME ASSUMPTIONS:
@@ -83,6 +84,7 @@ attr(calada_scm, "unmatched_units")
 get_att_ests(calada_scm)
 
 
+get_cem_matches(df, num_bins=5, method="average", return="sc_units")
 
 
 
@@ -119,7 +121,8 @@ calada_scm_feasible %>%
   geom_vline(xintercept=CALIPER, lty="dashed") +
   theme_classic() +
   labs(y = "",
-       x = "Scaled distance between tx and sc unit")
+       x = "Scaled distance between tx and sc unit") +
+  theme_classic()
 
 # compare distances to calipers
 #  - see how well scm brings points down from x=y line
@@ -130,7 +133,10 @@ calada_scm_feasible %>%
             by = "id") %>% 
   ggplot(aes(x=adacal, y=dist)) +
   geom_point() +
-  geom_abline(lty="dotted")
+  geom_abline(lty="dotted") +
+  theme_classic() +
+  labs(x = "Adaptive caliper",
+       y = "Dist. between tx and sc unit")
 
 
 # TODO: more analysis on how feasible/infeasible subsamples differ
@@ -151,7 +157,10 @@ scaled_diffs %>%
   ggplot(aes(x=name, y=value)) +
   geom_col() +
   geom_hline(yintercept=0, lty="dotted") +
-  coord_flip()
+  coord_flip() +
+  theme_classic() +
+  labs(y = "Scaled difference between feasible and infeasible subsamples",
+       x = "Covariate")
 
 
 
@@ -165,7 +174,10 @@ calada_scm %>%
   arrange(adacal) %>% 
   mutate(order = 1:n()) %>% 
   ggplot(aes(x=order, y=adacal)) +
-  geom_col()
+  geom_col() +
+  theme_classic() +
+  labs(y = "Adaptive caliper",
+       x = "Unit #")
 
 # ATT estimate vs. # co units added
 calada_scm %>%
@@ -179,7 +191,10 @@ calada_scm %>%
   slice(length(feasible_units):n()) %>% 
   ggplot(aes(x=order, y=cum_avg)) +
   geom_point() +
-  geom_step(linewidth=1)
+  geom_step(linewidth=1) +
+  theme_classic() +
+  labs(y = "Cumulative ATT Estimate",
+       x = "Unit #")
 
 
 # Love plot vs. # co units added
@@ -211,32 +226,6 @@ calada_scm %>%
        color = "Covariate") +
   scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(1,2,3,5)]) +
   theme_classic()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
