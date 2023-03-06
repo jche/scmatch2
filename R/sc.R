@@ -59,48 +59,6 @@ gen_sc_weights <- function(d, match_cols, dist_scaling) {
 
 
 
-# aggregation functions ---------------------------------------------------
-
-
-#' aggregate scweights to tx/sc units
-#'
-#' @param scweights list of sc weights (tibbles with tx unit in first row)
-#'
-#' @return df with tx and corresponding sc units
-agg_sc_units <- function(scweights) {
-  scweights %>% 
-    map_dfr(~mutate(., subclass=id[1])) %>% 
-    group_by(subclass, Z) %>% 
-    summarize(across(starts_with("X"),
-                     ~sum(.x * weights)),
-              across(starts_with("Y"),
-                     ~sum(.x * weights))) %>%
-    mutate(id = c(NA, subclass[1]), .before="subclass") %>% 
-    mutate(weights = 1) %>% 
-    ungroup()
-}
-
-
-#' aggregate sc weights to original tx and (weighted) co units
-#'
-#' @param scweights list of sc weights (tibbles with tx unit in first row)
-#'
-#' @return df with original tx and sc units, with weights
-agg_co_units <- function(scweights) {
-  scweights %>%
-    bind_rows() %>% 
-    group_by(id) %>%
-    summarize(across(-contains("weights"), ~first(.)),
-              weights = sum(weights),
-              subclass = NA,
-              dist = NA) %>%
-    mutate(weights = pmax(weights, 0))
-}
-
-
-
-
-
 
 
 

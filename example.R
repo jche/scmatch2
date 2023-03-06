@@ -7,6 +7,7 @@ source("R/distance.R")
 source("R/sc.R")
 source("R/matching.R")
 source("R/estimate.R")
+source("R/inference.R")
 
 
 # NAME ASSUMPTIONS:
@@ -49,7 +50,36 @@ df <- df %>%
   filter(dataset == "NSWD")
 
 
-# run matching ------------------------------------------------------------
+
+# EDA ---------------------------------------------------------------------
+
+if (F) {
+  # NSWD is...
+  #  - younger, less married
+  #  - less educated, fewer degrees
+  #  - much more black
+  #  - much lower earnings
+  df %>% 
+    group_by(dataset) %>% 
+    summarize(across(X1:X8, mean))
+  
+  # NSWD has...
+  #  - less variance in age/educ/income
+  df %>% 
+    group_by(dataset) %>% 
+    summarize(across(X1:X8, sd))
+  
+  # visualize covariate distributions
+  df %>% 
+    group_by(dataset) %>% 
+    pivot_longer(X1:X8) %>% 
+    ggplot(aes(x=value, color=dataset)) +
+    geom_density() +
+    facet_wrap(~name, scales="free")
+}
+
+
+# set matching settings ---------------------------------------------------
 
 CALIPER <- 1
 METRIC <- "manhattan"   # "maximum", "euclidean", "manhattan"
@@ -65,6 +95,31 @@ DIST_SCALING <- tibble(
   X8 = 1/5000
 )
 
+# DIST_SCALING <- tibble(
+#   X1 = 1/5,
+#   X2 = 1/4,
+#   X3 = 1000,
+#   X4 = 1000,
+#   X5 = 1000,
+#   X6 = 1000,
+#   X7 = 1/10000,
+#   X8 = 1/10000
+# )
+# 
+# DIST_SCALING <- tibble(
+#   X1 = 1/10,
+#   X2 = 1/4,
+#   X3 = 1000,
+#   X4 = 1000,
+#   X5 = 1000,
+#   X6 = 1000,
+#   X7 = 1/20000,
+#   X8 = 1/20000
+# )
+
+
+# run matching ------------------------------------------------------------
+
 calada_scm <- df %>%
   get_cal_matches(caliper = CALIPER,
                   metric = METRIC,
@@ -75,16 +130,9 @@ calada_scm <- df %>%
                   knn = 5,          # for ada
                   num_bins = 5,     # for cem
                   wider = F)        # for cem
-
-attr(calada_scm, "scaling")
-attr(calada_scm, "dm")[1:5,1:5]
-attr(calada_scm, "adacalipers")
-attr(calada_scm, "unmatched_units")
-
 get_att_ests(calada_scm)
 
-
-get_cem_matches(df, num_bins=5, method="average", return="sc_units")
+# get_cem_matches(df, num_bins=5, method="average", return="sc_units")
 
 
 
@@ -99,102 +147,86 @@ feasible_units <- attr(calada_scm, "adacalipers") %>%
 feasible_subclasses <- calada_scm %>% 
   filter(id %in% feasible_units) %>% 
   pull(subclass)
-calada_scm_feasible <- calada_scm %>% 
+feasible <- attr(calada_scm, "scweights") %>% 
+  bind_rows() %>% 
   filter(subclass %in% feasible_subclasses)
 
-# check number of feasible units
-length(feasible_units)
-
-# check att estimate
-get_att_ests(calada_scm_feasible)
-
 # check distances bw each tx/sc pair
-sc_dists <- gen_dm(calada_scm_feasible,
-                   scaling = DIST_SCALING,
-                   method = METRIC) %>% 
+sc_dists <- feasible %>% 
+  agg_sc_units() %>% 
+  gen_dm(scaling = DIST_SCALING,
+         method = METRIC) %>% 
   diag()
-calada_scm_feasible %>% 
-  filter(Z==T) %>% 
-  mutate(dist = sc_dists) %>% 
-  ggplot(aes(x=dist)) +
-  geom_density(linewidth=1) +
-  geom_vline(xintercept=CALIPER, lty="dashed") +
-  theme_classic() +
-  labs(y = "",
-       x = "Scaled distance between tx and sc unit") +
-  theme_classic()
+avg_dists <- feasible %>% 
+  agg_avg_units() %>% 
+  gen_dm(scaling = DIST_SCALING,
+         method = METRIC) %>% 
+  diag()
 
-# compare distances to calipers
-#  - see how well scm brings points down from x=y line
-calada_scm_feasible %>% 
-  filter(Z==T) %>% 
-  mutate(dist = sc_dists) %>% 
-  left_join(attr(calada_scm, "adacalipers"),
-            by = "id") %>% 
-  ggplot(aes(x=adacal, y=dist)) +
+
+if (F) {
+  ids <- feasible %>% 
+    agg_sc_units() %>% 
+    filter(!is.na(id)) %>% 
+    pull(id)
+  tibble(sc_dists = sc_dists,
+         avg_dists = avg_dists) %>% 
+    mutate(id = ids) %>% 
+    filter(sc_dists > avg_dists) %>% 
+    print(n=30)
+  
+  feasible %>% 
+    filter(subclass == 136)
+  feasible %>% 
+    agg_sc_units() %>% 
+    filter(subclass == 136)
+  feasible %>% 
+    agg_avg_units() %>% 
+    filter(subclass == 136)
+  
+  # TODO: double-check that SC units are using the right distance scaling...
+  
+  
+}
+
+
+
+# calada_scm_feasible %>% 
+#   filter(Z==T) %>% 
+#   mutate(dist = sc_dists) %>% 
+#   ggplot(aes(x=dist)) +
+#   geom_density(linewidth=1) +
+#   geom_vline(xintercept=CALIPER, lty="dashed") +
+#   theme_classic() +
+#   labs(y = "",
+#        x = "Scaled distance between tx and sc unit") +
+#   theme_classic()
+
+
+# TODO: simple plot comparing distance between:
+#  - tx unit and simple average control
+#  - tx unit and synthetic control
+
+p <- tibble(sc_dists = sc_dists,
+            avg_dists = avg_dists) %>% 
+  mutate(id = 1:n()) %>% 
+  ggplot(aes(x=sc_dists, y=avg_dists)) +
   geom_point() +
   geom_abline(lty="dotted") +
-  theme_classic() +
-  labs(x = "Adaptive caliper",
-       y = "Dist. between tx and sc unit")
+  theme_classic()
+p
 
+require(ggExtra)
+ggMarginal(p, type="density")
 
-# TODO: more analysis on how feasible/infeasible subsamples differ
-
-# "love plot" for scaled (feasible - infeasible) diffs
-#  - uses scaled cov dists
-scaled_diffs <- calada_scm %>% 
-  filter(Z==T) %>% 
-  mutate(feasible = subclass %in% feasible_subclasses) %>% 
-  group_by(feasible) %>% 
-  summarize(across(starts_with("X"), mean)) %>% 
-  summarize(across(starts_with("X"), ~.x[2]-.x[1])) * 
-  (DIST_SCALING %>% 
-     mutate(across(everything(),
-                   ~ifelse(.x==1000, 1, .x))))
-scaled_diffs %>% 
-  pivot_longer(everything()) %>% 
-  ggplot(aes(x=name, y=value)) +
-  geom_col() +
-  geom_hline(yintercept=0, lty="dotted") +
-  coord_flip() +
-  theme_classic() +
-  labs(y = "Scaled difference between feasible and infeasible subsamples",
-       x = "Covariate")
 
 
 
 # estimate-estimand tradeoff diagnostics ----------------------------------
 
 # maximum caliper vs. # co units added
-calada_scm %>% 
-  filter(!subclass %in% feasible_subclasses) %>% 
-  filter(Z==1) %>% 
-  left_join(attr(calada_scm, "adacalipers"), by="id") %>% 
-  arrange(adacal) %>% 
-  mutate(order = 1:n()) %>% 
-  ggplot(aes(x=order, y=adacal)) +
-  geom_col() +
-  theme_classic() +
-  labs(y = "Adaptive caliper",
-       x = "Unit #")
-
-# ATT estimate vs. # co units added
-calada_scm %>%
-  left_join(attr(calada_scm, "adacalipers"), by="id") %>% 
-  group_by(subclass) %>%
-  summarize(adacal = last(adacal),
-            tx = Y[2] - Y[1]) %>%
-  arrange(adacal) %>%
-  mutate(order = 1:n(),
-         cum_avg = cumsum(tx) / order) %>% 
-  slice(length(feasible_units):n()) %>% 
-  ggplot(aes(x=order, y=cum_avg)) +
-  geom_point() +
-  geom_step(linewidth=1) +
-  theme_classic() +
-  labs(y = "Cumulative ATT Estimate",
-       x = "Unit #")
+require(patchwork)
+satt_plot(calada_scm, B=100)
 
 
 # Love plot vs. # co units added
@@ -212,17 +244,18 @@ calada_scm %>%
          Educ = cumsum(X2) / order,
          Income74 = cumsum(X7) / order,
          Income75 = cumsum(X8) / order) %>% 
-  slice(length(feasible_units):n()) %>%
+  slice((length(feasible_units)+1):n()) %>%
+  mutate(order = 1:n()) %>% 
   pivot_longer(Age:Income75) %>% 
-  ggplot(aes(x=order, y=value)) +
+ggplot(aes(x=order, y=value)) +
   geom_point(data=. %>% slice(1:4), 
              aes(color=name), size=2) +
-  geom_step(aes(group=name, color=name), size=1.1) +
+  geom_step(aes(group=name, color=name), linewidth=1.1) +
   expand_limits(y = 0) +
   geom_hline(yintercept=0, lty="dotted") +
   facet_wrap(~name, scales="free_y") +
   labs(y = "\n Covariate balance (tx-co)",
-       x = "Maximum caliper size used",
+       x = "Number of units added",
        color = "Covariate") +
   scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(1,2,3,5)]) +
   theme_classic()
@@ -232,5 +265,13 @@ calada_scm %>%
 
 
 
+### naive bootstrap
+
+boot_naive_res <- boot_naive(df, 
+                             caliper = CALIPER,
+                             metric = METRIC,
+                             cal_method = CAL_METHOD,
+                             dist_scaling = DIST_SCALING,
+                             B = 50)
 
 
