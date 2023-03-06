@@ -35,6 +35,11 @@ gen_dm <- function(df,
   # scale covariate df, according to implicit distance metric
   #  - note: coerce non-numeric factor columns to integer values
   #  - note: coerces T/F into 1/2 instead of 1/0, but this is ok
+  # covs becomes:  covs * scaling
+  #               (nxp)    (pxp)
+  #  --> so dist2 is basically using V(x1-x2) rather than (x1-x2),
+  #      for V = scaling
+  #   - this means that euclidean distance has a (V^T V) scale!
   covs <- covs %>%
     mutate(across(!where(is.numeric), ~as.numeric(as.factor(.)))) %>%
     as.matrix() %*%

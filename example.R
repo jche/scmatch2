@@ -8,6 +8,7 @@ source("R/sc.R")
 source("R/matching.R")
 source("R/estimate.R")
 source("R/inference.R")
+source("R/diagnostic_plots.R")
 
 
 # NAME ASSUMPTIONS:
@@ -82,7 +83,7 @@ if (F) {
 # set matching settings ---------------------------------------------------
 
 CALIPER <- 1
-METRIC <- "manhattan"   # "maximum", "euclidean", "manhattan"
+METRIC <- "euclidean"   # "maximum", "euclidean", "manhattan"
 CAL_METHOD <- "ada"   # "ada", "cem"
 DIST_SCALING <- tibble(
   X1 = 1/3,
@@ -164,6 +165,8 @@ avg_dists <- feasible %>%
   diag()
 
 
+# identify places where average does better than sc
+#  (this should never happen)
 if (F) {
   ids <- feasible %>% 
     agg_sc_units() %>% 
@@ -175,17 +178,19 @@ if (F) {
     filter(sc_dists > avg_dists) %>% 
     print(n=30)
   
+  foo <- 153
   feasible %>% 
-    filter(subclass == 136)
+    filter(subclass == foo)
   feasible %>% 
     agg_sc_units() %>% 
-    filter(subclass == 136)
+    filter(subclass == foo)
   feasible %>% 
     agg_avg_units() %>% 
-    filter(subclass == 136)
+    filter(subclass == foo)
   
-  # TODO: double-check that SC units are using the right distance scaling...
   
+  # NOTE: SC units are minimizing Euclidean distance...
+  #  - should we try to make them minimize L_infty distance?
   
 }
 

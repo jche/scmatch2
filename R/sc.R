@@ -16,6 +16,8 @@ synth_qp <- function(X1, X0, V) {
   l <- c(1, numeric(n0))
   u <- c(1, rep(1, n0))
   
+  # browser()
+  
   settings = osqp::osqpSettings(verbose = FALSE,
                                 eps_rel = 1e-8,
                                 eps_abs = 1e-8)
@@ -34,13 +36,14 @@ gen_sc_weights <- function(d, match_cols, dist_scaling) {
   if (nrow(d) == 0) {
     return(tibble())
   } else if (nrow(d) == 2) {
-    d %>% 
-      mutate(unit = c("tx1", "c1"),
-             weights = c(1,1)) %>% 
-      return()
+    return(d %>% 
+             mutate(unit = c("tx1", "c1"),
+                    weights = c(1,1)))
   }
+  # browser()
   
   # run osqp
+  #  - note: square V, since we use (V^T V) within the euclidean distance!
   sol <- synth_qp(X1 = d[1,] %>% 
                     select(all_of(match_cols)) %>% 
                     as.numeric(),
@@ -50,6 +53,7 @@ gen_sc_weights <- function(d, match_cols, dist_scaling) {
                   V  = dist_scaling %>% 
                     select(all_of(match_cols)) %>% 
                     as.numeric() %>% 
+                    map_dbl(~.x^2) %>% 
                     diag())
   
   d %>% 
