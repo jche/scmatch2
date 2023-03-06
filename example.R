@@ -83,7 +83,7 @@ if (F) {
 # set matching settings ---------------------------------------------------
 
 CALIPER <- 1
-METRIC <- "euclidean"   # "maximum", "euclidean", "manhattan"
+METRIC <- "maximum"   # "maximum", "euclidean", "manhattan"
 CAL_METHOD <- "ada"   # "ada", "cem"
 DIST_SCALING <- tibble(
   X1 = 1/3,
@@ -128,7 +128,7 @@ calada_scm <- df %>%
                   dist_scaling = DIST_SCALING,
                   est_method = "scm",
                   return = "sc_units",
-                  knn = 5,          # for ada
+                  knn = 25,         # for ada
                   num_bins = 5,     # for cem
                   wider = F)        # for cem
 get_att_ests(calada_scm)
@@ -139,91 +139,16 @@ get_att_ests(calada_scm)
 
 # FSATT results -----------------------------------------------------------
 
-# note: this section uses return="sc_units" output
-
-# get feasible tx units
-feasible_units <- attr(calada_scm, "adacalipers") %>% 
-  filter(adacal <= CALIPER) %>% 
-  pull(id)
-feasible_subclasses <- calada_scm %>% 
-  filter(id %in% feasible_units) %>% 
-  pull(subclass)
 feasible <- attr(calada_scm, "scweights") %>% 
   bind_rows() %>% 
-  filter(subclass %in% feasible_subclasses)
+  filter(subclass %in% attr(calada_scm, "feasible_subclasses"))
 
-# check distances bw each tx/sc pair
-sc_dists <- feasible %>% 
-  agg_sc_units() %>% 
-  gen_dm(scaling = DIST_SCALING,
-         method = METRIC) %>% 
-  diag()
-avg_dists <- feasible %>% 
-  agg_avg_units() %>% 
-  gen_dm(scaling = DIST_SCALING,
-         method = METRIC) %>% 
-  diag()
+# compare distances between units represented by average and sc weights
+# scm_vs_avg_plot(feasible, DIST_SCALING, METRIC)
+dist_density_plot(feasible, DIST_SCALING, METRIC)
 
-
-# identify places where average does better than sc
-#  (this should never happen)
-if (F) {
-  ids <- feasible %>% 
-    agg_sc_units() %>% 
-    filter(!is.na(id)) %>% 
-    pull(id)
-  tibble(sc_dists = sc_dists,
-         avg_dists = avg_dists) %>% 
-    mutate(id = ids) %>% 
-    filter(sc_dists > avg_dists) %>% 
-    print(n=30)
-  
-  foo <- 153
-  feasible %>% 
-    filter(subclass == foo)
-  feasible %>% 
-    agg_sc_units() %>% 
-    filter(subclass == foo)
-  feasible %>% 
-    agg_avg_units() %>% 
-    filter(subclass == foo)
-  
-  
-  # NOTE: SC units are minimizing Euclidean distance...
-  #  - should we try to make them minimize L_infty distance?
-  
-}
-
-
-
-# calada_scm_feasible %>% 
-#   filter(Z==T) %>% 
-#   mutate(dist = sc_dists) %>% 
-#   ggplot(aes(x=dist)) +
-#   geom_density(linewidth=1) +
-#   geom_vline(xintercept=CALIPER, lty="dashed") +
-#   theme_classic() +
-#   labs(y = "",
-#        x = "Scaled distance between tx and sc unit") +
-#   theme_classic()
-
-
-# TODO: simple plot comparing distance between:
-#  - tx unit and simple average control
-#  - tx unit and synthetic control
-
-p <- tibble(sc_dists = sc_dists,
-            avg_dists = avg_dists) %>% 
-  mutate(id = 1:n()) %>% 
-  ggplot(aes(x=sc_dists, y=avg_dists)) +
-  geom_point() +
-  geom_abline(lty="dotted") +
-  theme_classic()
-p
-
-require(ggExtra)
-ggMarginal(p, type="density")
-
+# compare ESS
+ess_plot(feasible)
 
 
 
@@ -249,7 +174,7 @@ calada_scm %>%
          Educ = cumsum(X2) / order,
          Income74 = cumsum(X7) / order,
          Income75 = cumsum(X8) / order) %>% 
-  slice((length(feasible_units)+1):n()) %>%
+  slice((length(attr(calada_scm, "feasible_units"))+1):n()) %>%
   mutate(order = 1:n()) %>% 
   pivot_longer(Age:Income75) %>% 
 ggplot(aes(x=order, y=value)) +

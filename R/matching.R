@@ -70,7 +70,8 @@ get_cal_matches <- function(df,
   scweights <- est_weights(df,
                            matched_gps = scmatches$matches,
                            dist_scaling = dist_scaling,
-                           est_method = est_method)
+                           est_method = est_method,
+                           metric = metric)
   
   ### use return: sc units, aggregated weights per control, all weights
   m.data <- switch(return,
@@ -86,15 +87,29 @@ get_cal_matches <- function(df,
                         \t {paste(unmatched_units, collapse=\", \")}"))
   }
   
-  # join each treated unit to its adaptive caliper
+  # aggregate results
   res <- m.data
-  attr(res, "scaling") <- dist_scaling
-  attr(res, "adacalipers") <- tibble(
+  
+  # store information about scaling and adaptive calipers
+  adacalipers_df <- tibble(
     id = df %>% filter(Z == 1) %>% pull(id),
     adacal = scmatches$adacalipers)
+  attr(res, "scaling") <- dist_scaling
+  attr(res, "adacalipers") <- adacalipers_df
+  
+  # store information about feasible units/subclasses
+  feasible_units <- adacalipers_df %>% 
+    filter(adacal <= caliper) %>% 
+    pull(id)
+  attr(res, "unmatched_units") <- unmatched_units
+  attr(res, "feasible_units")  <- feasible_units
+  attr(res, "feasible_subclasses") <- res %>% 
+    filter(id %in% feasible_units) %>% 
+    pull(subclass)
+  
+  # keep a bunch of data around, just in case
   attr(res, "scweights") <- scweights
   attr(res, "dm") <- scmatches$dm
-  attr(res, "unmatched_units") <- unmatched_units
   
   return(res)
 }
@@ -228,8 +243,10 @@ gen_matches <- function(df,
 est_weights <- function(df, 
                         matched_gps, 
                         dist_scaling,
-                        est_method = c("scm", "average")) {
+                        est_method = c("scm", "average"),
+                        metric = c("maximum", "euclidean", "manhattan")) {
   est_method = match.arg(est_method)
+  metric = match.arg(metric)
   
   if (est_method == "scm") {
     # generate SCM matching formula
@@ -240,7 +257,7 @@ est_weights <- function(df,
       names()
     
     scweights <- map(matched_gps, 
-                     ~gen_sc_weights(.x, match_cols, dist_scaling),
+                     ~gen_sc_weights(.x, match_cols, dist_scaling, metric),
                      .progress="Producing SCM units...")   # add progress bar
   } else if (est_method == "average") {
     scweights <- map(matched_gps,
@@ -317,7 +334,8 @@ get_cem_matches <- function(
                                                 if (is.numeric(x)) num_bins / (max(x) - min(x))
                                                 else 1000
                                               })),
-                           est_method = method)
+                           est_method = method,
+                           metric = "maximum")
   
   # aggregate outcomes as desired
   m.data <- switch(return,
