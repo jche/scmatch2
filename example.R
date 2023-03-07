@@ -145,7 +145,8 @@ feasible <- attr(calada_scm, "scweights") %>%
 
 # compare distances between units represented by average and sc weights
 # scm_vs_avg_plot(feasible, DIST_SCALING, METRIC)
-dist_density_plot(feasible, DIST_SCALING, METRIC)
+dist_density_plot(feasible, DIST_SCALING, METRIC) +
+  theme(legend.position = c(0.82,0.68))
 ggsave("writeup/figures/lalonde_dist.png", height=3, width=5)
 
 # compare ESS

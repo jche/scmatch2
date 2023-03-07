@@ -34,15 +34,14 @@ dist_density_plot <- function(d, dist_scaling, metric) {
          Average = avg_dists,
          "1-NN" = nn_dists) %>% 
     pivot_longer(everything()) %>% 
-    mutate(name = factor(name, levels=c("Average", "SCM", "1-NN"))) %>% 
+    mutate(name = factor(name, levels=c("SCM", "Average", "1-NN"))) %>% 
     ggplot(aes(x=value, color=name)) +
     geom_density(linewidth=1) +
     theme_classic() +
-    scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(1,4,5)]) +
+    scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(5,4,1)]) +
     labs(y = "Density",
          x = "Distance between treated unit and corresponding control",
-         color = "Method used \nto generate \ncorresponding \ncontrol") +
-    theme(legend.position = c(0.85,0.65))
+         color = "Method used \nto generate \ncorresponding \ncontrol")
 }
 
 scm_vs_avg_plot <- function(d, dist_scaling, metric) {
@@ -121,24 +120,23 @@ ess_plot <- function(d) {
   df_tx <- d %>% 
     filter(Z==T)
   
-  vars_df <- list(df_tx, df_avg, df_sc, df_1nn) %>% 
+  vars_df <- list(df_tx, df_sc, df_avg, df_1nn) %>% 
     map_dbl(~ .x %>% 
               agg_co_units() %>% 
               summarize(var = sum(weights^2)) %>% 
               pull(var)) %>% 
-    tibble(method = c("tx", "avg", "sc", "1nn"),
+    tibble(method = c("tx", "sc", "avg", "1nn"),
            var = .)
   
   vars_df %>% 
-    mutate(method = factor(method, levels=c("tx", "avg", "sc", "1nn"))) %>% 
+    mutate(method = factor(method, levels=c("tx", "sc", "avg", "1nn"))) %>% 
     ggplot(aes(x=method, y=var)) +
-    geom_col(aes(fill = method=="tx")) +
-    scale_fill_manual(values = c("gray", 
-                                 # wesanderson::wes_palette("Zissou1", 5)[5])) +
-                                 "black")) +
+    geom_col(aes(fill = method)) +
+    scale_fill_manual(values = c("black",
+                                 wesanderson::wes_palette("Zissou1", 5)[c(5,4,1)])) +
     scale_x_discrete(labels = c("Treated units",
-                                "Control units \n(Average weights)", 
                                 "Control units \n(SCM weights)", 
+                                "Control units \n(Average weights)", 
                                 "Control units \n(1-NN weights)")) +
     theme_classic() +
     guides(fill="none") +
