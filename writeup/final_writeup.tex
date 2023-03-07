@@ -931,11 +931,28 @@ For example, if we set $K_3 = 1$, we would consider two units who are exactly ma
 
 We then conduct CSM using $d_V^{(\infty)}$ as defined above.
 For each treated unit $t$, we use an adaptive caliper $c_t = \max \{1, d_t\}$, so that treated units without any matches within the chosen covariatewise caliper are matched to their nearest neighbor.
-We finaly construct synthetic control units using the linear program described in Appendix \ref{app:scm}.
+We finally construct synthetic control units using the linear program described in Appendix \ref{app:scm} and estimate the FSATT and SATT.
 
-We divide the diagnostic plots for CSM into two categories: plots that assess estimation of the FSATT, and plots that assess the estimate-estimand tradeoff.
-First, we illustrate how synthetic controls affect potential bias and variance for estimating the FSATT.
+Figures \ref{fig:lalonde_dist} and \ref{fig:lalonde_ess} illustrate how synthetic controls impact the bias and variance of the final FSATT estimate.
+For reference, we compare synthetic controls to two baseline estimation strategies: 
+\begin{enumerate}
+    \item Simple average: for each treated unit $t$, estimate $Y_t(0)$ using $\frac{1}{|\Ct|} \sum_{j \in \Ct} Y_j$.
+    \item One-nearest-neighbor: for each treated unit $t$, estimate $Y_t(0)$ using $Y_{j^*}$, where $j^*$ indexes its nearest control-unit neighbor in $\Ct$.
+\end{enumerate}
 
+Figure \ref{fig:lalonde_dist} shows density plots of the $d_V^{(\infty)}$ distances between the covariates of each treated unit $t$ and its corresponding control.
+For the  ``SCM,'' ``Average,'' and ``1-NN'' methods, we construct the covariates of the corresponding controls as $\sum_{j \in \Ct} w_{jt} \Xj$, $\frac{1}{|\Ct|} \sum_{j \in \Ct} \Xj$, and $\mathbf{X}_{j^*}$, respectively.
+\begin{figure}[ht]
+    \centering
+    \includegraphics{writeup/figures/lalonde_dist.png}
+    \caption{Density plots of covariate distances between treated units and their corresponding controls.}
+    \label{fig:lalonde_dist}
+\end{figure}
+Figure \ref{fig:lalonde_dist} shows that distances are generally smaller for controls constructed using SCM than for controls constructed using a naive average or one-nearest-neighbor.
+
+
+
+Figure \ref{fig:lalonde_dist} visualizes potential extrapolation bias.
 
 \note{Highlight HERE that marginal balance plots don't tell the whole story. They're a bad summary because we're bad at visualizing higher dimensions, but they're useful.}
 
