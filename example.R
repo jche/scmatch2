@@ -36,20 +36,28 @@ lalonde <- read_csv("lalonde.csv") %>%
                      rep("CPS", 15992)),
          across(c(black, hispanic, married, nodegree), as.logical)) %>% 
   select(id, Z, Y,
-         age, education, black, hispanic, married, nodegree, re74, re75,
+         black, hispanic, married, nodegree, 
+         age, education, re74, re75,
          dataset)
 
 # rename variables for my matching methods
 df <- lalonde %>%
-  rename(X1=age, X2=education, 
-         X3=black, X4=hispanic, 
-         X5=married, X6=nodegree, 
+  rename(X1=black, X2=hispanic, 
+         X3=married, X4=nodegree, 
+         X5=age, X6=education,
          X7=re74, X8=re75)
 
-# for now, use only experimental data
-df <- df %>% 
-  filter(dataset == "NSWD")
+# # for now, use only experimental data
+# df <- df %>%
+#   filter(dataset == "NSWD")
 
+# # use experimental treateds and all controls
+# df <- df %>% 
+#   filter(Z==T | (dataset=="CPS" & Z==F))
+
+# use experimental treateds and nonexperimental controls
+df <- df %>% 
+  filter((dataset == "NSWD" & Z==T) | (dataset=="CPS" & Z==F))
 
 
 # EDA ---------------------------------------------------------------------
@@ -86,12 +94,12 @@ CALIPER <- 1
 METRIC <- "maximum"   # "maximum", "euclidean", "manhattan"
 CAL_METHOD <- "ada"   # "ada", "cem"
 DIST_SCALING <- tibble(
-  X1 = 1/3,
-  X2 = 1/2,
+  X1 = 1000,
+  X2 = 1000,
   X3 = 1000,
   X4 = 1000,
-  X5 = 1000,
-  X6 = 1000,
+  X5 = 1/3,
+  X6 = 1,
   X7 = 1/5000,
   X8 = 1/5000
 )
@@ -128,7 +136,7 @@ calada_scm <- df %>%
                   dist_scaling = DIST_SCALING,
                   est_method = "scm",
                   return = "sc_units",
-                  knn = 25,         # for ada
+                  knn = 10,         # for ada
                   num_bins = 5,     # for cem
                   wider = F)        # for cem
 get_att_ests(calada_scm)
@@ -142,6 +150,8 @@ get_att_ests(calada_scm)
 feasible <- attr(calada_scm, "scweights") %>% 
   bind_rows() %>% 
   filter(subclass %in% attr(calada_scm, "feasible_subclasses"))
+get_att_ests(feasible)
+
 
 # compare distances between units represented by average and sc weights
 # scm_vs_avg_plot(feasible, DIST_SCALING, METRIC)
@@ -158,41 +168,17 @@ ggsave("writeup/figures/lalonde_ess.png", height=3, width=5)
 
 # maximum caliper vs. # co units added
 require(patchwork)
-satt_plot(calada_scm, B=100)
+set.seed(1)
+satt_plot(calada_scm, B=100) +
+  geom_hline(yintercept=0, lty="dotted")
 ggsave("writeup/figures/lalonde_att.png", height=4, width=5)
 
 
 # Love plot vs. # co units added
-calada_scm %>%
-  left_join(attr(calada_scm, "adacalipers"), by="id") %>% 
-  group_by(subclass) %>%
-  summarize(adacal = last(adacal),
-            X1 = X1[2] - X1[1],
-            X2 = X2[2] - X2[1],
-            X7 = X7[2] - X7[1],
-            X8 = X8[2] - X8[1]) %>%
-  arrange(adacal) %>%
-  mutate(order = 1:n(),
-         Age = cumsum(X1) / order,
-         Education = cumsum(X2) / order,
-         Income74 = cumsum(X7) / order,
-         Income75 = cumsum(X8) / order) %>% 
-  slice((length(attr(calada_scm, "feasible_units"))+1):n()) %>%
-  pivot_longer(Age:Income75) %>% 
-ggplot(aes(x=order, y=value)) +
-  geom_point(data=. %>% slice(1:4), 
-             aes(color=name), size=2) +
-  geom_step(aes(group=name, color=name), linewidth=1.1) +
-  expand_limits(y = 0) +
-  geom_hline(yintercept=0, lty="dotted") +
-  facet_wrap(~name, scales="free_y") +
-  labs(y = "\n Covariate balance (tx-co)",
-       x = "Total number of treated units used",
-       color = "Covariate") +
-  scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(1,2,3,5)]) +
-  guides(color=F) +
-  theme_classic()
-
+set.seed(2)
+love_plot(calada_scm, covs=paste0("X",5:8), B=100) +
+  scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(5,3,2,1)]) +
+  guides(color=F)
 ggsave("writeup/figures/lalonde_love.png", height=3, width=5)
 
 

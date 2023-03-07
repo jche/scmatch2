@@ -225,3 +225,68 @@ satt_plot <- function(res, B=NA) {
 }
 
 
+
+# love plot ---------------------------------------------------------------
+
+love_plot <- function(res, covs, B=NA) {
+  feasible_subclasses <- attr(res, "feasible_subclasses")
+  n_feasible <- length(feasible_subclasses)
+  
+  love_steps <- res %>%
+    left_join(attr(res, "adacalipers"), by="id") %>% 
+    group_by(subclass) %>%
+    summarize(adacal = last(adacal),
+              across(all_of(covs),
+                     ~.[2] - .[1])) %>%
+    arrange(adacal) %>%
+    mutate(order = 1:n(),
+           across(all_of(covs),
+                  ~cumsum(.) / order)) %>% 
+    slice((n_feasible+1):n()) %>%
+    pivot_longer(all_of(covs))
+  
+  p <- love_steps %>% 
+    ggplot(aes(x=order, color=name)) +
+    geom_point(data=. %>% slice(1:length(covs)), 
+               aes(y=value), size=2) +
+    geom_step(aes(y=value, group=name), linewidth=1.1) +
+    expand_limits(y = 0) +
+    geom_hline(yintercept=0, lty="dotted") +
+    facet_wrap(~name, scales="free_y") +
+    labs(y = "\n Covariate balance (tx-co)",
+         x = "Total number of treated units used",
+         color = "Covariate") +
+    theme_classic()
+  
+  if (!is.na(B)) {
+    # bootstrap dists of FSATT and SATT
+    boot_fsatt <- attr(res, "scweights") %>% 
+      bind_rows() %>% 
+      filter(subclass %in% feasible_subclasses) %>% 
+      agg_co_units() %>% 
+      boot_bayesian_covs(covs=covs, B=B) %>% 
+      pivot_longer(everything()) %>% 
+      group_by(name) %>% 
+      summarize(q025 = quantile(value, 0.025),
+                q975 = quantile(value, 0.975)) %>% 
+      mutate(order = n_feasible+1)
+    
+    boot_satt <- attr(res, "scweights") %>% 
+      agg_co_units() %>% 
+      boot_bayesian_covs(covs=covs, B=B) %>% 
+      pivot_longer(everything()) %>% 
+      group_by(name) %>% 
+      summarize(q025 = quantile(value, 0.025),
+                q975 = quantile(value, 0.975)) %>% 
+      mutate(order = max(love_steps$order))
+    
+    p <- p +
+      geom_errorbar(data=bind_rows(boot_fsatt, boot_satt),
+                    aes(ymin=q025, ymax=q975),
+                    width = 1)
+  }
+  
+  return(p)
+  
+}
+

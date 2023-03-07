@@ -31,6 +31,23 @@ boot_bayesian <- function(d, B=100) {
 }
 
 
+# bootstrap the covariates
+boot_bayesian_covs <- function(d, covs, B=100) {
+  map_dfr(1:B,
+          .progress = "Bootstrapping...",
+          function(b) {
+            d %>% 
+              mutate(weights = weights * 
+                       as.numeric(gtools::rdirichlet(1, alpha=rep(1,nrow(d)))) *
+                       nrow(d)) %>% 
+              group_by(Z) %>% 
+              summarize(across(all_of(covs),
+                               ~sum(.*weights) / sum(weights))) %>% 
+              summarize(across(all_of(covs),
+                               ~last(.) - first(.)))
+          })
+}
+
 
 
 # naive bootstrap ---------------------------------------------------------
