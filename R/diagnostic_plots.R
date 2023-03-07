@@ -42,7 +42,7 @@ dist_density_plot <- function(d, dist_scaling, metric) {
     labs(y = "Density",
          x = "Distance between treated unit and corresponding control",
          color = "Method used \nto generate \ncorresponding \ncontrol") +
-    theme(legend.position = c(0.9,0.7))
+    theme(legend.position = c(0.85,0.65))
 }
 
 scm_vs_avg_plot <- function(d, dist_scaling, metric) {
@@ -142,7 +142,7 @@ ess_plot <- function(d) {
                                 "Control units \n(1-NN weights)")) +
     theme_classic() +
     guides(fill="none") +
-    labs(y = "Variance associated with set of units",
+    labs(y = "Variance associated \nwith set of units",
          x = "")
 }
 
@@ -151,21 +151,22 @@ ess_plot <- function(d) {
 
 satt_plot <- function(res, B=NA) {
   feasible_subclasses <- attr(res, "feasible_subclasses")
+  n_feasible <- length(feasible_subclasses)
   
   ggd_maxcal <- res %>% 
     filter(!subclass %in% feasible_subclasses) %>% 
     filter(Z==1) %>% 
     left_join(attr(res, "adacalipers"), by="id") %>% 
     arrange(adacal) %>% 
-    mutate(order = 1:n())
+    mutate(order = 1:n() + n_feasible)
   
   p1 <- ggd_maxcal %>% 
     ggplot(aes(x=order, y=adacal)) +
     geom_col(fill="gray") +
     geom_hline(yintercept=CALIPER, lty="dotted") +
     theme_classic() +
-    labs(y = "Adaptive caliper",
-         x = "Number of units added")
+    labs(y = "Largest adaptive \ncaliper used",
+         x = "Total number of treated units used")
   
   # ATT estimate vs. # co units added
   ggd_att <- res %>%
@@ -176,7 +177,7 @@ satt_plot <- function(res, B=NA) {
     arrange(adacal) %>%
     mutate(cum_avg = cumsum(tx) / (1:n()) ) %>% 
     slice((length(attr(res, "feasible_units"))+1):n()) %>% 
-    mutate(order = 1:n()) 
+    mutate(order = 1:n() + n_feasible) 
   
   p2 <- ggd_att %>% 
     ggplot(aes(x=order, y=cum_avg)) +
@@ -184,7 +185,7 @@ satt_plot <- function(res, B=NA) {
     geom_step(linewidth=1) +
     theme_classic() +
     labs(y = "Cumulative ATT Estimate",
-         x = "Number of units added")
+         x = "Total number of treated units used")
   
   if (!is.na(B)) {
     # bootstrap dists of FSATT and SATT

@@ -146,10 +146,11 @@ feasible <- attr(calada_scm, "scweights") %>%
 # compare distances between units represented by average and sc weights
 # scm_vs_avg_plot(feasible, DIST_SCALING, METRIC)
 dist_density_plot(feasible, DIST_SCALING, METRIC)
+ggsave("writeup/figures/lalonde_dist.png", height=3, width=5)
 
 # compare ESS
 ess_plot(feasible)
-
+ggsave("writeup/figures/lalonde_ess.png", height=3, width=5)
 
 
 # estimate-estimand tradeoff diagnostics ----------------------------------
@@ -157,6 +158,7 @@ ess_plot(feasible)
 # maximum caliper vs. # co units added
 require(patchwork)
 satt_plot(calada_scm, B=100)
+ggsave("writeup/figures/lalonde_att.png", height=4, width=5)
 
 
 # Love plot vs. # co units added
@@ -171,11 +173,10 @@ calada_scm %>%
   arrange(adacal) %>%
   mutate(order = 1:n(),
          Age = cumsum(X1) / order,
-         Educ = cumsum(X2) / order,
+         Education = cumsum(X2) / order,
          Income74 = cumsum(X7) / order,
          Income75 = cumsum(X8) / order) %>% 
   slice((length(attr(calada_scm, "feasible_units"))+1):n()) %>%
-  mutate(order = 1:n()) %>% 
   pivot_longer(Age:Income75) %>% 
 ggplot(aes(x=order, y=value)) +
   geom_point(data=. %>% slice(1:4), 
@@ -185,10 +186,13 @@ ggplot(aes(x=order, y=value)) +
   geom_hline(yintercept=0, lty="dotted") +
   facet_wrap(~name, scales="free_y") +
   labs(y = "\n Covariate balance (tx-co)",
-       x = "Number of units added",
+       x = "Total number of treated units used",
        color = "Covariate") +
   scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(1,2,3,5)]) +
+  guides(color=F) +
   theme_classic()
+
+ggsave("writeup/figures/lalonde_love.png", height=3, width=5)
 
 
 
