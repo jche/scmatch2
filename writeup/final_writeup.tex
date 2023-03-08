@@ -916,9 +916,12 @@ Ideal sim study: shows CSM works well even compared to balancing/doubly robust a
 \subsection{Toy example: Lalonde (1986)}
 \label{sec:lalonde}
 
+\note{A helpful feature: figure out which covariates are causing the most data to drop. Simple approach: marginal grid for each covariate, count number of feasible tx units and total number of matched controls}
+
 To illustrate an application of CSM, we analyze the Lalonde dataset \citep{lalonde1986evaluating}, a canonical benchmark dataset.
 The goal is to measure the impact of the National Supported Work (NSW) job training program on participants' real earnings in 1978.
 Measured covariates include general demographic and education information as well as past earnings.
+We consider the subsample of experimental treated units used in \citet{dehejia1999causal} and control units from the full Current Population Survey file, leading to a total of 185 treated and asdf control units.
 For further details about the dataset, we refer readers to the excellent overview provided in \citet{diamond2013genetic}.
 
 To conduct CSM, we first select a distance metric and a covariatewise caliper.
@@ -933,26 +936,41 @@ We then conduct CSM using $d_V^{(\infty)}$ as defined above.
 For each treated unit $t$, we use an adaptive caliper $c_t = \max \{1, d_t\}$, so that treated units without any matches within the chosen covariatewise caliper are matched to their nearest neighbor.
 We finally construct synthetic control units using the linear program described in Appendix \ref{app:scm} and estimate the FSATT and SATT.
 
-Figures \ref{fig:lalonde_dist} and \ref{fig:lalonde_ess} illustrate how synthetic controls impact the bias and variance of the final FSATT estimate.
+Figures asdf and asdf assess the estimate-estimand tradeoff.
+For the chosen caliper, 145 of the 185 treated units in the data
+
+
+
+
+
+
+
+
+
+
+
+
+
+Figures \ref{fig:lalonde_dist} and \ref{fig:lalonde_ess} illustrate how synthetic controls impact the bias and variance of the FSATT estimate.
 For reference, we compare synthetic controls to two baseline estimation strategies: 
 \begin{enumerate}
     \item Simple average: for each treated unit $t$, estimate $Y_t(0)$ using $\frac{1}{|\Ct|} \sum_{j \in \Ct} Y_j$.
     \item One-nearest-neighbor: for each treated unit $t$, estimate $Y_t(0)$ using $Y_{j^*}$, where $j^*$ indexes its nearest control-unit neighbor in $\Ct$.
 \end{enumerate}
 
-Figure \ref{fig:lalonde_dist} shows density plots of the $d_V^{(\infty)}$ distances between the covariates of each treated unit $t$ and its corresponding control.
-For the  ``SCM,'' ``Average,'' and ``1-NN'' methods, we construct the covariates of the corresponding controls as $\sum_{j \in \Ct} w_{jt} \Xj$, $\frac{1}{|\Ct|} \sum_{j \in \Ct} \Xj$, and $\mathbf{X}_{j^*}$, respectively.
+Figure \ref{fig:lalonde_dist} visualizes potential extrapolation bias.
+
+Generally speaking, convex weighted sums imply a linear interpolation to the covariates of the corresponding control ().\footnote{See Appendix \ref{app:scm} for details.}
+
+Figure \ref{fig:lalonde_dist} shows density plots of the $d_V^{(\infty)}$ distances between the covariates of each treated unit $t$ and its corresponding control, constructed as $\sum_{j \in \Ct} w_{jt} \Xj$, $\frac{1}{|\Ct|} \sum_{j \in \Ct} \Xj$, and $\mathbf{X}_{j^*}$, for the ``SCM,'' ``Average,'' and ``1-NN'' estimation methods, respectively.
 \begin{figure}[ht]
     \centering
     \includegraphics{writeup/figures/lalonde_dist.png}
     \caption{Density plots of covariate distances between treated units and their corresponding controls.}
     \label{fig:lalonde_dist}
 \end{figure}
-Figure \ref{fig:lalonde_dist} shows that distances are generally smaller for controls constructed using SCM than for controls constructed using a naive average or one-nearest-neighbor.
+As expected, we see that these distances are much smaller for the synthetic controls, which are constructed precisely to minimize $d_V^{(\infty)}(\Xt, \sum_{j \in \Ct} w_{jt} \Xj)$.
 
-
-
-Figure \ref{fig:lalonde_dist} visualizes potential extrapolation bias.
 
 \note{Highlight HERE that marginal balance plots don't tell the whole story. They're a bad summary because we're bad at visualizing higher dimensions, but they're useful.}
 
