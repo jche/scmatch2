@@ -307,7 +307,7 @@ satt_plot3 <- function(res, B=NA) {
     arrange(adacal) %>%
     mutate(order = 1:n(),
            cum_avg = cumsum(tx) / order ) %>% 
-    slice((n_feasible+1):n())
+    slice((n_feasible):n())
   
   p <- ggd_att %>% 
     ggplot(aes(x=order, y=cum_avg)) +

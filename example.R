@@ -175,8 +175,9 @@ set.seed(1)
 #   geom_hline(yintercept=0, lty="dotted")
 satt_plot3(calada_scm, B=100) +
   geom_hline(yintercept=0, lty="dotted") +
-  theme(legend.direction="horizontal",
-        legend.position = c(0.5, 0.9),
+  theme(# legend.direction="horizontal",
+        # legend.position = c(0.5, 0.9),
+        legend.position = "bottom",
         legend.background = element_blank(),
         legend.box.background = element_rect(colour = "black"))
 ggsave("writeup/figures/lalonde_att.png", height=3, width=5)
