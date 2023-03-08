@@ -224,6 +224,145 @@ satt_plot <- function(res, B=NA) {
   p1/p2
 }
 
+satt_plot2 <- function(res, B=NA) {
+  feasible_subclasses <- attr(res, "feasible_subclasses")
+  n_feasible <- length(feasible_subclasses)
+  
+  # ATT estimate vs. # co units added
+  ggd_att <- res %>%
+    left_join(attr(res, "adacalipers"), by="id") %>% 
+    group_by(subclass) %>%
+    summarize(adacal = last(adacal),
+              tx = Y[2] - Y[1]) %>%
+    arrange(adacal) %>%
+    mutate(order = 1:n(),
+           cum_avg = cumsum(tx) / order ) %>% 
+    slice((n_feasible+1):n())
+  
+  foo <- ggd_att %>% 
+    group_by(adacal) %>% 
+    summarize(cum_avg = last(cum_avg),
+              n = n()) %>% 
+    mutate(shape = ifelse(n==1, 20, 19))
+  p <- ggd_att %>% 
+    ggplot(aes(x=adacal, y=cum_avg)) +
+    geom_point(data = foo,
+               aes(shape = shape),
+               size=2) +
+    geom_step() +
+    theme_classic() +
+    labs(y = "Cumulative ATT Estimate",
+         x = "Maximum caliper size used") +
+    scale_shape_identity()
+
+  if (!is.na(B)) {
+    # bootstrap dists of FSATT and SATT
+    boot_fsatt <- attr(res, "scweights") %>% 
+      bind_rows() %>% 
+      filter(subclass %in% feasible_subclasses) %>% 
+      agg_co_units() %>% 
+      boot_bayesian(B=B)
+    
+    boot_satt <- attr(res, "scweights") %>% 
+      agg_co_units() %>% 
+      boot_bayesian(B=B)
+    
+    # # using sd of bootstrap samples
+    # boot_df <- ggd_att %>% 
+    #   filter(order == min(order) | order == max(order)) %>% 
+    #   mutate(sd = c(sd(boot_fsatt), sd(boot_satt)))
+    # 
+    # p2 <- p2 +
+    #   geom_errorbar(data=boot_df,
+    #                 aes(ymin=cum_avg-2*sd, ymax=cum_avg+2*sd),
+    #                 width = 1)
+    
+    # using full distribution of bootstrap samples
+    boot_df <- ggd_att %>% 
+      filter(order == min(order) | order == max(order)) %>% 
+      mutate(q025 = c(quantile(boot_fsatt, 0.025),
+                      quantile(boot_satt, 0.025)),
+             q975 = c(quantile(boot_fsatt, 0.975),
+                      quantile(boot_satt, 0.975)))
+    
+    p <- p +
+      geom_errorbar(data=boot_df,
+                    aes(ymin=q025, ymax=q975),
+                    width = 0.05)
+  }
+  
+  p
+}
+
+satt_plot3 <- function(res, B=NA) {
+  feasible_subclasses <- attr(res, "feasible_subclasses")
+  n_feasible <- length(feasible_subclasses)
+  
+  # ATT estimate vs. # co units added
+  ggd_att <- res %>%
+    left_join(attr(res, "adacalipers"), by="id") %>% 
+    group_by(subclass) %>%
+    summarize(adacal = last(adacal),
+              tx = Y[2] - Y[1]) %>%
+    arrange(adacal) %>%
+    mutate(order = 1:n(),
+           cum_avg = cumsum(tx) / order ) %>% 
+    slice((n_feasible+1):n())
+  
+  p <- ggd_att %>% 
+    ggplot(aes(x=order, y=cum_avg)) +
+    geom_step() +
+    geom_point(aes(color=adacal),
+               size=3) +
+    theme_classic() +
+    labs(y = "Cumulative ATT Estimate",
+         x = "Total number of treated units used",
+         color = "Maximum caliper \nsize used") +
+    scale_color_continuous(low="blue", high="orange") +
+    expand_limits(color=1)
+  
+  if (!is.na(B)) {
+    # bootstrap dists of FSATT and SATT
+    boot_fsatt <- attr(res, "scweights") %>% 
+      bind_rows() %>% 
+      filter(subclass %in% feasible_subclasses) %>% 
+      agg_co_units() %>% 
+      boot_bayesian(B=B)
+    
+    boot_satt <- attr(res, "scweights") %>% 
+      agg_co_units() %>% 
+      boot_bayesian(B=B)
+    
+    # # using sd of bootstrap samples
+    # boot_df <- ggd_att %>% 
+    #   filter(order == min(order) | order == max(order)) %>% 
+    #   mutate(sd = c(sd(boot_fsatt), sd(boot_satt)))
+    # 
+    # p2 <- p2 +
+    #   geom_errorbar(data=boot_df,
+    #                 aes(ymin=cum_avg-2*sd, ymax=cum_avg+2*sd),
+    #                 width = 1)
+    
+    # using full distribution of bootstrap samples
+    boot_df <- ggd_att %>% 
+      filter(order == min(order) | order == max(order)) %>% 
+      mutate(q025 = c(quantile(boot_fsatt, 0.025),
+                      quantile(boot_satt, 0.025)),
+             q975 = c(quantile(boot_fsatt, 0.975),
+                      quantile(boot_satt, 0.975)))
+    
+    p <- p +
+      geom_errorbar(data=boot_df,
+                    aes(ymin=q025, ymax=q975),
+                    width = 0.5) +
+      geom_point(aes(color=adacal),
+                 size=3)
+  }
+  
+  p
+}
+
+
 
 
 # love plot ---------------------------------------------------------------
