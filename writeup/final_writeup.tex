@@ -913,31 +913,37 @@ Ideal sim study: shows CSM works well even compared to balancing/doubly robust a
 
 % TODO: is there a way to simulate data such that the CEM-ATT is significantly different from the overall ATT?
 
-\subsection{Toy example: Lalonde (1986)}
+\subsection{Example: Lalonde (1986)}
 \label{sec:lalonde}
 
-\note{A helpful feature: figure out which covariates are causing the most data to drop. Simple approach: marginal grid for each covariate, count number of feasible tx units and total number of matched controls}
-
-To illustrate an application of CSM, we analyze the Lalonde dataset \citep{lalonde1986evaluating}, a canonical benchmark dataset.
+To illustrate an application of CSM, we analyze the canonical Lalonde dataset \citep{lalonde1986evaluating}.
 The goal is to measure the impact of the National Supported Work (NSW) job training program on participants' real earnings in 1978.
-Measured covariates include general demographic and education information as well as past earnings.
-We consider the subsample of experimental treated units used in \citet{dehejia1999causal} and control units from the full Current Population Survey file, leading to a total of 185 treated and asdf control units.
-For further details about the dataset, we refer readers to the excellent overview provided in \citet{diamond2013genetic}.
+Measured covariates include demographic information and past earnings.
+The NSW dataset is experimental, but researchers typically add observational data to study whether methods can recover the experimental difference-in-means SATT estimate of \$1,794.
+For this example, we estimate the SATT on the ``Dehejia and Wabha subsample'' of 185 NSW treated units \citep{dehejia1999causal}, using 15,992 observational control units from the Current Population Survey (CPS) dataset.\footnote{I.e., we exclude the experimental controls to make the analysis more challenging.}
+For further details about the Lalonde dataset, we refer readers to the excellent overview provided in \citet{diamond2013genetic}.
 
 To conduct CSM, we first select a distance metric and a covariatewise caliper.
 We choose to use scaled $L_\infty$ distance.
-For illustration, we exactly match on binary covariates ($X_1 =$ indicator for black, $X_2 =$ indicator for hispanic, $X_3 =$ marital status, $X_4 =$ degree status) and set covariatewise calipers of 3 years on $X_5 =$ age, 2 years on $X_6 =$ years of education, and \$5,000 on $X_7$ and $X_8$, real earnings in 1974 and 1975, respectively.\footnote{Appendix \ref{app:caliperchoice} provides guidance on caliper selection in the absence of prior preferences and domain knowledge.}
+For illustration, we exactly match on binary covariates ($X_1 =$ indicator for black, $X_2 =$ indicator for hispanic, $X_3 =$ marital status, $X_4 =$ degree status) and set covariatewise calipers of 3 years on $X_5 =$ age, 1 year on $X_6 =$ years of education, and \$5,000 on $X_7$ and $X_8$, real earnings in 1974 and 1975, respectively.\footnote{Appendix \ref{app:caliperchoice} provides guidance on caliper selection in the absence of prior preferences and domain knowledge.}
 According to Proposition \ref{prop:distmetriccal}, for a distance-metric caliper of $c=1$ this implies a diagonal scaling matrix of:
-$$V = \text{diag} \{K_1, K_2, K_3, K_4, \frac{1}{3}, \frac{1}{2}, \frac{1}{5000}, \frac{1}{5000}\},$$
-where $K_i$, $i=1,\dots,4$ are large constants which ensure that units are exactly matched on $X_1$ through $X_4$.\footnote{In general, $K_i$ may be chosen to reflect willingness to fail to exactly match covariate $X_i$.
+$$V = \text{diag} \{K_1, K_2, K_3, K_4, \frac{1}{3}, 1, \frac{1}{5000}, \frac{1}{5000}\},$$
+where $K_i$, $i=1,\dots,4$ are large constants ensuring that units are exactly matched on $X_1$, $X_2$, $X_3$, and $X_4$.\footnote{In general, $K_i$ may be chosen to reflect the importance of exactly matching binary covariate $X_i$.
 For example, if we set $K_3 = 1$, we would consider two units who are exactly matched on all covariates except marital status to be ``closer'' to each other than two units who are exactly matched on all covariates except $X_5=$ age, where they differ by more than 3 years.}
 
 We then conduct CSM using $d_V^{(\infty)}$ as defined above.
 For each treated unit $t$, we use an adaptive caliper $c_t = \max \{1, d_t\}$, so that treated units without any matches within the chosen covariatewise caliper are matched to their nearest neighbor.
 We finally construct synthetic control units using the linear program described in Appendix \ref{app:scm} and estimate the FSATT and SATT.
 
-Figures asdf and asdf assess the estimate-estimand tradeoff.
-For the chosen caliper, 145 of the 185 treated units in the data
+Figure \ref{fig:lalonde_att} assesses the estimate-estimand tradeoff.
+174 of the 185 treated units in the data have at least one control unit within the chosen caliper, so Figure \ref{fig:lalonde_att} visualizes the adaptive caliper sizes needed to estimate the SATT
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{writeup/figures/lalonde_att.png}
+    \caption{Estimate-estimand tradeoff plot}
+    \label{fig:lalonde_att}
+\end{figure}
 
 
 
