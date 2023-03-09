@@ -979,8 +979,14 @@ We finally construct synthetic control units using the linear program described 
 \subsubsection{Model Assessment}
 
 As discussed in Section \ref{sec:avoid} and shown in Proposition \ref{prop:wass}, distance-metric calipers directly guarantee approximate joint covariate balance, obviating the need to the usual marginal balance checks.
-Nonetheless, we include them here to illustrate a few points.
+Nonetheless, Figure \ref{fig:lalonde_love} visualizes the ``love plot'' of marginal covariate means to highlight a few ideas.
 
+\begin{figure}
+    \centering
+    \includegraphics{writeup/figures/lalonde_love2.png}
+    \caption{Love plot of marginal covariate means}
+    \label{fig:lalonde_love}
+\end{figure}
 
 Distance-metric calipers directly guarantee approximate joint covariate balance, so we do not need to check balance.
 Regardless, we include love plots here for completeness.
