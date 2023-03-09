@@ -173,10 +173,15 @@ love_plot(calada_scm, covs=paste0("X",5:8), B=NA) +
 ggsave("writeup/figures/lalonde_love.png", height=3, width=4)
 
 
+love_labs <- c("Age", "Years of Education", "Earnings (1974)", "Earnings (1975)")
+names(love_labs) <- paste0("X", 5:8)
 love_plot2(calada_scm, covs = paste0("X", 5:8)) +
   theme(legend.background = element_blank(),
         legend.box.background = element_rect(colour = "black")) +
-  scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(1,5)])
+  scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(1,5)]) +
+  facet_wrap(~name, 
+             scales="free",
+             labeller = labeller(name = love_labs))
 ggsave("writeup/figures/lalonde_love2.png", height=3, width=5)
 
 
