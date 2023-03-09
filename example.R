@@ -52,15 +52,19 @@ df <- lalonde %>%
 #   filter(dataset == "NSWD")
 
 # # use experimental treateds and all controls
-# df <- df %>% 
-#   filter(Z==T | (dataset=="CPS" & Z==F))
+# df <- df
 
 # use experimental treateds and nonexperimental controls
-df <- df %>% 
+df <- df %>%
   filter((dataset == "NSWD" & Z==T) | (dataset=="CPS" & Z==F))
 
 
 # EDA ---------------------------------------------------------------------
+
+df %>% 
+  group_by(dataset, Z) %>%
+  summarize(across(starts_with("X"),
+                   mean))
 
 if (F) {
   # NSWD is...
@@ -104,29 +108,6 @@ DIST_SCALING <- tibble(
   X8 = 1/5000
 )
 
-# DIST_SCALING <- tibble(
-#   X1 = 1/5,
-#   X2 = 1/4,
-#   X3 = 1000,
-#   X4 = 1000,
-#   X5 = 1000,
-#   X6 = 1000,
-#   X7 = 1/10000,
-#   X8 = 1/10000
-# )
-# 
-# DIST_SCALING <- tibble(
-#   X1 = 1/10,
-#   X2 = 1/4,
-#   X3 = 1000,
-#   X4 = 1000,
-#   X5 = 1000,
-#   X6 = 1000,
-#   X7 = 1/20000,
-#   X8 = 1/20000
-# )
-
-
 # run matching ------------------------------------------------------------
 
 calada_scm <- df %>%
@@ -156,12 +137,12 @@ get_att_ests(feasible)
 # compare distances between units represented by average and sc weights
 # scm_vs_avg_plot(feasible, DIST_SCALING, METRIC)
 dist_density_plot(feasible, DIST_SCALING, METRIC) +
-  theme(legend.position = c(0.82,0.68))
-ggsave("writeup/figures/lalonde_dist.png", height=3, width=5)
+  theme(legend.position = "bottom")
+ggsave("writeup/figures/lalonde_dist.png", height=3, width=4)
 
 # compare ESS
 ess_plot(feasible)
-ggsave("writeup/figures/lalonde_ess.png", height=3, width=5)
+ggsave("writeup/figures/lalonde_ess.png", height=3, width=4)
 
 
 # estimate-estimand tradeoff diagnostics ----------------------------------
@@ -173,7 +154,7 @@ set.seed(1)
 #   geom_hline(yintercept=0, lty="dotted")
 # satt_plot2(calada_scm, B=100) +
 #   geom_hline(yintercept=0, lty="dotted")
-satt_plot3(calada_scm, B=100) +
+satt_plot3(calada_scm, B=1000) +
   geom_hline(yintercept=0, lty="dotted") +
   theme(# legend.direction="horizontal",
         # legend.position = c(0.5, 0.9),
@@ -185,13 +166,18 @@ ggsave("writeup/figures/lalonde_att.png", height=3, width=5)
 
 # Love plot vs. # co units added
 set.seed(2)
-love_plot(calada_scm, covs=paste0("X",5:8), B=100) +
+love_plot(calada_scm, covs=paste0("X",5:8), B=NA) +
   scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(5,3,2,1)]) +
-  guides(color=F)
-ggsave("writeup/figures/lalonde_love.png", height=3, width=5)
+  guides(color=F) +
+  scale_x_continuous(breaks = c(174, 177, 180, 183))
+ggsave("writeup/figures/lalonde_love.png", height=3, width=4)
 
 
-
+love_plot2(calada_scm, covs = paste0("X", 5:8)) +
+  theme(legend.background = element_blank(),
+        legend.box.background = element_rect(colour = "black")) +
+  scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(1,5)])
+ggsave("writeup/figures/lalonde_love2.png", height=3, width=5)
 
 
 

@@ -40,8 +40,8 @@ dist_density_plot <- function(d, dist_scaling, metric) {
     theme_classic() +
     scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(5,4,1)]) +
     labs(y = "Density",
-         x = "Distance between treated unit and corresponding control",
-         color = "Method used \nto generate \ncorresponding \ncontrol")
+         x = "Distance between treated unit \nand corresponding control",
+         color = "Method")
 }
 
 scm_vs_avg_plot <- function(d, dist_scaling, metric) {
@@ -129,19 +129,20 @@ ess_plot <- function(d) {
            var = .)
   
   vars_df %>% 
-    mutate(method = factor(method, levels=c("tx", "sc", "avg", "1nn"))) %>% 
+    mutate(method = factor(method, levels=c("1nn", "avg", "sc", "tx"))) %>% 
     ggplot(aes(x=method, y=var)) +
     geom_col(aes(fill = method)) +
     scale_fill_manual(values = c("black",
                                  wesanderson::wes_palette("Zissou1", 5)[c(5,4,1)])) +
-    scale_x_discrete(labels = c("Treated units",
+    scale_x_discrete(labels = c("Control units \n(1-NN weights)",
+                                "Control units \n(Average weights)",
                                 "Control units \n(SCM weights)", 
-                                "Control units \n(Average weights)", 
-                                "Control units \n(1-NN weights)")) +
+                                "Treated units")) +
     theme_classic() +
     guides(fill="none") +
     labs(y = "Variance associated \nwith set of units",
-         x = "")
+         x = "") +
+    coord_flip()
 }
 
 
@@ -311,7 +312,7 @@ satt_plot3 <- function(res, B=NA) {
   
   p <- ggd_att %>% 
     ggplot(aes(x=order, y=cum_avg)) +
-    geom_step() +
+    geom_line(alpha=0.5) +
     geom_point(aes(color=adacal),
                size=3) +
     theme_classic() +
@@ -333,30 +334,42 @@ satt_plot3 <- function(res, B=NA) {
       agg_co_units() %>% 
       boot_bayesian(B=B)
     
-    # # using sd of bootstrap samples
-    # boot_df <- ggd_att %>% 
-    #   filter(order == min(order) | order == max(order)) %>% 
-    #   mutate(sd = c(sd(boot_fsatt), sd(boot_satt)))
-    # 
-    # p2 <- p2 +
-    #   geom_errorbar(data=boot_df,
-    #                 aes(ymin=cum_avg-2*sd, ymax=cum_avg+2*sd),
-    #                 width = 1)
+    # using sd of bootstrap samples
+    boot_df <- ggd_att %>%
+      filter(order == min(order) | order == max(order)) %>%
+      mutate(sd = c(sd(boot_fsatt), sd(boot_satt)))
     
-    # using full distribution of bootstrap samples
-    boot_df <- ggd_att %>% 
-      filter(order == min(order) | order == max(order)) %>% 
-      mutate(q025 = c(quantile(boot_fsatt, 0.025),
-                      quantile(boot_satt, 0.025)),
-             q975 = c(quantile(boot_fsatt, 0.975),
-                      quantile(boot_satt, 0.975)))
-    
+    print(paste0("FSATT: (", 
+                 round(boot_df$cum_avg[1]-1.96*boot_df$sd[1],3), 
+                 ", ",
+                 round(boot_df$cum_avg[1]+1.96*boot_df$sd[1], 3), ")"))
+    print(paste0("SATT: (",
+                 round(boot_df$cum_avg[2]-1.96*boot_df$sd[2], 3), 
+                 ", ",
+                 round(boot_df$cum_avg[2]+1.96*boot_df$sd[2], 3), ")"))
+
     p <- p +
       geom_errorbar(data=boot_df,
-                    aes(ymin=q025, ymax=q975),
-                    width = 0.5) +
+                    aes(ymin=cum_avg-1.96*sd, ymax=cum_avg+1.96*sd),
+                    width = 0.5,
+                    linewidth=1) +
       geom_point(aes(color=adacal),
                  size=3)
+    
+    # # using full distribution of bootstrap samples
+    # boot_df <- ggd_att %>% 
+    #   filter(order == min(order) | order == max(order)) %>% 
+    #   mutate(q025 = c(quantile(boot_fsatt, 0.025),
+    #                   quantile(boot_satt, 0.025)),
+    #          q975 = c(quantile(boot_fsatt, 0.975),
+    #                   quantile(boot_satt, 0.975)))
+    # 
+    # p <- p +
+    #   geom_errorbar(data=boot_df,
+    #                 aes(ymin=q025, ymax=q975),
+    #                 width = 0.5) +
+    #   geom_point(aes(color=adacal),
+    #              size=3)
   }
   
   p
@@ -381,12 +394,13 @@ love_plot <- function(res, covs, B=NA) {
     mutate(order = 1:n(),
            across(all_of(covs),
                   ~cumsum(.) / order)) %>% 
-    slice((n_feasible+1):n()) %>%
+    slice((n_feasible):n()) %>%
     pivot_longer(all_of(covs))
   
   p <- love_steps %>% 
     ggplot(aes(x=order, color=name)) +
-    geom_point(data=. %>% slice(1:length(covs)), 
+    geom_point(data=. %>% slice(c(1:length(covs),
+                                  (n()-length(covs)):n())), 
                aes(y=value), size=2) +
     geom_step(aes(y=value, group=name), linewidth=1.1) +
     expand_limits(y = 0) +
@@ -427,5 +441,41 @@ love_plot <- function(res, covs, B=NA) {
   
   return(p)
   
+}
+
+
+love_plot2 <- function(res, covs, B=NA) {
+  feasible_subclasses <- attr(res, "feasible_subclasses")
+  n_feasible <- length(feasible_subclasses)
+  
+  adacal_key <- attr(res, "adacalipers") %>% 
+    rename(subclass = id) %>% 
+    arrange(adacal) %>% 
+    mutate(order = 1:n())
+    
+  love_steps <- res %>%
+    left_join(adacal_key, by="subclass") %>% 
+    group_by(Z) %>%
+    arrange(order) %>% 
+    mutate(across(all_of(covs), ~cumsum(.) / order)) %>% 
+    slice((n_feasible):n()) %>%
+    pivot_longer(all_of(covs))
+  
+  love_steps %>% 
+    mutate(Z = as.factor(Z)) %>% 
+    ggplot(aes(x=order, y=value, color=Z)) +
+    # geom_line(aes(group=order), alpha=0.3, color="black") +
+    geom_point(size=1) +
+    geom_point(data=. %>% 
+                 filter(order == max(order) | 
+                          order == min(order)),
+               size=2) +
+    geom_line(aes(group=interaction(name, Z)),
+              alpha=0.3) +
+    facet_wrap(~name, scales="free_y") +
+    labs(y = "Marginal mean",
+         x = "Total number of treated units used",
+         color = "Treatment \nStatus") +
+    theme_classic()
 }
 
