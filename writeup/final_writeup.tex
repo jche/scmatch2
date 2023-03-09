@@ -18,7 +18,8 @@
 \usepackage{caption}
 \usepackage{subcaption}
 
-\usepackage{xcolor}
+% \usepackage{xcolor}
+\usepackage[table,xcdraw]{xcolor}
 \usepackage{hyperref}
 
 % letter enumerate, enumerate spacing
@@ -378,6 +379,7 @@ Using $L_\infty$ calipers generalizes this idea of exact matching on coarsened c
 % we exactly match control units not to the treated units themselves, but rather to the neighborhoods of the treated units as defined by their calipers.
 
 \subsection{Principle 3: Avoid ``unknown unknowns''}
+\label{sec:avoid}
 % \subsection{Principle 3: Matches should be easy to assess}
 
 An important step in any matching procedure is to assess the resulting matches.
@@ -916,12 +918,50 @@ Ideal sim study: shows CSM works well even compared to balancing/doubly robust a
 \subsection{Example: Lalonde (1986)}
 \label{sec:lalonde}
 
-To illustrate an application of CSM, we analyze the canonical Lalonde dataset \citep{lalonde1986evaluating}.
-The goal is to measure the impact of the National Supported Work (NSW) job training program on participants' real earnings in 1978.
-Measured covariates include demographic information and past earnings.
-The NSW dataset is experimental, but researchers typically add observational data to study whether methods can recover the experimental difference-in-means SATT estimate of \$1,794.
-For this example, we estimate the SATT on the ``Dehejia and Wabha subsample'' of 185 NSW treated units \citep{dehejia1999causal}, using 15,992 observational control units from the Current Population Survey (CPS) dataset.\footnote{I.e., we exclude the experimental controls to make the analysis more challenging.}
-For further details about the Lalonde dataset, we refer readers to the excellent overview provided in \citet{diamond2013genetic}.
+\subsubsection{Background}
+
+To illustrate the use of CSM, we analyze the canonical Lalonde datasets \citep{lalonde1986evaluating}.
+The goal is to estimate the effect of a job training program on participants' 1978 earnings.
+Measured covariates include demographic information and past earnings, as shown in Table \ref{tab:lalonde}.
+
+Researchers typically augment the experimental National Supported Work Demonstration (NSWD) data with observational data to study whether methods can recover the experimental difference-in-means SATT estimate of \$1,794.
+For this example, we use the 185 NSWD treated units studied by \citet{dehejia1999causal} and 15,992 observational controls from the Current Population Survey (CPS) dataset.
+Unlike many analyses of these datasets, we exclude the 260 experimental NSWD control units.
+As seen in Table \ref{tab:lalonde}, the treated units are generally much more similar to the NSWD controls than they are to the CPS controls;
+in this example, however, we consider a more standard observational setting where we do not have access to such high-quality control units.
+
+
+% \begin{table}[]
+% \begin{tabular}{|l|c|c|c|c|c|c|c|c|c|}
+% \hline
+% \rowcolor[HTML]{D3D3D3} 
+% Dataset                               & n      & \% Black & \% Hispanic & \% Married & \% No degree & Avg. age & Avg. years of \textbackslash{}neducation & Avg. earnings, 1974 & Avg. earnings, 1975 \\ \hline
+% \cellcolor[HTML]{D3D3D3}NSW (Treated) & 185    & 84\%     & 6\%         & 19\%       & 71\%         & 26       & 10                                       & \$2096              & \$1532              \\ \hline
+% \cellcolor[HTML]{D3D3D3}NSW (Control) & 260    & 83\%     & 11\%        & 15\%       & 84\%         & 25       & 10                                       & \$2107              & \$1267              \\ \hline
+% \cellcolor[HTML]{D3D3D3}CPS           & 15,992 & 7\%      & 7\%         & 71\%       & 30\%         & 33       & 12                                       & \$14017             & \$13651             \\ \hline
+% \end{tabular}
+% \end{table}
+\begin{table}[t]
+\centering
+\begin{tabular}{c|ccc|}
+\cline{2-4}
+                                                                          & \multicolumn{3}{c|}{\cellcolor[HTML]{C0C0C0}Dataset}                                                                                                                                                                   \\ \hline
+\rowcolor[HTML]{C0C0C0} 
+\multicolumn{1}{|c|}{\cellcolor[HTML]{C0C0C0}Variables}                   & \multicolumn{1}{c|}{\cellcolor[HTML]{C0C0C0}\begin{tabular}[c]{@{}c@{}}NSW \\ (Treated)\end{tabular}} & \multicolumn{1}{c|}{\cellcolor[HTML]{C0C0C0}\begin{tabular}[c]{@{}c@{}}NSW \\ (Control)\end{tabular}} & CPS    \\ \hline
+\multicolumn{1}{|c|}{\cellcolor[HTML]{EFEFEF}\% Black}                    & \multicolumn{1}{c|}{84}                                                                               & \multicolumn{1}{c|}{83}                                                                               & 7      \\ \hline
+\multicolumn{1}{|c|}{\cellcolor[HTML]{EFEFEF}\% Hispanic}                 & \multicolumn{1}{c|}{6}                                                                                & \multicolumn{1}{c|}{11}                                                                               & 7      \\ \hline
+\multicolumn{1}{|c|}{\cellcolor[HTML]{EFEFEF}\% Married}                  & \multicolumn{1}{c|}{19}                                                                               & \multicolumn{1}{c|}{15}                                                                               & 71     \\ \hline
+\multicolumn{1}{|c|}{\cellcolor[HTML]{EFEFEF}\% No degree}                & \multicolumn{1}{c|}{71}                                                                               & \multicolumn{1}{c|}{84}                                                                               & 30     \\ \hline
+\multicolumn{1}{|c|}{\cellcolor[HTML]{EFEFEF}Average age}                 & \multicolumn{1}{c|}{25.8}                                                                             & \multicolumn{1}{c|}{25.1}                                                                             & 33.2   \\ \hline
+\multicolumn{1}{|c|}{\cellcolor[HTML]{EFEFEF}Average years of education}  & \multicolumn{1}{c|}{10.3}                                                                             & \multicolumn{1}{c|}{10.1}                                                                             & 12.0   \\ \hline
+\multicolumn{1}{|c|}{\cellcolor[HTML]{EFEFEF}Average earnings, 1974 (\$)} & \multicolumn{1}{c|}{2,096}                                                                            & \multicolumn{1}{c|}{2,107}                                                                            & 14,017 \\ \hline
+\multicolumn{1}{|c|}{\cellcolor[HTML]{EFEFEF}Average earnings, 1974 (\$)} & \multicolumn{1}{c|}{1,532}                                                                            & \multicolumn{1}{c|}{1,267}                                                                            & 13,651 \\ \hline
+\end{tabular}
+\caption{Marginal means of covariates in Lalonde datasets.}
+\label{tab:lalonde}
+\end{table}
+
+\subsubsection{Methods}
 
 To conduct CSM, we first select a distance metric and a covariatewise caliper.
 We choose to use scaled $L_\infty$ distance.
@@ -929,34 +969,38 @@ For illustration, we exactly match on binary covariates ($X_1 =$ indicator for b
 According to Proposition \ref{prop:distmetriccal}, for a distance-metric caliper of $c=1$ this implies a diagonal scaling matrix of:
 $$V = \text{diag} \{K_1, K_2, K_3, K_4, \frac{1}{3}, 1, \frac{1}{5000}, \frac{1}{5000}\},$$
 where $K_i$, $i=1,\dots,4$ are large constants ensuring that units are exactly matched on $X_1$, $X_2$, $X_3$, and $X_4$.\footnote{In general, $K_i$ may be chosen to reflect the importance of exactly matching binary covariate $X_i$.
-For example, if we set $K_3 = 1$, we would consider two units who are exactly matched on all covariates except marital status to be ``closer'' to each other than two units who are exactly matched on all covariates except $X_5=$ age, where they differ by more than 3 years.}
+For example, if we set $K_3 = 1$, we would consider two units who are exactly matched on all covariates except marital status to be ``closer'' to each other than two units who are exactly matched on all covariates except $X_5=$ age, where they differ by more than 3 years.
+In this example, we simply set $K_i=1000$ to force exact matches on these covariates.}
 
 We then conduct CSM using $d_V^{(\infty)}$ as defined above.
 For each treated unit $t$, we use an adaptive caliper $c_t = \max \{1, d_t\}$, so that treated units without any matches within the chosen covariatewise caliper are matched to their nearest neighbor.
 We finally construct synthetic control units using the linear program described in Appendix \ref{app:scm} and estimate the FSATT and SATT.
 
-Figure \ref{fig:lalonde_att} assesses the estimate-estimand tradeoff.
-174 of the 185 treated units in the data have at least one control unit within the chosen caliper, so Figure \ref{fig:lalonde_att} visualizes the adaptive caliper sizes needed to estimate the SATT
+\subsubsection{Model Assessment}
 
-\begin{figure}
-    \centering
-    \includegraphics[width=\textwidth]{writeup/figures/lalonde_att.png}
-    \caption{Estimate-estimand tradeoff plot}
-    \label{fig:lalonde_att}
-\end{figure}
+As discussed in Section \ref{sec:avoid} and shown in Proposition \ref{prop:wass}, distance-metric calipers directly guarantee approximate joint covariate balance, obviating the need to the usual marginal balance checks.
+Nonetheless, we include them here to illustrate a few points.
 
 
+Distance-metric calipers directly guarantee approximate joint covariate balance, so we do not need to check balance.
+Regardless, we include love plots here for completeness.
+
+LOVE PLOTS.
+
+These love plots show that, marginally, balance is generally much better than our guarantees.
+Importantly, marginal balance isn't the whole story.
+While we visualize it because we're bad at visualizing higher dimensions, seeing good love plots here doesn't give us good joint balance!
+Our calipers have already done that for us.
+
+As we describe further in the following section, these love plots are, however, helpful for comparing the characteristics of the feasible and infeasible treated units, as well as their matched controls.
+We emphasize that the role of these balance plots differs from their usual role.
+By using distance-metric calipers, we ensure that the feasible joint distributions are close to each other.
+We are using balance plots not to diagnose match quality, but to conduct exploratory data analysis into how the feasible units differ from the infeasible units.
+We see that our feasible units tend to have better balance in terms of asdf and asdf.
 
 
-
-
-
-
-
-
-
-
-
+To build intuition for the use of synthetic controls, we may assess how well our synthetic controls perform.
+While these plots are not generally necessary, we find them helpful for building intuition here.
 Figures \ref{fig:lalonde_dist} and \ref{fig:lalonde_ess} illustrate how synthetic controls impact the bias and variance of the FSATT estimate.
 For reference, we compare synthetic controls to two baseline estimation strategies: 
 \begin{enumerate}
@@ -969,21 +1013,57 @@ Figure \ref{fig:lalonde_dist} visualizes potential extrapolation bias.
 Generally speaking, convex weighted sums imply a linear interpolation to the covariates of the corresponding control ().\footnote{See Appendix \ref{app:scm} for details.}
 
 Figure \ref{fig:lalonde_dist} shows density plots of the $d_V^{(\infty)}$ distances between the covariates of each treated unit $t$ and its corresponding control, constructed as $\sum_{j \in \Ct} w_{jt} \Xj$, $\frac{1}{|\Ct|} \sum_{j \in \Ct} \Xj$, and $\mathbf{X}_{j^*}$, for the ``SCM,'' ``Average,'' and ``1-NN'' estimation methods, respectively.
-\begin{figure}[ht]
-    \centering
-    \includegraphics{writeup/figures/lalonde_dist.png}
-    \caption{Density plots of covariate distances between treated units and their corresponding controls.}
-    \label{fig:lalonde_dist}
-\end{figure}
 As expected, we see that these distances are much smaller for the synthetic controls, which are constructed precisely to minimize $d_V^{(\infty)}(\Xt, \sum_{j \in \Ct} w_{jt} \Xj)$.
 
+\begin{figure}[t]
+     \centering
+     \begin{subfigure}[t]{0.48\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{writeup/figures/lalonde_dist.png}
+         \caption{Density plots of covariate distances between treated units and their corresponding controls.}
+         \label{fig:lalonde_dist}
+     \end{subfigure}
+     \hfill
+     \begin{subfigure}[t]{0.48\textwidth}
+         \centering
+         \includegraphics[width=\textwidth]{writeup/figures/lalonde_ess.png}
+         \caption{Effective sample size}
+         \label{fig:lalonde_ess}
+     \end{subfigure}
+     % \caption{Three simple graphs}
+     \label{fig:lalonde_bv}
+\end{figure}
 
-\note{Highlight HERE that marginal balance plots don't tell the whole story. They're a bad summary because we're bad at visualizing higher dimensions, but they're useful.}
+
+\subsubsection{Results}
+
+Analyses of the Lalonde datasets typically show that causal-inference procedures recover estimates close to the experimental benchmark of \$1,794 while naive approaches (e.g., raw difference-in-means, linear regression) underestimate it.
+Because individuals in the CPS dataset tend to have features associated with greater earnings, naive procedures often overestimate the counterfactual outcomes for the NSWD treated units, i.e., underestimate the treatment effect for those units.
+
+Figure \ref{fig:lalonde_att} visualizes the main results of our analysis.
+Without using the experimental controls, CSM estimates an FSATT of \$1,595, as represented by the leftmost point estimate, similar to the experimental benchmark.\footnote{For the same caliper using the experimental controls along with the observational controls, the FSATT and SATT estimates are \$1,826 and \$1,771, respectively.}
+Interestingly, as worse CPS controls are used, the ATT estimate generally decreases until we reach the full SATT estimate of \$1,344 at the far right,
+though we note that this decrease is negligible compared to the uncertainty represented by the 95\% bootstrap intervals.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\textwidth]{writeup/figures/lalonde_att.png}
+    \caption{Estimate-estimand tradeoff plot. Intervals represent 95\% bootstrap confidence intervals of (\$19, \$3,172) for the FSATT (left) and (-\$258, \$2,946) for the full SATT (right), generated using 1,000 bootstrap samples. Maximum adaptive caliper sizes range from 1 (for the FSATT) to 2.62 (for the full ATT).}
+    \label{fig:lalonde_att}
+\end{figure}
+
+Moving toward the right-hand side of Figure \ref{fig:lalonde_att} makes an estimate-estimand tradeoff: the estimand approaches the full SATT, but the estimate is exposed to more potential bias.
+If the FSATT and SATT intervals differ significantly, it is worth thinking about why this may be the case.
+In our example, lower-quality matches may bias our effect estimates downward.
+The differences between the NSWD and CPS datasets shown by Table \ref{tab:lalonde} lead us to expect that low-quality matches would pair NSWD individuals with low-earning characteristics to CPS individuals with higher-earning characteristics.
+For example, we can check that the worst match (where $c_t = 2.62$) pairs an individual with zero earnings in 1974 and 1975 to someone with more than \$10,000 of earnings in both years.
+This naturally leads to a very negative effect estimate for that individual, reducing the cumulative ATT estimate.
+
+More generally, we would turn to exploratory plots such as figure LOVE PLOTS to continue with our diagnostics here.
+Beyond checking imbalances, we can check if the feasible and infeasible treated units seem to significantly differ: if yes, heterogeneous effects might be at play, so the change in estimand might be a big deal.
+If, on the other hand, it appears that it's mostly the feasible and infeasible control units that differ, we might be more worried about estimate bias.
 
 
-\subsection{Empirical Study}
-
-\note{TODO: contact Francesca Dominici to see if health dataset is useful.}
 
 \section{Conclusion}
 
