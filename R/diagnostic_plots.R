@@ -318,7 +318,7 @@ satt_plot3 <- function(res, B=NA) {
     theme_classic() +
     labs(y = "Cumulative ATT Estimate",
          x = "Total number of treated units used",
-         color = "Maximum caliper \nsize used") +
+         color = "Maximum caliper size used") +
     scale_color_continuous(low="blue", high="orange") +
     expand_limits(color=1)
   
