@@ -475,7 +475,7 @@ love_plot2 <- function(res, covs, B=NA) {
     facet_wrap(~name, scales="free_y") +
     labs(y = "Marginal mean",
          x = "Total number of treated units used",
-         color = "Treatment \nStatus") +
+         color = "Z") +
     theme_classic()
 }
 
