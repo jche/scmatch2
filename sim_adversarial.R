@@ -10,6 +10,31 @@
 require(tidyverse)
 require(mvtnorm)
 
+require(optweight)
+require(dbarts)
+require(tmle)
+require(AIPW)
+
+require(tictoc)
+
+source("R/distance.R")
+source("R/sc.R")
+source("R/matching.R")
+source("R/estimate.R")
+
+tic()
+
+#superlearner libraries
+
+SL.library1 <- c("SL.mean", "SL.lm", "SL.glm")
+# "based on Dorie et al. ACIC 2016 competition 
+#   and SuperLearner documentation,
+#   adjusted to reduce the computational burden"
+SL.library2 <- c("SL.glm", "SL.gam", "SL.glmnet",
+                 # "SL.gbm", "SL.bartMachine",   # too slow
+                 "SL.randomForest", "SL.xgboost")
+
+
 
 
 # simplest example in 2D, just like toy example
@@ -17,28 +42,34 @@ require(mvtnorm)
 gen_df_adv2d <- function(nc, nt, 
                          tx_effect = 0.2,   # constant tx effect
                          effect_fun = function(X1, X2) { abs(X1-X2) },
-                         sig=0.2) {
+                         sig = 0.2) {
   MU <- c(0.5, 0.5)
   SIG <- matrix(c(0.5, 0.2, 0.2, 0.5), nrow=2)
   
   # tx units clustered at (0,0) and (1,1)
   dat_txblobs <- tibble(
-    X1 = c(rnorm(nt, mean=0, sd=sig), rnorm(nt, mean=1, sd=sig)),
-    X2 = c(rnorm(nt, mean=0, sd=sig), rnorm(nt, mean=1, sd=sig)),
+    X1 = c(rnorm(nt/2, mean=0, sd=sig), 
+           rnorm(nt/2, mean=1, sd=sig)),
+    X2 = c(rnorm(nt/2, mean=0, sd=sig), 
+           rnorm(nt/2, mean=1, sd=sig)),
     Z  = T
   )
   
   # co units clustered at (1,0) and (0,1)
   dat_coblobs <- tibble(
-    X1 = c(rnorm(nc, mean=0, sd=sig), rnorm(nc, mean=1, sd=sig)),
-    X2 = c(rnorm(nc, mean=1, sd=sig), rnorm(nc, mean=0, sd=sig)),
+    X1 = c(rnorm((nc-nt)/2, mean=0, sd=sig), 
+           rnorm((nc-nt)/2, mean=1, sd=sig)),
+    X2 = c(rnorm((nc-nt)/2, mean=1, sd=sig), 
+           rnorm((nc-nt)/2, mean=0, sd=sig)),
     Z  = F
   )
   
   # some co units near (0,0) and (1,1)
   dat_conear <- tibble(
-    X1 = c(rnorm(nt, mean=0, sd=sig), rnorm(nt, mean=1, sd=sig)),
-    X2 = c(rnorm(nt, mean=0, sd=sig), rnorm(nt, mean=1, sd=sig)),
+    X1 = c(rnorm(nt/2, mean=0, sd=sig), 
+           rnorm(nt/2, mean=1, sd=sig)),
+    X2 = c(rnorm(nt/2, mean=0, sd=sig), 
+           rnorm(nt/2, mean=1, sd=sig)),
     Z  = F
   )
   
@@ -49,11 +80,6 @@ gen_df_adv2d <- function(nc, nt,
            Y1 = effect_fun(X1,X2) + tx_effect,
            Y  = ifelse(Z, Y1, Y0)) %>% 
     mutate(id = 1:n(), .before=X1)
-  # rowwise() %>% 
-  # mutate(Y0 = dmvnorm(x = c(X1,X2),
-  #                     mean = MU,
-  #                     sigma = SIG)) %>% 
-  # ungroup()
 }
 
 if (F) {
@@ -67,7 +93,7 @@ if (F) {
 
 # generate data -----------------------------------------------------------
 
-set.seed(90210)
+# set.seed(90210)
 df <- gen_df_adv2d(nc=1000, nt=10, 
                    tx_effect=0.2,
                    effect_fun = function(x,y) {
@@ -76,7 +102,7 @@ df <- gen_df_adv2d(nc=1000, nt=10,
                                sigma = matrix(c(1,0.8,0.8,1), nrow=2))
                    },
                    sig=0.2)
-if (T) {
+if (F) {
   df %>% 
     ggplot(aes(X1,X2)) +
     geom_point(aes(pch=as.factor(Z), color=Y0)) +
@@ -103,7 +129,6 @@ if (T) {
 #                   method = "optweight")
 
 
-require(optweight)
 m_bal <- optweight(Z ~ X1+X2,
                    data = df,
                    tols = c(0.01, 0.01),
@@ -114,9 +139,12 @@ preds_bal <- df %>%
   mutate(wt = m_bal$weights)
 
 # get ATT estimate: biased!
-preds_bal %>% 
+ATT_bal <- preds_bal %>% 
   group_by(Z) %>% 
-  summarize(Y = mean(Y*wt))
+  summarize(Y = mean(Y*wt)) %>% 
+  pivot_wider(names_from=Z, values_from=Y) %>% 
+  mutate(ATThat = `TRUE` - `FALSE`) %>% 
+  pull(ATThat)
 
 # check balance: it's great!
 if (F) {
@@ -127,7 +155,27 @@ if (F) {
 }
 
 
-# BART --------------------------------------------------------------------
+# outcome regression ------------------------------------------------------
+
+# \frac{1}{n1} \sum Y_t - mhat0(X_t)
+
+# See https://github.com/uber/causalml/issues/323 
+#   for discussion on S vs. T learners
+#  - S-learner: fit on full dataset
+#  - T-learner: separately fit on just the co units
+# --> I'll just use T-learner, doesn't drop much data (few tx units)
+
+### lm
+
+m_lm <- lm(Y ~ X1*X2, data = df %>% filter(!Z))
+ATT_or_lm <- df %>% 
+  filter(Z) %>% 
+  mutate(mhat0 = predict(m_lm, newdata=.)) %>% 
+  summarize(ATThat = mean(Y - mhat0)) %>% 
+  pull(ATThat)
+
+
+### BART
 
 # History of packages (see Nonparametric Machine Learning and Efficient
 #  Computation with Bayesian Additive Regression Trees: The BART R Package):
@@ -138,46 +186,96 @@ if (F) {
 
 # Hill uses BayesTree, so I'll use dbarts
 # TODO: add a propensity score for even better results
-require(dbarts)
 
-m_bart <- bart(x.train = df %>% select(Z,X1,X2), 
-               y.train = df$Y,
-               x.test  = df %>% 
-                 select(Z,X1,X2) %>% 
+m_bart <- bart(x.train = df %>% 
+                 filter(Z==0) %>% 
+                 select(X1,X2), 
+               y.train = df %>% 
+                 filter(Z==0) %>% 
+                 pull(Y),
+               x.test = df %>% 
                  filter(Z==1) %>% 
-                 mutate(Z=0) )
+                 select(X1,X2))
 
 # grab counterfactual predictions for each treated unit
-preds_bart <- df %>% 
+ATT_or_bart <- df %>% 
   filter(Z==1) %>% 
-  mutate(Y0hat = colMeans(m_bart$yhat.test))
+  mutate(mhat0 = colMeans(m_bart$yhat.test)) %>% 
+  summarize(ATThat = mean(Y-mhat0)) %>% 
+  pull(ATThat)
 
-# get ATT estimate: it's great!
-preds_bart %>% 
-  summarize(ATThat = mean(Y-Y0hat))
 
-# visualize BART predictions
-if (F) {
-  # TODO
+
+# propensity score --------------------------------------------------------
+
+# \frac{1}{n} \sum Y_t - e(Xj)/(1-e(Xj)) Y_j
+
+### lm
+
+m_lm_ps <- glm(Z ~ X1*X2, data = df, family="binomial")
+ATT_ps_lm <- df %>% 
+  mutate(e = predict(m_lm_ps, newdata=.),
+         wt = ifelse(Z, 1, e/(1-e))) %>% 
+  summarize(ATThat = sum(Z*wt*Y - (1-Z)*wt*Y) / n()) %>% 
+  pull(ATThat)
+
+
+
+# tmle --------------------------------------------------------------------
+
+tmle1 <- tmle(Y = df$Y, 
+              A = as.numeric(df$Z),
+              W = df %>% 
+                select(X1,X2) %>% 
+                mutate(X3=X1*X2),
+              Q.SL.library = SL.library1,
+              g.SL.library = SL.library1)
+ATT_tmle1 <- tmle1$estimates$ATT$psi
+
+if (T) {
+  tmle2 <- tmle(Y = df$Y, 
+                A = as.numeric(df$Z),
+                W = df %>% 
+                  select(X1,X2) %>% 
+                  mutate(X3=X1*X2),
+                Q.SL.library = SL.library2,
+                g.SL.library = SL.library2)
+  ATT_tmle2 <- tmle2$estimates$ATT$psi
 }
 
 
+# timing
+if (F) {
+  require(tictoc)
+  SL.library2 <- c("SL.glm", "SL.gam")
+  tic()
+  tmle2 <- tmle(Y = df$Y, 
+                A = as.numeric(df$Z),
+                W = df %>% 
+                  select(X1,X2) %>% 
+                  mutate(X3=X1*X2),
+                Q.SL.library = SL.library2,
+                g.SL.library = SL.library2)
+  tmle2$estimates$ATT$psi
+  toc()
+  
+  # glm: 0.59 sec
+  # gam: 5.45 sec
+  # glmnet: 7.5 sec
+  # randomForest: 29.28 sec
+  # xgboost: 64.51 sec
+  # gbm: super slow, at least 5 mins
+  # bartMachine: also super slow, at least 5 mins
+}
 
-# BART propensity score ---------------------------------------------------
 
-# TODO
+# AIPW --------------------------------------------------------------------
 
-
-
-# aipw --------------------------------------------------------------------
+# refresher on doubly robust estimation:
+# http://www2.stat.duke.edu/~fl35/teaching/640/Chap3.5_Doubly%20Robust%20Estimation.pdf
 
 # https://cran.r-project.org/web/packages/AIPW/AIPW.pdf
 # https://github.com/yqzhong7/AIPW for short vignette
-require(AIPW)
-require(SuperLearner)
-
-listWrappers()
-SL.library1 <- c("SL.mean", "SL.lm", "SL.glm")
 
 aipw1 <- AIPW$
   new(Y = df$Y,
@@ -187,21 +285,18 @@ aipw1 <- AIPW$
         mutate(X3=X1*X2),
       Q.SL.library = SL.library1,
       g.SL.library = SL.library1,
-      k_split = 10,
+      k_split = 5,
       verbose = T)$
   stratified_fit()$
   summary()
+ATT_aipw1 <- aipw1$ATT_estimates$RD['Estimate'] %>% as.numeric()
 
+# listWrappers()
 # print(aipw1$result)
 # aipw1$obs_est %>% names()
-aipw1$ATT_estimates
-
-
 
 # takes a few minutes to run, is very accurate
-if (F) {
-  SL.library2 <- c("SL.glmnet", "SL.randomForest", "SL.xgboost")
-  
+if (T) {
   aipw2 <- AIPW$
     new(Y = df$Y,
         A = df$Z,
@@ -212,90 +307,38 @@ if (F) {
         verbose = T)$
     stratified_fit()$
     summary()
-  
-  # print(aipw1$result)
-  # aipw1$obs_est %>% names()
-  aipw2$ATT_estimates
+  ATT_aipw2 <- aipw2$ATT_estimates$RD['Estimate'] %>% as.numeric()
 }
 
 
-
-# tmle --------------------------------------------------------------------
-
-require(tmle)
-
-SL.library1 <- c("SL.mean", "SL.lm", "SL.glm")
-
-tmle1 <- tmle(Y = df$Y, 
-              A = as.numeric(df$Z),
-              W = df %>% 
-                select(X1,X2) %>% 
-                mutate(X3=X1*X2),
-              Q.SL.library = SL.library1,
-              g.SL.library = SL.library1)
-tmle1$estimates$ATT
-
-# grab AIPW ATT estimate
-df %>% 
-  mutate(ehat = tmle1$g$g1W,
-         mhat0 = as.numeric(tmle1$Qstar[,'Q0W'])) %>% 
-  summarize(ATThat = 
-              sum(Y*Z - 
-                    (Y*(1-Z)*ehat + mhat0*(Z-ehat)) / (1-ehat) ) / 
-              sum(Z) )
-
+# timing
 if (F) {
-  tmle2 <- tmle(Y = df$Y, 
-                A = as.numeric(df$Z),
-                W = df %>% 
-                  select(X1,X2) %>% 
-                  mutate(X3=X1*X2),
-                Q.SL.library = SL.library2,
-                g.SL.library = SL.library2)
-  tmle2$estimates$ATT
-}
-
-
-
-df %>% 
-  mutate(ehat = tmle1$g$g1W,
-         mhat0 = as.numeric(tmle1$Qstar[,'Q0W'])) %>% 
-  summarize(ATThat = 
-              sum(Y*Z - 
-                  (Y*(1-Z)*ehat + mhat0*(Z-ehat)) / (1-ehat) ) / 
-              sum(Z) )
-
-
-if (F) {
-  # manually estimate ATE: 
-  # using Qstar matches what AIPW package spits out
-  df %>% 
-    mutate(ehat = tmle1$g$g1W,
-           mhat0 = as.numeric(tmle1$Qstar[,'Q0W']),
-           mhat1 = as.numeric(tmle1$Qstar[,'Q1W'])) %>%    # with Qstar?
-    summarize(ATEhat = 
-                sum(Y*Z/ehat - (Z-ehat)*mhat1/ehat) / n() -
-                sum(Y*(1-Z)/(1-ehat) + (Z-ehat)*mhat0/(1-ehat)) / n())
-  
-  # with AIPW package
-  aipw_tmle1 <- AIPW_tmle$
-    new(Y = df$Y, 
-        A = as.numeric(df$Z),
-        tmle_fit = tmle1,
+  require(tictoc)
+  SL.library2 <- c("SL.glm", "SL.gam", "SL.glmnet", "SL.xgboost")
+  tic()
+  aipw2 <- AIPW$
+    new(Y = df$Y,
+        A = df$Z,
+        W = df %>% select(X1,X2) %>% mutate(X3=X1*X2),
+        Q.SL.library = SL.library2,
+        g.SL.library = SL.library2,
+        k_split = 5,
         verbose = T)$
-    summary(g.bound=0.025)
+    stratified_fit()$
+    summary()
+  aipw2$ATT_estimates$RD['Estimate']
+  toc()
+  
+  # glm: 1.82 sec
+  # gam: 12.5 sec, ish
+  # glmnet: 19.2 sec, ish
+  
+  # randomForest: 134.35 sec
+  # xgboost: 215 sec
 }
   
-
-
-
 
 # our method --------------------------------------------------------------
-
-source("R/distance.R")
-source("R/sc.R")
-source("R/matching.R")
-source("R/estimate.R")
 
 preds_csm <- get_cal_matches(
   df = df,
@@ -311,9 +354,12 @@ preds_csm <- get_cal_matches(
 )
 
 # get ATT estimate:
-preds_csm %>% 
+ATT_csm <- preds_csm %>% 
   group_by(Z) %>% 
-  summarize(Y = mean(Y*weights))
+  summarize(Y = mean(Y*weights)) %>% 
+  pivot_wider(names_from=Z, values_from=Y) %>% 
+  mutate(ATThat = `TRUE` - `FALSE`) %>% 
+  pull(ATThat)
 
 # check balance: it's great!
 if (F) {
@@ -333,9 +379,12 @@ preds_cem <- get_cem_matches(
   return = "sc_units")
 
 # get ATT estimate:
-preds_cem %>% 
+ATT_cem <- preds_cem %>% 
   group_by(Z) %>% 
-  summarize(Y = mean(Y*weights))
+  summarize(Y = mean(Y*weights)) %>% 
+  pivot_wider(names_from=Z, values_from=Y) %>% 
+  mutate(ATThat = `TRUE` - `FALSE`) %>% 
+  pull(ATThat)
 
 # check balance: it's great!
 if (F) {
@@ -349,26 +398,91 @@ if (F) {
 
 
 
-# TODO: some standard doubly robust thing? perhaps unnecessary
-#  - see https://cran.r-project.org/web/packages/drtmle/vignettes/using_drtmle.html
-#  - https://multithreaded.stitchfix.com/blog/2021/07/23/double-robust-estimator/
+# aggregate results -------------------------------------------------------
+
+toc()   # ~12-13 minutes, ish
+
+res <- c(
+  true = 0.2,
+  or_lm = ATT_or_lm,
+  or_bart = ATT_or_bart,
+  ps_lm = ATT_ps_lm,
+  bal = ATT_bal,
+  tmle1 = ATT_tmle1,
+  tmle2 = ATT_tmle2,
+  aipw1 = ATT_aipw1,
+  aipw2 = ATT_aipw2,
+  csm = ATT_csm,
+  cem = ATT_cem)
 
 
 
-# adaptive hyperboxes -----------------------------------------------------
+# reproducing AIPW from TMLE ----------------------------------------------
 
-# TODO: some almost matching exactly thing?
-#  - see https://almost-matching-exactly.github.io/software
-#  - issue: MALTS is only in python, adaptive hyperboxes are in R though
+# RESULTS: estimates are slightly different from TMLE
+#  - part of this is random noise
+#  - part of this is cross-fitting, I think...
+# --> I'll just use AIPW instead of backing out from TMLE
 
-
-
-
-
-
-
-
-
+if (F) {
+  # AIPW ATT estimate 1
+  df %>% 
+    mutate(ehat = tmle1$g$g1W,
+           mhat0 = as.numeric(tmle1$Qstar[,'Q0W'])) %>% 
+    summarize(ATThat = 
+                sum(Y*Z - 
+                      (Y*(1-Z)*ehat + mhat0*(Z-ehat)) / (1-ehat) ) / 
+                sum(Z) )
+  
+  # with initial Q estimate, not targeted one.
+  df %>% 
+    mutate(ehat = tmle1$g$g1W,
+           mhat0 = as.numeric(tmle1$Qinit$Q[,'Q0W'])) %>% 
+    summarize(ATThat = 
+                sum(Y*Z - 
+                      (Y*(1-Z)*ehat + mhat0*(Z-ehat)) / (1-ehat) ) / 
+                sum(Z) )
+  
+  
+  # AIPW ATT estimate 2
+  df %>% 
+    mutate(ehat = tmle1$g$g1W,
+           mhat0 = as.numeric(tmle1$Qstar[,'Q0W'])) %>% 
+    summarize(ATThat = 
+                sum(Y*Z - 
+                      (Y*(1-Z)*ehat + mhat0*(Z-ehat)) / (1-ehat) ) / 
+                sum(Z) )
+  
+  
+  
+  
+  df %>% 
+    mutate(ehat = tmle1$g$g1W,
+           mhat0 = as.numeric(tmle1$Qstar[,'Q0W'])) %>% 
+    summarize(ATThat = 
+                sum(Y*Z - 
+                      (Y*(1-Z)*ehat + mhat0*(Z-ehat)) / (1-ehat) ) / 
+                sum(Z) )
+  
+  
+  # manually estimate ATE: 
+  # using Qstar matches what AIPW package spits out
+  df %>% 
+    mutate(ehat = tmle1$g$g1W,
+           mhat0 = as.numeric(tmle1$Qstar[,'Q0W']),
+           mhat1 = as.numeric(tmle1$Qstar[,'Q1W'])) %>%    # with Qstar?
+    summarize(ATEhat = 
+                sum(Y*Z/ehat - (Z-ehat)*mhat1/ehat) / n() -
+                sum(Y*(1-Z)/(1-ehat) + (Z-ehat)*mhat0/(1-ehat)) / n())
+  
+  # with AIPW package
+  aipw_tmle1 <- AIPW_tmle$
+    new(Y = df$Y, 
+        A = as.numeric(df$Z),
+        tmle_fit = tmle1,
+        verbose = T)$
+    summary(g.bound=0.025)
+}
 
 
 
