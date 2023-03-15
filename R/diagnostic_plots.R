@@ -30,6 +30,13 @@ dist_density_plot <- function(d, dist_scaling, metric) {
            method = metric) %>% 
     diag()
   
+  res_list <- list(sc = sc_dists, avg = avg_dists, nn = nn_dists)
+  print(tibble(
+    method = c("SCM", "Average", "1-NN"),
+    mean = map_dbl(res_list, ~round(mean(.), 3)),
+    median = map_dbl(res_list, ~round(median(.), 3))
+  ))
+  
   tibble(SCM = sc_dists,
          Average = avg_dists,
          "1-NN" = nn_dists) %>% 
@@ -123,14 +130,16 @@ ess_plot <- function(d) {
   vars_df <- list(df_tx, df_sc, df_avg, df_1nn) %>% 
     map_dbl(~ .x %>% 
               agg_co_units() %>% 
-              summarize(var = sum(weights^2)) %>% 
-              pull(var)) %>% 
+              summarize(ess = sum(weights)^2 / sum(weights^2)) %>% 
+              pull(ess)) %>% 
     tibble(method = c("tx", "sc", "avg", "1nn"),
-           var = .)
+           ess = .)
+  
+  print(vars_df)
   
   vars_df %>% 
     mutate(method = factor(method, levels=c("1nn", "avg", "sc", "tx"))) %>% 
-    ggplot(aes(x=method, y=var)) +
+    ggplot(aes(x=method, y=ess)) +
     geom_col(aes(fill = method)) +
     scale_fill_manual(values = c("black",
                                  wesanderson::wes_palette("Zissou1", 5)[c(5,4,1)])) +
@@ -140,7 +149,7 @@ ess_plot <- function(d) {
                                 "Treated units")) +
     theme_classic() +
     guides(fill="none") +
-    labs(y = "Variance associated \nwith set of units",
+    labs(y = "ESS of set of units",
          x = "") +
     coord_flip()
 }

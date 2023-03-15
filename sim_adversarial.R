@@ -14,7 +14,10 @@ require(mvtnorm)
 
 # simplest example in 2D, just like toy example
 #  - constant treatment effect
-gen_df_adv2d <- function(nc, nt, sig=0.2) {
+gen_df_adv2d <- function(nc, nt, 
+                         tx_effect = 0.2,   # constant tx effect
+                         effect_fun = function(X1, X2) { abs(X1-X2) },
+                         sig=0.2) {
   MU <- c(0.5, 0.5)
   SIG <- matrix(c(0.5, 0.2, 0.2, 0.5), nrow=2)
   
@@ -41,11 +44,6 @@ gen_df_adv2d <- function(nc, nt, sig=0.2) {
   
   dat <- bind_rows(dat_txblobs, dat_coblobs, dat_conear)
   
-  # function for control POs
-  effect_fun <- function(X1, X2) { abs(X1-X2) }
-  # constant tx effect
-  tx_effect <- 0.2
-  
   dat %>% 
     mutate(Y0 = effect_fun(X1,X2),
            Y1 = effect_fun(X1,X2) + tx_effect,
@@ -69,12 +67,16 @@ if (F) {
 
 # generate data -----------------------------------------------------------
 
-# GOAL: predict Y0 for treated units
-
-# generate data
 set.seed(90210)
-df <- gen_df_adv2d(nc=1000, nt=10, sig=0.2)
-if (F) {
+df <- gen_df_adv2d(nc=1000, nt=10, 
+                   tx_effect=0.2,
+                   effect_fun = function(x,y) {
+                     matrix(c(x,y), ncol=2) %>% 
+                       dmvnorm(mean = c(0.5,0.5),
+                               sigma = matrix(c(1,0.8,0.8,1), nrow=2))
+                   },
+                   sig=0.2)
+if (T) {
   df %>% 
     ggplot(aes(X1,X2)) +
     geom_point(aes(pch=as.factor(Z), color=Y0)) +
@@ -163,7 +165,129 @@ if (F) {
 
 # BART propensity score ---------------------------------------------------
 
-# TODO?
+# TODO
+
+
+
+# aipw --------------------------------------------------------------------
+
+# https://cran.r-project.org/web/packages/AIPW/AIPW.pdf
+# https://github.com/yqzhong7/AIPW for short vignette
+require(AIPW)
+require(SuperLearner)
+
+listWrappers()
+SL.library1 <- c("SL.mean", "SL.lm", "SL.glm")
+
+aipw1 <- AIPW$
+  new(Y = df$Y,
+      A = df$Z,
+      W = df %>% 
+        select(X1,X2) %>% 
+        mutate(X3=X1*X2),
+      Q.SL.library = SL.library1,
+      g.SL.library = SL.library1,
+      k_split = 10,
+      verbose = T)$
+  stratified_fit()$
+  summary()
+
+# print(aipw1$result)
+# aipw1$obs_est %>% names()
+aipw1$ATT_estimates
+
+
+
+# takes a few minutes to run, is very accurate
+if (F) {
+  SL.library2 <- c("SL.glmnet", "SL.randomForest", "SL.xgboost")
+  
+  aipw2 <- AIPW$
+    new(Y = df$Y,
+        A = df$Z,
+        W = df %>% select(X1,X2) %>% mutate(X3=X1*X2),
+        Q.SL.library = SL.library2,
+        g.SL.library = SL.library2,
+        k_split = 5,
+        verbose = T)$
+    stratified_fit()$
+    summary()
+  
+  # print(aipw1$result)
+  # aipw1$obs_est %>% names()
+  aipw2$ATT_estimates
+}
+
+
+
+# tmle --------------------------------------------------------------------
+
+require(tmle)
+
+SL.library1 <- c("SL.mean", "SL.lm", "SL.glm")
+
+tmle1 <- tmle(Y = df$Y, 
+              A = as.numeric(df$Z),
+              W = df %>% 
+                select(X1,X2) %>% 
+                mutate(X3=X1*X2),
+              Q.SL.library = SL.library1,
+              g.SL.library = SL.library1)
+tmle1$estimates$ATT
+
+# grab AIPW ATT estimate
+df %>% 
+  mutate(ehat = tmle1$g$g1W,
+         mhat0 = as.numeric(tmle1$Qstar[,'Q0W'])) %>% 
+  summarize(ATThat = 
+              sum(Y*Z - 
+                    (Y*(1-Z)*ehat + mhat0*(Z-ehat)) / (1-ehat) ) / 
+              sum(Z) )
+
+if (F) {
+  tmle2 <- tmle(Y = df$Y, 
+                A = as.numeric(df$Z),
+                W = df %>% 
+                  select(X1,X2) %>% 
+                  mutate(X3=X1*X2),
+                Q.SL.library = SL.library2,
+                g.SL.library = SL.library2)
+  tmle2$estimates$ATT
+}
+
+
+
+df %>% 
+  mutate(ehat = tmle1$g$g1W,
+         mhat0 = as.numeric(tmle1$Qstar[,'Q0W'])) %>% 
+  summarize(ATThat = 
+              sum(Y*Z - 
+                  (Y*(1-Z)*ehat + mhat0*(Z-ehat)) / (1-ehat) ) / 
+              sum(Z) )
+
+
+if (F) {
+  # manually estimate ATE: 
+  # using Qstar matches what AIPW package spits out
+  df %>% 
+    mutate(ehat = tmle1$g$g1W,
+           mhat0 = as.numeric(tmle1$Qstar[,'Q0W']),
+           mhat1 = as.numeric(tmle1$Qstar[,'Q1W'])) %>%    # with Qstar?
+    summarize(ATEhat = 
+                sum(Y*Z/ehat - (Z-ehat)*mhat1/ehat) / n() -
+                sum(Y*(1-Z)/(1-ehat) + (Z-ehat)*mhat0/(1-ehat)) / n())
+  
+  # with AIPW package
+  aipw_tmle1 <- AIPW_tmle$
+    new(Y = df$Y, 
+        A = as.numeric(df$Z),
+        tmle_fit = tmle1,
+        verbose = T)$
+    summary(g.bound=0.025)
+}
+  
+
+
 
 
 # our method --------------------------------------------------------------
@@ -171,6 +295,7 @@ if (F) {
 source("R/distance.R")
 source("R/sc.R")
 source("R/matching.R")
+source("R/estimate.R")
 
 preds_csm <- get_cal_matches(
   df = df,

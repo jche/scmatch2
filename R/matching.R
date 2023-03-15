@@ -187,7 +187,6 @@ gen_matches <- function(df,
     }
   }
   
-  
   ### step 3: generate df of matched controls for each treated unit
   df_list <- map(1:ntx, function(x) {
     
@@ -210,7 +209,7 @@ gen_matches <- function(df,
     
     df %>%
       filter(as.logical({{treatment}})) %>%
-      slice(x) %>%
+      dplyr::slice(x) %>%
       mutate(dist = 0) %>%
       rbind(matched_rows) %>%
       mutate(subclass = x)

@@ -154,14 +154,18 @@ set.seed(1)
 #   geom_hline(yintercept=0, lty="dotted")
 # satt_plot2(calada_scm, B=100) +
 #   geom_hline(yintercept=0, lty="dotted")
-satt_plot3(calada_scm, B=1000) +
+foo <- satt_plot3(calada_scm, B=1000)
+foo +
   geom_hline(yintercept=0, lty="dotted") +
-  theme(# legend.direction="horizontal",
-        # legend.position = c(0.5, 0.9),
-        legend.position = "bottom",
+  theme(legend.direction="horizontal",
+        legend.position = c(0.5, 0.85),
+        # legend.position = "bottom",
         legend.background = element_blank(),
-        legend.box.background = element_rect(colour = "black"))
-ggsave("writeup/figures/lalonde_att.png", height=3, width=5)
+        legend.box.background = element_rect(colour = "black")) +
+  labs(y = "Cumulative ATT Estimate",
+       x = "Total number of treated units used",
+       color = "Maximum \ncaliper \nsize used    ")
+ggsave("writeup/figures/lalonde_att.png", height=3, width=6)
 
 
 # Love plot vs. # co units added
@@ -182,7 +186,7 @@ love_plot2(calada_scm, covs = paste0("X", 5:8)) +
   facet_wrap(~name, 
              scales="free",
              labeller = labeller(name = love_labs))
-ggsave("writeup/figures/lalonde_love2.png", height=3, width=5)
+ggsave("writeup/figures/lalonde_love2.png", height=3, width=6)
 
 
 
