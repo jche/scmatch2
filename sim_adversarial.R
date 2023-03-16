@@ -343,7 +343,7 @@ if (F) {
 preds_csm <- get_cal_matches(
   df = df,
   metric = "maximum",
-  cal_method = "cem",
+  cal_method = "fixed",
   est_method = "scm",
   return = "sc_units",
   num_bins = 5,

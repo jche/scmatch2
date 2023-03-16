@@ -12,7 +12,7 @@
 #' @param df 
 #' @param metric 
 #' @param caliper 
-#' @param cal_method 
+#' @param cal_method adaptive caliper, fixed caliper, only 1nn caliper
 #' @param est_method 
 #' @param return 
 #' @param dist_scaling 
@@ -22,7 +22,7 @@
 get_cal_matches <- function(df,
                             metric = c("maximum", "euclidean", "manhattan"),
                             caliper = 1,
-                            cal_method = c("ada", "cem"),
+                            cal_method = c("adaptive", "fixed", "1nn"),
                             est_method = c("scm", "scm_extrap", "average"),
                             return = c("sc_units", "agg_co_units", "all"),
                             dist_scaling = df %>%
@@ -38,31 +38,15 @@ get_cal_matches <- function(df,
   return <- match.arg(return)
   args <- list(...)
   
-  ### use cal_method: determine distance metric and generate matches
-  
-  if (cal_method == "cem") {
-    if (!all(c('num_bins', 'wider') %in% names(args))) {
-      stop("CEM caliper matches needs arguments: num_bins, wider")
-    }
-    
-    dist_scaling <- df %>%
-      summarize(across(starts_with("X"), 
-                       function(x) {
-                         if (is.numeric(x)) args$num_bins / (max(x) - min(x))
-                         else 1000
-                       }))
-    if (!args$wider) {
-      dist_scaling <- 2*dist_scaling
-    }
-  }
+  ### use cal_method: generate matches
   
   # get caliper matches
   scmatches <- df %>%
     gen_matches(
       scaling = dist_scaling, 
-      method = metric,
+      metric = metric,
       caliper = caliper,
-      adaptive = (cal_method=="ada"),
+      cal_method = cal_method,
       ...)
   
   ### use est_method: scm or average
@@ -124,10 +108,11 @@ gen_matches <- function(df,
                         covs = starts_with("X"),
                         treatment = Z,
                         scaling,
-                        method,
+                        metric,
                         caliper,
-                        adaptive = T,
+                        cal_method = c("adaptive", "1nn", "fixed"),
                         ...) {
+  cal_method <- match.arg(cal_method)
   args <- list(...)
   
   # store helpful constants
@@ -140,12 +125,13 @@ gen_matches <- function(df,
                covs={{covs}}, 
                treatment={{treatment}}, 
                scaling=scaling, 
-               method=method)
+               metric=metric)
   
   
   ### step 1: get caliper for each treated unit
   
-  if (adaptive) {
+  # adaptive caliper: min(caliper, 1nn)
+  if (cal_method == "adaptive") {
     # default: p+1 nearest neighbors
     if (is.null(args$knn)) {
       knn <- p+1
@@ -167,8 +153,10 @@ gen_matches <- function(df,
         min_dists[i] <- min(caliper, temp_sorted[knn])
       }
     }
-  } else {
+  } else if (cal_method == "1nn") {
     min_dists <- apply(dm, 1, min)
+  } else {
+    min_dists <- rep(caliper, nrow(dm))
   }
   
   
@@ -285,9 +273,9 @@ get_cem_matches <- function(
                                   paste0(grep("^X", names(df), value=T), 
                                          collapse="+"))),
     num_bins,
-    method = c("average", "scm"),
+    est_method = c("average", "scm"),
     return = c("sc_units", "agg_co_units", "all")) {
-  method <- match.arg(method)
+  est_method <- match.arg(est_method)
   return <- match.arg(return)
   
   m.out3 <- MatchIt::matchit(
@@ -333,7 +321,7 @@ get_cem_matches <- function(
                                                 if (is.numeric(x)) num_bins / (max(x) - min(x))
                                                 else 1000
                                               })),
-                           est_method = method,
+                           est_method = est_method,
                            metric = "maximum")
   
   # aggregate outcomes as desired

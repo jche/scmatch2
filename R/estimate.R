@@ -29,7 +29,8 @@ agg_sc_units <- function(scweights) {
     summarize(across(starts_with("X"),
                      ~sum(.x * weights)),
               across(starts_with("Y"),
-                     ~sum(.x * weights))) %>%
+                     ~sum(.x * weights)),
+              .groups="drop_last") %>%
     mutate(id = c(NA, subclass[1]), .before="subclass") %>% 
     mutate(weights = 1) %>% 
     ungroup()

@@ -9,15 +9,15 @@
 #' @param covs covariates; default all "X" variables
 #' @param treatment treatment variable; default "Z"
 #' @param scaling vector of scaling constants for covariates
-#' @param method distance metric to use
+#' @param metric distance metric to use
 #'
 #' @return (#tx) by (#co) distance matrix
 gen_dm <- function(df, 
                    covs = starts_with("X"),
                    treatment = Z,
                    scaling = 1,
-                   method = c("maximum", "euclidean", "manhattan")) {
-  method <- match.arg(method)
+                   metric = c("maximum", "euclidean", "manhattan")) {
+  metric <- match.arg(metric)
   
   # pull out df with only covariates
   covs <- df %>%
@@ -47,7 +47,7 @@ gen_dm <- function(df,
   
   # compute (#tx) x (#co) distance matrix
   # TODO: any way to make this faster?
-  dm <- flexclust::dist2(covs[tx_obs,], covs[co_obs,], method = method)
+  dm <- flexclust::dist2(covs[tx_obs,], covs[co_obs,], method = metric)
   rownames(dm) <- tx_obs
   colnames(dm) <- co_obs
   

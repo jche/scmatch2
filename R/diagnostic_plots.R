@@ -11,12 +11,12 @@ dist_density_plot <- function(d, dist_scaling, metric) {
   sc_dists <- d %>% 
     agg_sc_units() %>% 
     gen_dm(scaling = dist_scaling,
-           method = metric) %>% 
+           metric = metric) %>% 
     diag()
   avg_dists <- d %>% 
     agg_avg_units() %>% 
     gen_dm(scaling = dist_scaling,
-           method = metric) %>% 
+           metric = metric) %>% 
     diag()
   
   nn_dists <- d %>% 
@@ -27,7 +27,7 @@ dist_density_plot <- function(d, dist_scaling, metric) {
     ungroup() %>% 
     agg_avg_units() %>% 
     gen_dm(scaling = dist_scaling,
-           method = metric) %>% 
+           metric = metric) %>% 
     diag()
   
   res_list <- list(sc = sc_dists, avg = avg_dists, nn = nn_dists)
@@ -56,12 +56,12 @@ scm_vs_avg_plot <- function(d, dist_scaling, metric) {
   sc_dists <- d %>% 
     agg_sc_units() %>% 
     gen_dm(scaling = dist_scaling,
-           method = metric) %>% 
+           metric = metric) %>% 
     diag()
   avg_dists <- d %>% 
     agg_avg_units() %>% 
     gen_dm(scaling = dist_scaling,
-           method = metric) %>% 
+           metric = metric) %>% 
     diag()
   
   

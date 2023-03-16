@@ -27,12 +27,17 @@ source("R/estimate.R")
 
 
 SL.library1 <- c("SL.mean", "SL.lm", "SL.glm")
-# "based on Dorie et al. ACIC 2016 competition 
+
+# "based on Dorie et al. ACIC 2016 competition
 #   and SuperLearner documentation,
 #   adjusted to reduce the computational burden"
 SL.library2 <- c("SL.glm", "SL.gam", "SL.glmnet",
                  # "SL.gbm", "SL.bartMachine",   # too slow
-                 "SL.randomForest", "SL.xgboost")
+                 "SL.randomForest", "SL.xgboost")             # based on aipw recommendations
+
+# tmle defaults
+SL.library3Q <- c("SL.glm", "tmle.SL.dbarts2", "SL.glmnet")   # default tmle Q.SL.library
+SL.library3g <-  c("SL.glm", "tmle.SL.dbarts.k.5", "SL.gam")  # default tmle g.SL.library
 
 
 # functions for generating data -------------------------------------------
@@ -146,26 +151,29 @@ get_att_ps_lm <- function(d,
 
 get_att_tmle <- function(d, 
                          covs,
-                         SL.library) {
+                         Q.SL.library,
+                         g.SL.library) {
   tmle <- tmle(Y = d$Y, 
                A = as.numeric(d$Z),
                W = d %>% 
                  select({{covs}}),
-               Q.SL.library = SL.library,
-               g.SL.library = SL.library)
+               Q.SL.library = Q.SL.library,
+               g.SL.library = g.SL.library,
+               V = 5)
   tmle$estimates$ATT$psi
 }
 
 get_att_aipw <- function(d,
                          covs,
-                         SL.library) {
+                         Q.SL.library,
+                         g.SL.library) {
   aipw <- AIPW$
     new(Y = d$Y,
         A = d$Z,
         W = d %>% 
           select({{covs}}),
-        Q.SL.library = SL.library1,
-        g.SL.library = SL.library1,
+        Q.SL.library = Q.SL.library,
+        g.SL.library = g.SL.library,
         k_split = 5,
         verbose = F)$
     stratified_fit()$
@@ -176,15 +184,20 @@ get_att_aipw <- function(d,
 }
 
 get_att_csm <- function(d,
-                        num_bins) {
+                        num_bins,
+                        est_method = "scm") {
   preds_csm <- get_cal_matches(
     df = d,
     metric = "maximum",
-    cal_method = "cem",
-    est_method = "scm",
+    cal_method = "fixed",
+    est_method = est_method,
+    dist_scaling = d %>%
+      summarize(across(starts_with("X"),
+                       function(x) {
+                         if (is.numeric(x)) num_bins / (max(x) - min(x))
+                         else 1000
+                       })),
     return = "sc_units",
-    num_bins = num_bins,
-    wider = F,
     cem_tx_units = d %>% 
       filter(Z==1) %>% 
       pull(id)
@@ -200,11 +213,12 @@ get_att_csm <- function(d,
 }
 
 get_att_cem <- function(d,
-                        num_bins) {
+                        num_bins,
+                        est_method = "average") {
   preds_cem <- get_cem_matches(
     df = d,
     num_bins = num_bins,
-    method = "average",
+    est_method = est_method,
     return = "sc_units")
   
   # get ATT estimate:
@@ -220,7 +234,7 @@ get_att_cem <- function(d,
 # test these
 if (F) {
   df <- gen_df_adv2d(nc=1000, nt=10, sig=0.2)
-  df <- gen_df_adv2d(nc=1000, nt=10, 
+  df <- gen_df_adv2d(nc=1000, nt=50, 
                      tx_effect=0.2,
                      effect_fun = function(x,y) {
                        matrix(c(x,y), ncol=2) %>% 
@@ -243,25 +257,24 @@ if (F) {
   get_att_tmle(df %>% 
                  mutate(X3 = X1*X2), 
                covs=c(X1,X2,X3),
-               SL.library = SL.library1)
+               Q.SL.library = SL.library1,
+               g.SL.library = SL.library1)
   get_att_aipw(df %>% 
                  mutate(X3 = X1*X2), 
                covs=c(X1,X2,X3),
-               SL.library = SL.library1)
+               Q.SL.library = SL.library1,
+               g.SL.library = SL.library1)
   
-  get_att_csm(df, num_bins=5)
-  get_att_cem(df, num_bins=5)
+  get_att_csm(df, num_bins=5, est_method="scm")
+  get_att_cem(df, num_bins=5, est_method="scm")
 }
 
 
 
 # run simulations ---------------------------------------------------------
 
-pars <- expand_grid(
-  nc = 1000,
-  nt = 10,
-  sig = 0.2
-)
+# TODO: 1nn might do well here...
+# TODO: I think csm is only getting 1nn...?
 
 zform1 <- as.formula("Z ~ X1+X2")
 zform2 <- as.formula("Z ~ X1*X2")
@@ -270,64 +283,89 @@ form2 <- as.formula("Y ~ X1*X2")
 
 # repeatedly run for all combinations of pars
 tic()
-total_res <- map_dfr(
-  1:3,
-  function(x) {
-    pars %>% 
-      mutate(runid = x, .before=nc) %>% 
-      rowwise() %>% 
-      mutate(df = list(gen_df_adv2d(nc, nt, sig,
-                                    effect_fun = function(x,y) {
-                                      matrix(c(x,y), ncol=2) %>% 
-                                        dmvnorm(mean = c(0.5,0.5),
-                                                sigma = matrix(c(1,0.8,0.8,1), nrow=2))
-                                    }) %>% 
-                         mutate(X3 = X1*X2))) %>% 
-      mutate(bal1 = get_att_bal(df, zform1, c(0.01, 0.01)),
-             bal2 = get_att_bal(df, zform2, c(0.01, 0.01, 0.01)),
-             
-             or_lm = get_att_or_lm(df, form=form2),
-             or_bart = get_att_or_bart(df, covs=c(X1, X2)),
-             ps_lm = get_att_ps_lm(df, zform2),
-             
-             tmle1 = get_att_tmle(df, covs=c(X1,X2,X3), SL.library1),
-             tmle2 = get_att_tmle(df, covs=c(X1,X2), SL.library2),
-             tmle3 = get_att_tmle(df, covs=c(X1,X2,X3), SL.library2),
-             
-             aipw1 = get_att_aipw(df, covs=c(X1,X2,X3), SL.library1),
-             aipw2 = get_att_aipw(df, covs=c(X1,X2), SL.library2),
-             aipw3 = get_att_aipw(df, covs=c(X1,X2,X3), SL.library2),
-             
-             csm = get_att_csm(df, num_bins=5),
-             cem = get_att_cem(df, num_bins=5)) %>% 
-      ungroup() %>% 
-      select(-df)
-  })
+for (i in 1:100) {
+  df <- gen_df_adv2d(nc=1000, nt=50, sig=0.2,
+                     effect_fun = function(x,y) {
+                       matrix(c(x,y), ncol=2) %>% 
+                         dmvnorm(mean = c(0.5,0.5),
+                                 sigma = matrix(c(1,0.8,0.8,1), nrow=2))}) %>% 
+               mutate(X3 = X1*X2)
+  
+  res <- tibble(
+    runid = i,
+    bal1 = get_att_bal(df, zform1, c(0.01, 0.01)),
+    bal2 = get_att_bal(df, zform2, c(0.01, 0.01, 0.01)),
+    
+    or_lm = get_att_or_lm(df, form=form2),
+    or_bart = get_att_or_bart(df, covs=c(X1, X2)),
+    ps_lm = get_att_ps_lm(df, zform2),
+    
+    csm_scm = get_att_csm(df, num_bins=5, est_method="scm"),
+    csm_avg = get_att_csm(df, num_bins=5, est_method="average"),
+    cem_scm = get_att_cem(df, num_bins=5, est_method="scm"),
+    cem_avg = get_att_cem(df, num_bins=5, est_method="average"),
+    
+    tmle1 = get_att_tmle(df, covs=c(X1,X2,X3),
+                         Q.SL.library = SL.library1,
+                         g.SL.library = SL.library1),
+    # tmle2 = get_att_tmle(df, covs=c(X1,X2),
+    #                      Q.SL.library = SL.library3Q,
+    #                      g.SL.library = SL.library3g),
+    tmle3 = get_att_tmle(df, covs=c(X1,X2,X3),
+                         Q.SL.library = SL.library3Q,
+                         g.SL.library = SL.library3g),
+    
+    aipw1 = get_att_aipw(df, covs=c(X1,X2,X3), 
+                         Q.SL.library = SL.library1,
+                         g.SL.library = SL.library1),
+    # aipw2 = get_att_aipw(df, covs=c(X1,X2),
+    #                      Q.SL.library = SL.library2,
+    #                      g.SL.library = SL.library2),
+    aipw3 = get_att_aipw(df, covs=c(X1,X2,X3),
+                         Q.SL.library = SL.library2,
+                         g.SL.library = SL.library2)
+  )
+  
+  FNAME <- "sim_adversarial_results/test3.csv"
+  if (file.exists(FNAME)) {
+    write_csv(res, FNAME, append=T)
+  } else {
+    write_csv(res, FNAME)
+  }
+}
 toc()
-
-write_csv(total_res, "sim_adversarial_results/test2.csv")
-
 
 
 
 # analyze results ---------------------------------------------------------
 
 # plot sample data
-gen_df_adv2d(nc=1000, nt=10, sig=0.2) %>% 
+gen_df_adv2d(nc=1000, nt=50, sig=0.2) %>% 
   ggplot(aes(x=X1, y=X2, color=Y)) +
   geom_point(aes(pch=Z)) +
   scale_color_continuous(low="blue", high="orange")
 
 
-total_res <- read_csv("sim_adversarial_results/test2.csv")
+total_res <- read_csv("sim_adversarial_results/test3.csv")
 # show results
 total_res %>% 
-  pivot_longer(bal1:cem) %>% 
+  pivot_longer(-runid) %>% 
   group_by(name) %>% 
   summarize(rmse = sqrt(mean((value-0.2)^2)),
             bias = mean(value-0.2),
             sd   = sd(value))
 
-
+total_res %>% 
+  pivot_longer(-runid) %>% 
+  group_by(name) %>% 
+  summarize(rmse = sqrt(mean((value-0.2)^2)),
+            bias = mean(value-0.2),
+            sd   = sd(value)) %>% 
+  rename(method = name) %>% 
+  pivot_longer(rmse:sd) %>% 
+  ggplot(aes(x=method, y=value)) +
+  geom_col() +
+  facet_wrap(~name, scales="free") +
+  coord_flip()
 
 
