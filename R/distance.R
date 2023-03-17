@@ -47,7 +47,9 @@ gen_dm <- function(df,
   
   # compute (#tx) x (#co) distance matrix
   # TODO: any way to make this faster?
-  dm <- flexclust::dist2(covs[tx_obs,], covs[co_obs,], method = metric)
+  dm <- flexclust::dist2(matrix(covs[tx_obs,], ncol = ncol(covs)),   # in case only one tx unit
+                         covs[co_obs,], 
+                         method = metric)
   rownames(dm) <- tx_obs
   colnames(dm) <- co_obs
   

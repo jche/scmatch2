@@ -157,6 +157,53 @@ gen_df_veryadv <- function(nc, nt,
 }
 
 
+
+# simplest example in 2D, just like toy example
+gen_df_advhet <- function(nc, nt, 
+                          tx_effect = function(X1, X2) {(X1-0.5)^2+(X2-0.5)^2},
+                          eps_sd = 0.1,
+                          effect_fun = function(X1, X2) { abs(X1-X2) }) {
+  
+  # tx units clustered at (0,0) and (1,1)
+  dat_txblobs <- tibble(
+    X1 = c(rnorm(nt/2, mean=0, sd=0.2), 
+           rnorm(nt/2, mean=1, sd=0.2)),
+    X2 = c(rnorm(nt/2, mean=0, sd=0.2), 
+           rnorm(nt/2, mean=1, sd=0.2)),
+    Z  = T
+  )
+  
+  # co units clustered at (1,0) and (0,1)
+  dat_coblobs <- tibble(
+    X1 = c(rnorm((nc-nt)/2, mean=0, sd=0.2), 
+           rnorm((nc-nt)/2, mean=1, sd=0.2)),
+    X2 = c(rnorm((nc-nt)/2, mean=1, sd=0.2), 
+           rnorm((nc-nt)/2, mean=0, sd=0.2)),
+    Z  = F
+  )
+  
+  # some co units near (0,0) and (1,1)
+  dat_conear <- tibble(
+    X1 = c(rnorm(nt/2, mean=0, sd=0.2), 
+           rnorm(nt/2, mean=1, sd=0.2)),
+    X2 = c(rnorm(nt/2, mean=0, sd=0.2), 
+           rnorm(nt/2, mean=1, sd=0.2)),
+    Z  = F
+  )
+  
+  dat <- bind_rows(dat_txblobs, dat_coblobs, dat_conear)
+  
+  res <- dat %>% 
+    mutate(Y0 = effect_fun(X1,X2) + rnorm(n(), mean=0, sd=eps_sd),
+           Y1 = effect_fun(X1,X2) + tx_effect(X1,X2) + rnorm(n(), mean=0, sd=eps_sd),
+           Y  = ifelse(Z, Y1, Y0)) %>% 
+    mutate(id = 1:n(), .before=X1)
+  print(paste0("SD of control outcomes: ", round(sd(res$Y0),4)))
+  
+  return(res)
+}
+
+
 # wrapper functions for getting att estimate ------------------------------
 
 get_att_bal <- function(d, 
@@ -276,7 +323,7 @@ get_att_csm <- function(d,
   preds_csm <- get_cal_matches(
     df = d,
     metric = "maximum",
-    cal_method = "fixed",
+    cal_method = "adaptive",
     est_method = est_method,
     dist_scaling = d %>%
       summarize(across(starts_with("X"),
@@ -284,11 +331,7 @@ get_att_csm <- function(d,
                          if (is.numeric(x)) num_bins / (max(x) - min(x))
                          else 1000
                        })),
-    return = "sc_units",
-    cem_tx_units = d %>% 
-      filter(Z==1) %>% 
-      pull(id)
-  )
+    return = "sc_units")
   
   # get ATT estimate:
   preds_csm %>% 
@@ -299,23 +342,48 @@ get_att_csm <- function(d,
     pull(ATT)
 }
 
+# estimates ATT!
 get_att_cem <- function(d,
                         num_bins,
                         est_method = "average") {
-  preds_cem <- get_cem_matches(
+  preds_feasible <- get_cem_matches(
     df = d,
     num_bins = num_bins,
     est_method = est_method,
     return = "sc_units")
   
   # get ATT estimate:
-  preds_cem %>% 
+  att_feasible <- preds_feasible %>% 
     group_by(Z) %>% 
     summarize(Y = mean(Y*weights)) %>% 
     pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
     mutate(ATT = YTRUE - YFALSE) %>% 
     pull(ATT)
+  
+  preds_infeasible <- d %>% 
+    filter(!Z | !(id %in% attr(preds_feasible, "feasible_units"))) %>% 
+    get_cal_matches(.,
+                    metric = "maximum",
+                    cal_method = "1nn",
+                    est_method = est_method,
+                    dist_scaling = d %>%
+                      summarize(across(starts_with("X"),
+                                       function(x) {
+                                         if (is.numeric(x)) num_bins / (max(x) - min(x))
+                                         else 1000
+                                       })),
+                    return = "sc_units")
+  att_infeasible <- preds_infeasible %>% 
+    group_by(Z) %>% 
+    summarize(Y = mean(Y*weights)) %>% 
+    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
+    mutate(ATT = YTRUE - YFALSE) %>% 
+    pull(ATT)
+  
+  return((att_feasible * sum(preds_feasible$Z) + 
+            att_infeasible * sum(preds_infeasible$Z)) / sum(d$Z))
 }
+
 
 get_att_1nn <- function(d, num_bins) {
   preds_1nn <- get_cal_matches(
@@ -407,13 +475,13 @@ form2 <- as.formula("Y ~ X1*X2")
 
 # repeatedly run for all combinations of pars
 tic()
-for (i in 1:100) {
+for (i in 1:250) {
   nc <- 1000
   nt <- 25
-  tx_effect <- 0.2
-  sd <- 0
-  df <- gen_df_adv2d(nc=nc, nt=nt, tx_effect=tx_effect, sd=sd,
-                     effect_fun = function(x,y) {
+  eps_sd <- 0
+  df <- gen_df_advhet(nc=nc, nt=nt, eps_sd = eps_sd,
+                      tx_effect = function(X1, X2) {(X1-0.5)^2+(X2-0.5)^2},
+                      effect_fun = function(x,y) {
                        matrix(c(x,y), ncol=2) %>% 
                          dmvnorm(mean = c(0.5,0.5),
                                  sigma = matrix(c(1,0.8,0.8,1), nrow=2))}) %>% 
@@ -423,11 +491,15 @@ for (i in 1:100) {
     runid = i,
     nc = nc,
     nt = nt,
-    tx_effect = tx_effect,
-    sd = sd,
+    eps_sd = eps_sd,
+    
+    true_ATT = df %>% 
+      filter(Z) %>% 
+      summarize(att = mean(Y1-Y0)) %>% 
+      pull(att),
     
     bal1 = get_att_bal(df, zform1, c(0.01, 0.01)),
-    bal2 = get_att_bal(df, zform2, c(0.01, 0.01, 0.01)),
+    bal2 = get_att_bal(df, zform2, c(0.01, 0.01, 0.1)),
     
     or_lm = get_att_or_lm(df, form=form2),
     or_bart = get_att_or_bart(df, covs=c(X1,X2)),
@@ -446,9 +518,9 @@ for (i in 1:100) {
     # tmle2 = get_att_tmle(df, covs=c(X1,X2),
     #                      Q.SL.library = SL.library3Q,
     #                      g.SL.library = SL.library3g),
-    # tmle3 = get_att_tmle(df, covs=c(X1,X2,X3),
-    #                      Q.SL.library = SL.library3Q,
-    #                      g.SL.library = SL.library3g),
+    tmle3 = get_att_tmle(df, covs=c(X1,X2,X3),
+                         Q.SL.library = SL.library3Q,
+                         g.SL.library = SL.library3g),
 
     aipw1 = get_att_aipw(df, covs=c(X1,X2,X3),
                          Q.SL.library = SL.library1,
@@ -456,12 +528,12 @@ for (i in 1:100) {
     # aipw2 = get_att_aipw(df, covs=c(X1,X2),
     #                      Q.SL.library = SL.library2,
     #                      g.SL.library = SL.library2),
-    # aipw3 = get_att_aipw(df, covs=c(X1,X2),
-    #                      Q.SL.library = SL.library2,
-    #                      g.SL.library = SL.library2)
+    aipw3 = get_att_aipw(df, covs=c(X1,X2),
+                         Q.SL.library = SL.library2,
+                         g.SL.library = SL.library2)
   )
   
-  FNAME <- "sim_adversarial_results/test5.csv"
+  FNAME <- "sim_adversarial_results/test_het2.csv"
   if (file.exists(FNAME)) {
     write_csv(res, FNAME, append=T)
   } else {
@@ -476,7 +548,7 @@ toc()
 
 # plot sample data
 set.seed(1)
-dat <- gen_df_adv2d(nc=1000, nt=50)
+dat <- gen_df_advhet(nc=1000, nt=50)
 vlines <- seq(min(dat$X1),max(dat$X1),length.out=6)
 hlines <- seq(min(dat$X2),max(dat$X2),length.out=6)
 dat %>% 
@@ -489,7 +561,7 @@ dat %>%
 
 
 
-total_res <- read_csv("sim_adversarial_results/test5.csv")
+total_res <- read_csv("sim_adversarial_results/test_het2.csv")
 # show results
 
 total_res %>% 
@@ -506,42 +578,17 @@ total_res %>%
 
 
 total_res %>% 
-  rename(y_sd = sd) %>%
-  pivot_longer(-(runid:y_sd)) %>%
-  group_by(name, nc, nt, tx_effect, y_sd) %>%
-  summarize(rmse = sqrt(mean((value-tx_effect)^2)),
-            bias = mean(value-tx_effect),
+  pivot_longer(-(runid:true_ATT)) %>%
+  group_by(nc,nt,eps_sd,name) %>%
+  summarize(rmse = sqrt(mean((value-true_ATT)^2)),
+            bias = mean(value-true_ATT),
             sd   = sd(value)) %>% 
   rename(method = name) %>% 
   # pivot_longer(c(rmse, bias, sd)) %>% 
   ggplot(aes(x=method)) +
   geom_col(aes(y=rmse)) +
-  facet_grid(nt~y_sd, scales="free") +
   coord_flip()
 
-
-# ISSUE: one nearest neighbor nails it in this sim...
-#  - and I was doing 1nn before when I thought I was doing csm...
-total_res %>% 
-  rename(y_sd = sd) %>%
-  pivot_longer(-(runid:y_sd)) %>%
-  group_by(name, nc, nt, tx_effect, y_sd) %>%
-  summarize(rmse = sqrt(mean((value-tx_effect)^2)),
-            bias = mean(value-tx_effect),
-            sd   = sd(value)) %>% 
-  rename(method = name) %>% 
-  filter(str_detect(method, "c*m_") | method=="onenn") %>% 
-  # pivot_longer(c(rmse, bias, sd)) %>% 
-  ggplot(aes(x=method)) +
-  geom_col(aes(y=rmse)) +
-  facet_grid(nt~y_sd, scales="free") +
-  coord_flip()
-
-
-
-# CURRENT ISSUES:
-# - 1nn nails it
-# - constant tx effect --> cem might drop weird units, leads to better results?
-#    - no... we're using a fixed caliper for csm.
-
+# CEM does worse now, since it suffers some bias (due to dropping units with extreme tx effects)
+# but 1nn still completely nails it! As does BART, but that's okay.
 

@@ -98,6 +98,87 @@ get_cal_matches <- function(df,
 }
 
 
+# TODO
+get_cem_matches <- function(
+    df, 
+    Z_FORMULA = as.formula(paste0("Z~", 
+                                  paste0(grep("^X", names(df), value=T), 
+                                         collapse="+"))),
+    num_bins,
+    est_method = c("average", "scm"),
+    return = c("sc_units", "agg_co_units", "all")) {
+  est_method <- match.arg(est_method)
+  return <- match.arg(return)
+  
+  m.out3 <- MatchIt::matchit(
+    Z_FORMULA,
+    data = df,
+    method = "cem",
+    estimand = "ATT",
+    grouping = NULL,   # exact match factor covariates
+    cutpoints = num_bins,
+    k2k = F)   # not 1:1 matching
+  m.data3 <- MatchIt::match.data(m.out3)
+  # print(glue("Number of tx units kept: {sum(m.data3$Z)}"))
+  
+  # transform m.data3 into our format
+  co_units <- m.data3 %>%
+    filter(Z == 0)
+  tx_units <- m.data3 %>%
+    filter(Z == 1) %>%
+    mutate(subclass_new = 1:n())  # give each tx unit its own subclass,
+  # instead of letting multiple tx units share subclass
+  
+  # generate list of dfs, tx unit in first row
+  # TODO: this is terribly slow, for no good reason...
+  cem_matched_gps <- tx_units %>%
+    split(f = ~subclass_new) %>%
+    map(function(d) {
+      d %>% 
+        bind_rows(
+          co_units %>%
+            filter(subclass == d$subclass) %>% 
+            mutate(subclass_new = d$subclass_new))
+    }) %>% 
+    map(~.x %>% 
+          mutate(subclass = subclass_new) %>% 
+          select(-subclass_new, -weights))
+  
+  # estimate outcomes within cells
+  scweights <- est_weights(df,
+                           matched_gps = cem_matched_gps,
+                           dist_scaling = df %>%
+                             summarize(across(starts_with("X"), 
+                                              function(x) {
+                                                if (is.numeric(x)) num_bins / (max(x) - min(x))
+                                                else 1000
+                                              })),
+                           est_method = est_method,
+                           metric = "maximum")
+  
+  # aggregate outcomes as desired
+  m.data <- switch(return,
+                   sc_units     = agg_sc_units(scweights),
+                   agg_co_units = agg_co_units(scweights),
+                   all          = bind_rows(scweights))
+  
+  unmatched_units <- setdiff(df %>% filter(Z==1) %>% pull(id),
+                             m.data %>% filter(Z==1) %>% pull(id))
+  if (length(unmatched_units) > 0) {
+    warning(glue::glue("Dropped the following treated units from data:
+                        \t {paste(unmatched_units, collapse=\", \")}"))
+  }
+  
+  attr(m.data, "feasible_units") <- m.data %>% 
+    filter(Z) %>% 
+    pull(id)
+  
+  return(m.data)
+}
+
+
+
+
 
 
 # matching method ---------------------------------------------------------
@@ -256,91 +337,6 @@ est_weights <- function(df,
   }
   return(scweights)
 }
-
-
-
-
-
-
-
-# CEM (for comparison) ----------------------------------------------------
-
-# TODO
-get_cem_matches <- function(
-    df, 
-    Z_FORMULA = as.formula(paste0("Z~", 
-                                  paste0(grep("^X", names(df), value=T), 
-                                         collapse="+"))),
-    num_bins,
-    est_method = c("average", "scm"),
-    return = c("sc_units", "agg_co_units", "all")) {
-  est_method <- match.arg(est_method)
-  return <- match.arg(return)
-  
-  m.out3 <- MatchIt::matchit(
-    Z_FORMULA,
-    data = df,
-    method = "cem",
-    estimand = "ATT",
-    grouping = NULL,   # exact match factor covariates
-    cutpoints = num_bins,
-    k2k = F)   # not 1:1 matching
-  m.data3 <- MatchIt::match.data(m.out3)
-  # print(glue("Number of tx units kept: {sum(m.data3$Z)}"))
-  
-  # transform m.data3 into our format
-  co_units <- m.data3 %>%
-    filter(Z == 0)
-  tx_units <- m.data3 %>%
-    filter(Z == 1) %>%
-    mutate(subclass_new = 1:n())  # give each tx unit its own subclass,
-                                  # instead of letting multiple tx units share subclass
-  
-  # generate list of dfs, tx unit in first row
-  # TODO: this is terribly slow, for no good reason...
-  cem_matched_gps <- tx_units %>%
-    split(f = ~subclass_new) %>%
-    map(function(d) {
-      d %>% 
-        bind_rows(
-          co_units %>%
-            filter(subclass == d$subclass) %>% 
-            mutate(subclass_new = d$subclass_new))
-    }) %>% 
-    map(~.x %>% 
-          mutate(subclass = subclass_new) %>% 
-          select(-subclass_new, -weights))
-  
-  # estimate outcomes within cells
-  scweights <- est_weights(df,
-                           matched_gps = cem_matched_gps,
-                           dist_scaling = df %>%
-                             summarize(across(starts_with("X"), 
-                                              function(x) {
-                                                if (is.numeric(x)) num_bins / (max(x) - min(x))
-                                                else 1000
-                                              })),
-                           est_method = est_method,
-                           metric = "maximum")
-  
-  # aggregate outcomes as desired
-  m.data <- switch(return,
-                   sc_units     = agg_sc_units(scweights),
-                   agg_co_units = agg_co_units(scweights),
-                   all          = bind_rows(scweights))
-  
-  unmatched_units <- setdiff(df %>% filter(Z==1) %>% pull(id),
-                             m.data %>% filter(Z==1) %>% pull(id))
-  if (length(unmatched_units) > 0) {
-    warning(glue::glue("Dropped the following treated units from data:
-                        \t {paste(unmatched_units, collapse=\", \")}"))
-  }
-  
-  return(m.data)
-}
-
-
-
 
 
 
