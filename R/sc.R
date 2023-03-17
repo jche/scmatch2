@@ -67,13 +67,10 @@ gen_sc_weights <- function(d, match_cols, dist_scaling,
   if (nrow(d) == 0) {
     return(tibble())
   } else if (nrow(d) == 2) {
-    print("only one match")
     return(d %>% 
              mutate(unit = c("tx1", "c1"),
                     weights = c(1,1)))
   }
-  print("multiple matches")
-  # browser()
   
   if (metric == "maximum") {
     # run linear program

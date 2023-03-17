@@ -38,48 +38,48 @@ SL.library2 <- c("SL.glm", "SL.gam", "SL.glmnet",
 
 
 # simplest example in 2D, just like toy example
-#  - constant treatment effect
 gen_df_adv2d <- function(nc, nt, 
-                         tx_effect = 0.2,   # constant tx effect
-                         effect_fun = function(X1, X2) { abs(X1-X2) },
-                         sig = 0.2) {
-  MU <- c(0.5, 0.5)
-  SIG <- matrix(c(0.5, 0.2, 0.2, 0.5), nrow=2)
+                         tx_effect = 0.3,   # constant tx effect
+                         sd = 0.1,
+                         effect_fun = function(X1, X2) { abs(X1-X2) }) {
   
   # tx units clustered at (0,0) and (1,1)
   dat_txblobs <- tibble(
-    X1 = c(rnorm(nt/2, mean=0, sd=sig), 
-           rnorm(nt/2, mean=1, sd=sig)),
-    X2 = c(rnorm(nt/2, mean=0, sd=sig), 
-           rnorm(nt/2, mean=1, sd=sig)),
+    X1 = c(rnorm(nt/2, mean=0, sd=0.2), 
+           rnorm(nt/2, mean=1, sd=0.2)),
+    X2 = c(rnorm(nt/2, mean=0, sd=0.2), 
+           rnorm(nt/2, mean=1, sd=0.2)),
     Z  = T
   )
   
   # co units clustered at (1,0) and (0,1)
   dat_coblobs <- tibble(
-    X1 = c(rnorm((nc-nt)/2, mean=0, sd=sig), 
-           rnorm((nc-nt)/2, mean=1, sd=sig)),
-    X2 = c(rnorm((nc-nt)/2, mean=1, sd=sig), 
-           rnorm((nc-nt)/2, mean=0, sd=sig)),
+    X1 = c(rnorm((nc-nt)/2, mean=0, sd=0.2), 
+           rnorm((nc-nt)/2, mean=1, sd=0.2)),
+    X2 = c(rnorm((nc-nt)/2, mean=1, sd=0.2), 
+           rnorm((nc-nt)/2, mean=0, sd=0.2)),
     Z  = F
   )
   
   # some co units near (0,0) and (1,1)
   dat_conear <- tibble(
-    X1 = c(rnorm(nt/2, mean=0, sd=sig), 
-           rnorm(nt/2, mean=1, sd=sig)),
-    X2 = c(rnorm(nt/2, mean=0, sd=sig), 
-           rnorm(nt/2, mean=1, sd=sig)),
+    X1 = c(rnorm(nt/2, mean=0, sd=0.2), 
+           rnorm(nt/2, mean=1, sd=0.2)),
+    X2 = c(rnorm(nt/2, mean=0, sd=0.2), 
+           rnorm(nt/2, mean=1, sd=0.2)),
     Z  = F
   )
   
   dat <- bind_rows(dat_txblobs, dat_coblobs, dat_conear)
   
-  dat %>% 
-    mutate(Y0 = effect_fun(X1,X2),
-           Y1 = effect_fun(X1,X2) + tx_effect,
+  res <- dat %>% 
+    mutate(Y0 = effect_fun(X1,X2) + rnorm(n(), mean=0, sd=sd),
+           Y1 = effect_fun(X1,X2) + tx_effect + rnorm(n(), mean=0, sd=sd),
            Y  = ifelse(Z, Y1, Y0)) %>% 
     mutate(id = 1:n(), .before=X1)
+  print(paste0("SD of control outcomes: ", round(sd(res$Y0),4)))
+  
+  return(res)
 }
 
 if (F) {
@@ -96,12 +96,12 @@ if (F) {
 # set.seed(90210)
 df <- gen_df_adv2d(nc=1000, nt=10, 
                    tx_effect=0.2,
+                   sd = 0.02,
                    effect_fun = function(x,y) {
                      matrix(c(x,y), ncol=2) %>% 
                        dmvnorm(mean = c(0.5,0.5),
                                sigma = matrix(c(1,0.8,0.8,1), nrow=2))
-                   },
-                   sig=0.2)
+                   })
 if (F) {
   df %>% 
     ggplot(aes(X1,X2)) +
@@ -345,9 +345,13 @@ preds_csm <- get_cal_matches(
   metric = "maximum",
   cal_method = "fixed",
   est_method = "scm",
+  dist_scaling = df %>%
+    summarize(across(starts_with("X"),
+                     function(x) {
+                       if (is.numeric(x)) 5 / (max(x) - min(x))
+                       else 1000
+                     })),
   return = "sc_units",
-  num_bins = 5,
-  wider = F,
   cem_tx_units = df %>% 
     filter(Z==1) %>% 
     pull(id)
@@ -375,7 +379,7 @@ if (F) {
 preds_cem <- get_cem_matches(
   df = df,
   num_bins = 5,
-  method = "scm",
+  est_method = "scm",
   return = "sc_units")
 
 # get ATT estimate:

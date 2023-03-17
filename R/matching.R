@@ -66,8 +66,7 @@ get_cal_matches <- function(df,
   unmatched_units <- setdiff(df %>% filter(Z==1) %>% pull(id),
                              m.data %>% filter(Z==1) %>% pull(id))
   if (length(unmatched_units) > 0) {
-    warning(glue::glue("Dropped the following treated units from data
-                        (unable to exact-match categorical covariates):
+    warning(glue::glue("Dropped the following treated units from data:
                         \t {paste(unmatched_units, collapse=\", \")}"))
   }
   
@@ -329,6 +328,13 @@ get_cem_matches <- function(
                    sc_units     = agg_sc_units(scweights),
                    agg_co_units = agg_co_units(scweights),
                    all          = bind_rows(scweights))
+  
+  unmatched_units <- setdiff(df %>% filter(Z==1) %>% pull(id),
+                             m.data %>% filter(Z==1) %>% pull(id))
+  if (length(unmatched_units) > 0) {
+    warning(glue::glue("Dropped the following treated units from data:
+                        \t {paste(unmatched_units, collapse=\", \")}"))
+  }
   
   return(m.data)
 }
