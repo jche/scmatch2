@@ -218,6 +218,7 @@ gen_matches <- function(df,
     } else {
       knn <- args$knn
     }
+    # print(paste0("knn: ", knn))
     
     min_dists <- 1:ntx
     for (i in 1:ntx) {

@@ -26,6 +26,15 @@ source("R/matching.R")
 source("R/estimate.R")
 
 
+logit <- function(x) {
+  log(x/(1-x))
+}
+invlogit <- function(x) {
+  exp(x) / (1+exp(x))
+}
+
+
+
 SL.library1 <- c("SL.mean", "SL.lm", "SL.glm")
 
 # "based on Dorie et al. ACIC 2016 competition
@@ -204,6 +213,60 @@ gen_df_advhet <- function(nc, nt,
 }
 
 
+
+
+# generate co in unit square
+gen_df_full <- function(nc, nt, eps_sd = 0.1,
+                        tx_effect = function(X1, X2) {(X1-0.5)^2+(X2-0.5)^2},
+                        effect_fun = function(X1, X2) { abs(X1-X2) }) {
+  dat_co <- tibble(
+    X1 = runif(nc),
+    X2 = runif(nc),
+    Z = F
+  )
+  
+  dat_tx1 <- tibble(
+    X1 = rnorm(nt/2, mean=0.25, sd=0.1),
+    X2 = rnorm(nt/2, mean=0.25, sd=0.1),
+    Z = T
+  )
+  dat_tx2 <- tibble(
+    X1 = rnorm(nt/2, mean=0.75, sd=0.1),
+    X2 = rnorm(nt/2, mean=0.75, sd=0.1),
+    Z = T
+  )
+  
+  dat <- bind_rows(dat_co, dat_tx1, dat_tx2)
+  print(dat %>% mutate(eff = tx_effect(X1,X2)) %>% head())
+  res <- dat %>% 
+    mutate(Y0 = effect_fun(X1,X2) + rnorm(n(), mean=0, sd=eps_sd),
+           Y1 = effect_fun(X1,X2) + tx_effect(X1,X2) + rnorm(n(), mean=0, sd=eps_sd),
+           Y  = ifelse(Z, Y1, Y0)) %>% 
+    mutate(id = 1:n(), .before=X1)
+  print(paste0("SD of control outcomes: ", round(sd(res$Y0),4)))
+  
+  return(res)
+}
+
+
+gen_df_ps <- function(n, eps_sd = 0.1,
+                      ps = function(x,y) {invlogit(2*x+2*y - 5)},
+                      tx_effect = function(X1, X2) {(X1-0.5)^2+(X2-0.5)^2},
+                      effect_fun = function(X1, X2) { abs(X1-X2) }) {
+  dat <- tibble(
+    X1 = runif(n),
+    X2 = runif(n)
+  ) %>% 
+    mutate(Z = runif(n) < ps(X1,X2))
+  
+  res <- dat %>% 
+    mutate(Y0 = effect_fun(X1,X2) + rnorm(n(), mean=0, sd=eps_sd),
+           Y1 = effect_fun(X1,X2) + tx_effect(X1,X2) + rnorm(n(), mean=0, sd=eps_sd),
+           Y  = ifelse(Z, Y1, Y0)) %>% 
+    mutate(id = 1:n(), .before=X1)
+}
+
+
 # wrapper functions for getting att estimate ------------------------------
 
 get_att_bal <- function(d, 
@@ -259,8 +322,11 @@ get_att_or_bart <- function(d,
 get_att_ps_lm <- function(d,
                           form) {
   m_lm_ps <- glm(form, data = d, family="binomial")
+  
+  # TODO: WHY IS PS NOT WORKING?
+  
   d %>% 
-    mutate(e = predict(m_lm_ps, newdata=.),
+    mutate(e = invlogit(predict(m_lm_ps, newdata=.)),
            wt = ifelse(Z, 1, e/(1-e))) %>% 
     summarize(ATThat = sum(Z*wt*Y - (1-Z)*wt*Y) / n()) %>% 
     pull(ATThat)
@@ -275,11 +341,21 @@ get_att_ps_bart <- function(d,
                  x.test = d %>% 
                    select({{covs}}))
   
+  # Q: why is bart not even getting ps right? shape is right, but values are low
+  if (F) {
+    gen_df_ps
+    d %>% 
+      mutate(e = pnorm(colMeans(m_bart$yhat.test))) %>% 
+      ggplot(aes(X1,X2)) +
+      geom_point(aes(color=e, shape=Z)) +
+      facet_wrap(~Z)
+  }
+  
   # output ATT estimate
   d %>% 
-    mutate(e = colMeans(m_bart$yhat.test),
-           wt = ifelse(Z, 1, e/(1-e))) %>% 
-    summarize(ATThat = sum(Z*wt*Y - (1-Z)*wt*Y) / n()) %>% 
+    mutate(e = pnorm(colMeans(m_bart$yhat.test)),
+           wt = Z - e*(1-Z)/(1-e)) %>% 
+    summarize(ATThat = mean(wt*Y)) %>% 
     pull(ATThat)
 }
 
@@ -331,7 +407,8 @@ get_att_csm <- function(d,
                          if (is.numeric(x)) num_bins / (max(x) - min(x))
                          else 1000
                        })),
-    return = "sc_units")
+    return = "sc_units",
+    knn = 25)
   
   # get ATT estimate:
   preds_csm %>% 
@@ -360,28 +437,32 @@ get_att_cem <- function(d,
     mutate(ATT = YTRUE - YFALSE) %>% 
     pull(ATT)
   
-  preds_infeasible <- d %>% 
-    filter(!Z | !(id %in% attr(preds_feasible, "feasible_units"))) %>% 
-    get_cal_matches(.,
-                    metric = "maximum",
-                    cal_method = "1nn",
-                    est_method = est_method,
-                    dist_scaling = d %>%
-                      summarize(across(starts_with("X"),
-                                       function(x) {
-                                         if (is.numeric(x)) num_bins / (max(x) - min(x))
-                                         else 1000
-                                       })),
-                    return = "sc_units")
-  att_infeasible <- preds_infeasible %>% 
-    group_by(Z) %>% 
-    summarize(Y = mean(Y*weights)) %>% 
-    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
-    mutate(ATT = YTRUE - YFALSE) %>% 
-    pull(ATT)
+  if (length(attr(preds_feasible, "feasible_units")) < sum(d$Z)) {
+    preds_infeasible <- d %>% 
+      filter(!Z | !(id %in% attr(preds_feasible, "feasible_units"))) %>% 
+      get_cal_matches(.,
+                      metric = "maximum",
+                      cal_method = "1nn",
+                      est_method = est_method,
+                      dist_scaling = d %>%
+                        summarize(across(starts_with("X"),
+                                         function(x) {
+                                           if (is.numeric(x)) num_bins / (max(x) - min(x))
+                                           else 1000
+                                         })),
+                      return = "sc_units")
+    att_infeasible <- preds_infeasible %>% 
+      group_by(Z) %>% 
+      summarize(Y = mean(Y*weights)) %>% 
+      pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
+      mutate(ATT = YTRUE - YFALSE) %>% 
+      pull(ATT)
+    
+    return((att_feasible * sum(preds_feasible$Z) + 
+              att_infeasible * sum(preds_infeasible$Z)) / sum(d$Z))
+  }
   
-  return((att_feasible * sum(preds_feasible$Z) + 
-            att_infeasible * sum(preds_infeasible$Z)) / sum(d$Z))
+  return(att_feasible)
 }
 
 
@@ -426,15 +507,25 @@ if (F) {
                                  sigma = matrix(c(1,0.8,0.8,1), nrow=2))
                      })
   
+  df <- gen_df_full(nc=1000, nt=50, eps_sd=0,
+                    tx_effect = function(x,y) {(0.5*(x+y))},
+                     effect_fun = function(x,y) {x+y})
+  
+  df <- gen_df_ps(n=10000, eps_sd=0, tx_effect = function(x,y) {1}, effect_fun = function(x,y) {1})
+  
   df %>% 
     ggplot(aes(X1,X2)) +
-    geom_point(aes(pch=as.factor(Z), color=Y0)) +
+    geom_point(aes(pch=as.factor(Z), color=Y)) +
     scale_color_continuous(low="orange", high="blue") +
     theme_classic() +
     labs(pch = "Treated",
          color = latex2exp::TeX("$f_0(X)$"),
          x = latex2exp::TeX("$X_1$"),
-         y = latex2exp::TeX("$X_2$"))
+         y = latex2exp::TeX("$X_2$")) +
+    facet_wrap(~Z)
+  df %>% 
+    filter(Z) %>% 
+    summarize(eff = mean(Y1-Y0))
   
   
   get_att_bal(df,
@@ -477,30 +568,31 @@ form2 <- as.formula("Y ~ X1*X2")
 tic()
 for (i in 1:250) {
   nc <- 1000
-  nt <- 25
-  eps_sd <- 0
-  df <- gen_df_advhet(nc=nc, nt=nt, eps_sd = eps_sd,
-                      tx_effect = function(X1, X2) {(X1-0.5)^2+(X2-0.5)^2},
-                      effect_fun = function(x,y) {
-                       matrix(c(x,y), ncol=2) %>% 
-                         dmvnorm(mean = c(0.5,0.5),
-                                 sigma = matrix(c(1,0.8,0.8,1), nrow=2))}) %>% 
-               mutate(X3 = X1*X2)
+  nt <- 100
+  eps_sd <- 0.05
+  df <- gen_df_full(
+    nc=nc, nt=nt, eps_sd = eps_sd,
+    tx_effect = function(X1, X2) {(X1+X2)*2},
+    effect_fun = function(x,y) {
+      matrix(c(x,y), ncol=2) %>% 
+        dmvnorm(mean = c(0.5,0.5),
+                sigma = matrix(c(1,0.8,0.8,1), nrow=2))}) %>% 
+    mutate(X3 = X1*X2)
   
   res <- tibble(
     runid = i,
     nc = nc,
     nt = nt,
     eps_sd = eps_sd,
-    
-    true_ATT = df %>% 
-      filter(Z) %>% 
-      summarize(att = mean(Y1-Y0)) %>% 
+
+    true_ATT = df %>%
+      filter(Z) %>%
+      summarize(att = mean(Y1-Y0)) %>%
       pull(att),
-    
+
     bal1 = get_att_bal(df, zform1, c(0.01, 0.01)),
     bal2 = get_att_bal(df, zform2, c(0.01, 0.01, 0.1)),
-    
+
     or_lm = get_att_or_lm(df, form=form2),
     or_bart = get_att_or_bart(df, covs=c(X1,X2)),
     ps_lm = get_att_ps_lm(df, zform2),
@@ -533,7 +625,7 @@ for (i in 1:250) {
                          g.SL.library = SL.library2)
   )
   
-  FNAME <- "sim_adversarial_results/test_het2.csv"
+  FNAME <- "sim_adversarial_results/test_full4.csv"
   if (file.exists(FNAME)) {
     write_csv(res, FNAME, append=T)
   } else {
@@ -544,11 +636,19 @@ toc()
 
 
 
+# NOTES:
+#  - test_full2: tx_effect = function(X1, X2) {(X1-0.5)^2+(X2-0.5)^2}
+#  - test_full3: tx_effect = function(X1, X2) {X1+X2}
+#  - test_full4: tx_effect = function(X1, X2) {(X1+X2)*2}, less sd
+#  - 
+
+
 # analyze results ---------------------------------------------------------
 
 # plot sample data
 set.seed(1)
-dat <- gen_df_advhet(nc=1000, nt=50)
+# dat <- gen_df_advhet(nc=1000, nt=50)
+dat <- gen_df_full(nc=1000, nt=100)
 vlines <- seq(min(dat$X1),max(dat$X1),length.out=6)
 hlines <- seq(min(dat$X2),max(dat$X2),length.out=6)
 dat %>% 
@@ -561,7 +661,7 @@ dat %>%
 
 
 
-total_res <- read_csv("sim_adversarial_results/test_het2.csv")
+total_res <- read_csv("sim_adversarial_results/test_full4.csv")
 # show results
 
 total_res %>% 
@@ -579,14 +679,16 @@ total_res %>%
 
 total_res %>% 
   pivot_longer(-(runid:true_ATT)) %>%
+  filter(!name %in% c("ps_lm", "ps_bart")) %>% 
   group_by(nc,nt,eps_sd,name) %>%
   summarize(rmse = sqrt(mean((value-true_ATT)^2)),
             bias = mean(value-true_ATT),
             sd   = sd(value)) %>% 
   rename(method = name) %>% 
-  # pivot_longer(c(rmse, bias, sd)) %>% 
+  pivot_longer(c(rmse, bias, sd)) %>%
   ggplot(aes(x=method)) +
-  geom_col(aes(y=rmse)) +
+  geom_col(aes(y=value)) +
+  facet_wrap(~name) +
   coord_flip()
 
 # CEM does worse now, since it suffers some bias (due to dropping units with extreme tx effects)
