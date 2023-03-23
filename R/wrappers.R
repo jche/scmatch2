@@ -7,6 +7,15 @@ require(tmle)
 require(AIPW)
 
 
+get_att_diff <- function(d) {
+  d %>% 
+    group_by(Z) %>% 
+    summarize(mn = mean(Y)) %>% 
+    pivot_wider(names_from=Z, names_prefix="Y", values_from=mn) %>% 
+    mutate(ATT = YTRUE - YFALSE) %>% 
+    pull(ATT)
+}
+
 get_att_bal <- function(d, 
                         form,
                         tols) {
