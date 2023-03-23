@@ -1,14 +1,5 @@
 
-# Idea: simplest possible simulation study where:
-#  1) balancing performs poorly (if not balanced on enough things)
-#  2) CSM performs on par with BART
-
-# TODO: a more complex version of this study
-#  - heterogeneous treatment effects?
-#  - more covariates that interact like this?
-#  - open Q: what would the goal of this more complex simulation be?
-#     we've already shown (in this simulation) that there are cases 
-#     where CSM is nice...
+# Same as sim_adversarial, but it's actually the toy example used in the paper!
 
 require(tidyverse)
 require(mvtnorm)
