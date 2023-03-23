@@ -1,6 +1,12 @@
 
 # wrapper functions: input data/settings, output ATT estimate
 
+require(optweight)
+require(dbarts)
+require(tmle)
+require(AIPW)
+
+
 get_att_bal <- function(d, 
                         form,
                         tols) {

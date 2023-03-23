@@ -48,11 +48,13 @@ tic()
 for (i in 1:250) {
   nc <- 1000
   nt <- 100
-  eps_sd <- 0.05
-  df <- gen_df_full(
-    nc=nc, nt=nt, eps_sd = eps_sd,
-    tx_effect = function(X1, X2) {(X1+X2)*2},
-    effect_fun = function(x,y) {
+  f0_sd <- 0.1
+  df <- gen_df_adv(
+    nc=nc, 
+    nt=nt, 
+    f0_sd = f0_sd,
+    tx_effect_fun = function(X1, X2) {0.2},
+    f0_fun = function(x,y) {
       matrix(c(x,y), ncol=2) %>% 
         dmvnorm(mean = c(0.5,0.5),
                 sigma = matrix(c(1,0.8,0.8,1), nrow=2))}) %>% 
@@ -62,7 +64,7 @@ for (i in 1:250) {
     runid = i,
     nc = nc,
     nt = nt,
-    eps_sd = eps_sd,
+    f0_sd = f0_sd,
 
     true_ATT = df %>%
       filter(Z) %>%
@@ -77,10 +79,10 @@ for (i in 1:250) {
     ps_lm = get_att_ps_lm(df, zform2),
     ps_bart = get_att_ps_bart(df, covs=c(X1,X2)),
     
-    # csm_scm = get_att_csm(df, num_bins=5, est_method="scm"),
-    # csm_avg = get_att_csm(df, num_bins=5, est_method="average"),
-    # cem_scm = get_att_cem(df, num_bins=5, est_method="scm"),
-    # cem_avg = get_att_cem(df, num_bins=5, est_method="average"),
+    csm_scm = get_att_csm(df, num_bins=5, est_method="scm"),
+    csm_avg = get_att_csm(df, num_bins=5, est_method="average"),
+    cem_scm = get_att_cem(df, num_bins=5, est_method="scm"),
+    cem_avg = get_att_cem(df, num_bins=5, est_method="average"),
     onenn = get_att_1nn(df, num_bins=5),
     
     # tmle1 = get_att_tmle(df, covs=c(X1,X2),
@@ -104,7 +106,10 @@ for (i in 1:250) {
     #                      g.SL.library = SL.library2)
   )
   
-  FNAME <- "sim_adversarial_results/test_full4.csv"
+  res %>% 
+    pivot_longer(-c(runid:true_ATT))
+  
+  FNAME <- "sim_adversarial_results/toy_constant-tx-effect.csv"
   if (file.exists(FNAME)) {
     write_csv(res, FNAME, append=T)
   } else {
