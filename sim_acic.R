@@ -19,6 +19,14 @@ source("R/sim_data.R")
 source("R/wrappers.R")
 source("R/utils.R")
 
+# parallelize
+if (T) {
+  library(foreach)
+  library(doParallel)
+  cores=detectCores()
+  cl <- makeCluster(cores[1]-1) #not to overload your computer
+  registerDoParallel(cl)
+}
 
 # set superlearner libraries
 SL.library1 <- c("SL.mean", "SL.lm", "SL.glm")
@@ -40,7 +48,21 @@ SL.library3g <-  c("SL.glm", "tmle.SL.dbarts.k.5", "SL.gam")  # default tmle g.S
 # run simulations ---------------------------------------------------------
 
 # repeatedly run for all combinations of pars
-for (i in 1:100) {
+# for (i in 1:100) {
+res <- foreach(
+  i=23:100, 
+  .packages = c("tidyverse", 
+                "mvtnorm", "optweight", "dbarts", "tmle", "AIPW", "tictoc",
+                "aciccomp2016"),
+  .combine=rbind) %dopar% {
+    source("R/distance.R")
+    source("R/sc.R")
+    source("R/matching.R")
+    source("R/estimate.R")
+    source("R/sim_data.R")
+    source("R/wrappers.R")
+    source("R/utils.R")
+    
   n <- 1000
   p <- 10
   model.trt = "step"
@@ -153,7 +175,7 @@ for (i in 1:100) {
   res %>% 
     pivot_longer(-c(runid:true_ATT))
   
-  FNAME <- "sim_canonical_results/acic_final.csv"
+  FNAME <- "sim_canonical_results/acic_spaceship.csv"
   if (file.exists(FNAME)) {
     write_csv(res, FNAME, append=T)
   } else {
@@ -172,7 +194,7 @@ for (i in 1:100) {
 #  - now, cem_scm slightly better than lm models
 
 
-total_res <- read_csv("sim_canonical_results/acic_final.csv")
+total_res <- read_csv("sim_canonical_results/acic_spaceship.csv")
 
 total_res %>% 
   ggplot() +

@@ -19,6 +19,14 @@ source("R/sim_data.R")
 source("R/wrappers.R")
 source("R/utils.R")
 
+# parallelize
+if (T) {
+  library(foreach)
+  library(doParallel)
+  cores=detectCores()
+  cl <- makeCluster(cores[1]-1) #not to overload your computer
+  registerDoParallel(cl)
+}
 
 # set superlearner libraries
 SL.library1 <- c("SL.mean", "SL.lm", "SL.glm")
@@ -45,7 +53,21 @@ form1 <- as.formula("Y ~ X1+X2+X3+X4+X5+X6")
 form2 <- as.formula("Y ~ (X1+X2+X3+X4+X5+X6)^2")
 
 # repeatedly run for all combinations of pars
-for (i in 1:39) {
+# for (i in 1:39) {
+res <- foreach(
+  i=1:100, 
+  .packages = c("tidyverse", 
+                "mvtnorm", "optweight", "dbarts", "tmle", "AIPW", "tictoc",
+                "aciccomp2016"),
+  .combine=rbind) %dopar% {
+    source("R/distance.R")
+    source("R/sc.R")
+    source("R/matching.R")
+    source("R/estimate.R")
+    source("R/sim_data.R")
+    source("R/wrappers.R")
+    source("R/utils.R")
+    
   nc <- 250
   nt <- 50
   df <- gen_df_hain(
@@ -131,15 +153,17 @@ for (i in 1:39) {
   
   toc()
   
-  res %>% 
-    pivot_longer(-c(runid:true_ATT))
+  # res %>% 
+  #   pivot_longer(-c(runid:true_ATT))
   
-  FNAME <- "sim_canonical_results/hain_final.csv"
+  FNAME <- "sim_canonical_results/hain_spaceship.csv"
   if (file.exists(FNAME)) {
     write_csv(res, FNAME, append=T)
   } else {
     write_csv(res, FNAME)
   }
+  
+  res
 }
 
 
@@ -158,7 +182,7 @@ for (i in 1:39) {
 #  - I think that Table 1 in Hain uses MSE * 100? Seems similar for 1nn
 #  - Goal: show that csm isn't too bad... it's pretty bad...
 
-total_res <- read_csv("sim_canonical_results/hain_final.csv")
+total_res <- read_csv("sim_canonical_results/hain_spaceship.csv")
 
 total_res %>% 
   pivot_longer(-(runid:true_ATT)) %>%

@@ -19,6 +19,15 @@ source("R/sim_data.R")
 source("R/wrappers.R")
 source("R/utils.R")
 
+# parallelize
+if (T) {
+  library(foreach)
+  library(doParallel)
+  cores=detectCores()
+  cl <- makeCluster(cores[1]-1) #not to overload your computer
+  registerDoParallel(cl)
+}
+
 
 # set superlearner libraries
 SL.library1 <- c("SL.mean", "SL.lm", "SL.glm")
@@ -44,8 +53,24 @@ form1 <- as.formula("Y ~ X1+X2")
 form2 <- as.formula("Y ~ X1*X2")
 
 # repeatedly run for all combinations of pars
-tic()
-for (i in 1:250) {
+res <- foreach(
+  i=23:100, 
+  .packages = c("tidyverse", 
+                "mvtnorm", "optweight", "dbarts", "tmle", "AIPW", "tictoc",
+                "aciccomp2016"),
+  .combine=rbind) %dopar% {
+    source("R/distance.R")
+    source("R/sc.R")
+    source("R/matching.R")
+    source("R/estimate.R")
+    source("R/sim_data.R")
+    source("R/wrappers.R")
+    source("R/utils.R")
+    
+# for (i in 1:250) {
+    
+  tic()
+  
   nc <- 1000
   nt <- 200
   f0_sd <- 0.1
@@ -61,10 +86,12 @@ for (i in 1:250) {
                 sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 4   # multiply for more slope!
       })
   
+  num_bins <- 8
+  
   dist_scaling <- df %>%
     summarize(across(starts_with("X"),
                      function(x) {
-                       if (is.numeric(x)) 8 / (max(x) - min(x))
+                       if (is.numeric(x)) num_bins / (max(x) - min(x))
                        else 1000
                      }))
 
@@ -91,44 +118,44 @@ for (i in 1:250) {
     
     csm_scm = get_att_csm(df, dist_scaling=dist_scaling, est_method="scm"),
     csm_avg = get_att_csm(df, dist_scaling=dist_scaling, est_method="average"),
-    cem_scm = get_att_cem(df, num_bins=8, est_method="scm"),
-    cem_avg = get_att_cem(df, num_bins=8, est_method="average"),
+    cem_scm = get_att_cem(df, num_bins=num_bins, est_method="scm"),
+    cem_avg = get_att_cem(df, num_bins=num_bins, est_method="average"),
     onenn = get_att_1nn(df, dist_scaling=dist_scaling),
     
-    tmle1 = get_att_tmle(df %>% mutate(X3 = X1*X2), 
-                         covs=c(X1,X2,X3),
+    tmle1 = get_att_tmle(df, 
+                         covs=c(X1,X2),
                          Q.SL.library = SL.library1,
                          g.SL.library = SL.library1),
-    # tmle2 = get_att_tmle(df, covs=c(X1,X2),
-    #                      Q.SL.library = SL.library3Q,
-    #                      g.SL.library = SL.library3g),
-    # tmle3 = get_att_tmle(df, covs=c(X1,X2,X3),
-    #                      Q.SL.library = SL.library3Q,
-    #                      g.SL.library = SL.library3g),
-
-    aipw1 = get_att_aipw(df %>% mutate(X3 = X1*X2), 
-                         covs=c(X1,X2,X3),
+    aipw1 = get_att_aipw(df, 
+                         covs=c(X1,X2),
                          Q.SL.library = SL.library1,
                          g.SL.library = SL.library1),
-    # aipw2 = get_att_aipw(df, covs=c(X1,X2),
-    #                      Q.SL.library = SL.library2,
-    #                      g.SL.library = SL.library2),
-    # aipw3 = get_att_aipw(df, covs=c(X1,X2),
-    #                      Q.SL.library = SL.library2,
-    #                      g.SL.library = SL.library2)
+    
+    tmle3 = get_att_tmle(df, covs=c(X1,X2),
+                         Q.SL.library = SL.library3Q,
+                         g.SL.library = SL.library3g),
+    aipw3 = get_att_aipw(df, covs=c(X1,X2),
+                         Q.SL.library = SL.library2,
+                         g.SL.library = SL.library2)
   )
   
-  res %>% 
-    pivot_longer(-c(runid:true_ATT))
+  toc()
   
-  FNAME <- "sim_toy_results/toy_constant-tx-effect6.csv"
+  # res %>% 
+  #   pivot_longer(-c(runid:true_ATT))
+  
+  FNAME <- "sim_toy_results/toy_spaceship.csv"
   if (file.exists(FNAME)) {
     write_csv(res, FNAME, append=T)
   } else {
     write_csv(res, FNAME)
   }
+  
+  res
 }
-toc()
+
+stopCluster(cl)
+
 
 
 # analyze results ---------------------------------------------------------
@@ -192,7 +219,7 @@ if (F) {
 
 
 
-total_res <- read_csv("sim_toy_results/toy_constant-tx-effect6.csv")
+total_res <- read_csv("sim_toy_results/toy_spaceship.csv")
 
 total_res %>% 
   pivot_longer(-(runid:true_ATT)) %>%
