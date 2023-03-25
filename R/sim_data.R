@@ -75,7 +75,157 @@ if (F) {
 
 # canonical examples ------------------------------------------------------
 
+# generate sample dataset from Hainmueller (2012), exactly
+#  - note: generates a big population and samples nt/nco units
+# paper settings:
+#  - n (total number of units): 300, 600, 1500
+#  - r (ratio of co/tx units): 1,2,5
+#  - sigma_e: n30 = low overlap, n100 = high overlap, chi5 = weird overlap
+#  - outcome: "linear", "nl1", "nl2"
+#  - sigma_y: 1
+gen_df_hain <- function(nt = 50,
+                        nc = 250,
+                        sigma_e = c("chi5", "n30", "n100"), 
+                        outcome = c("linear", "nl1", "nl2"),
+                        sigma_y = 1,
+                        ATE = 0) {
+  sigma_e <- match.arg(sigma_e)
+  outcome <- match.arg(outcome)
+  NUMSAMP <- max(nt, nc)*10
+  
+  if (sigma_e == "n30") {
+    eps_e <- rnorm(NUMSAMP, sd=sqrt(30))
+  } else if (sigma_e == "n100"){
+    eps_e <- rnorm(NUMSAMP, sd=sqrt(100))
+  } else if (sigma_e == "chi5") {
+    eps_e <- rchisq(NUMSAMP, df=5)
+    eps_e <- (eps_e - mean(eps_e)) / sd(eps_e)
+    eps_e <- eps_e * sqrt(67.6) + 0.5
+  }
+  
+  df <- as_tibble(rmvnorm(NUMSAMP, 
+                          mean = c(0,0,0), 
+                          sigma = matrix(c(2,1,-1,1,1,-0.5,-1,-0.5,1), ncol=3))) %>%
+    mutate(V4 = runif(NUMSAMP, min=-3, max=3),
+           V5 = rchisq(NUMSAMP, df=1),
+           V6 = sample(c(T,F), NUMSAMP, replace=T, prob=c(0.5,0.5)),
+           Z  = (V1 + 2*V2 - 2*V3 + V4 - 0.5*V5 + V6 + eps_e) > 0,
+           id = 1:n()) %>%
+    relocate(id)
+  
+  if (outcome == "linear") {
+    df <- df %>%
+      mutate(Y0 = V1 + V2 + V3 - V4 + V5 + V6 + rnorm(NUMSAMP, sd=sigma_y))
+  } else if (outcome == "nl1") {
+    df <- df %>%
+      mutate(Y0 = V1 + V2 + 0.2*V3*V4 - sqrt(V5) + rnorm(NUMSAMP, sd=sigma_y))
+  } else if (outcome == "nl2") {
+    df <- df %>%
+      mutate(Y0 = (V1 + V2 + V5)^2 + rnorm(NUMSAMP, sd=sigma_y))
+  } else if (outcome == "nl3") {   # not in paper
+    df <- df %>%
+      mutate(Y0 = V1*V2 + V2*V5 + V1*V5 + 3*cos(V3) + 2*sin(V2) + 
+               V3*V4 + 0.5*V4^2 + rnorm(NUMSAMP, sd=sigma_y))
+  }
+  df <- df %>%
+    mutate(Y1 = Y0 + ATE,
+           Y  = ifelse(Z, Y1, Y0))
+  
+  # get correct number of observations
+  if (nt > sum(df$Z) | nc > nrow(df)-sum(df$Z)) {
+    warning("Insufficient population pool: increase NUMSAMP")
+  }
+  df_tx <- df %>%
+    filter(Z) %>%
+    slice_sample(n=nt)
+  df_co <- df %>%
+    filter(!Z) %>%
+    slice_sample(n=nc)
+  
+  # bind rows, tx then co
+  df_final <- df_tx %>%
+    bind_rows(df_co)
+  names(df_final) <- names(df_final) %>% 
+    str_replace("V", "X")
+  
+  return(df_final)
+}
 
+gen_df_acic <- function(model.trt="linear", root.trt=0.35, overlap.trt="full",
+                        model.rsp="linear", alignment=0.75, te.hetero="none",
+                        random.seed=1,
+                        n=1000, p=10) {
+  # idea: input_2016 is a 4802 x 58 df of COVARIATES
+  #  - dgp_2016() outputs a dataset of POs for input_2016
+  #  - see parameters_2016 for example inputs
+  
+  # rows:
+  #  - model.trt: tx assignment model (linear, polynomial, step)
+  #  - root.trt: percentage of tx units (any #; 0.35, 0.65)
+  #  - overlap.trt: overlap between tx/co (one-term, full)
+  #  - model.rsp: outcome model (linear, exponential, step)
+  #  - alignment: prop of tx assignment covs used in response fxn (any #; 0, 0.25, 0.75)
+  #  - te.hetero: tx-effect heterogeneity (none, med, high)
+  
+  # NOTE: for some god-forsaken reason, subsetting rows breaks things
+  #  - i.e., it makes the browser() functionality start running...
+  #  - the browser() call is from newDiscreteBaseFunction(),
+  #    where numLevels <= 1...?
+  
+  set.seed(random.seed)
+  # base_df <- input_2016
+  if (n > nrow(input_2016)) {
+    error(glue("n too large; needs to be <= {nrow(input_2016)}"))
+  }
+  if (p > ncol(input_2016)) {
+    error(glue("p too large; needs to be <= {nrow(input_2016)}"))
+  }
+  base_df <- input_2016[,1:p] %>%
+    sample_n(n, replace=F)
+  
+  # NECESSARY: ensure that there aren't any factor levels without entries
+  base_df$x_2 <- as.factor(as.character(base_df$x_2))
+  
+  # base_df %>%
+  #   summarize(across(everything(), ~length(unique(.))))
+  # browser()
+  df <- 
+    dgp_2016(base_df,
+             parameters = list(
+               model.trt = model.trt,
+               root.trt = root.trt,
+               overlap.trt = overlap.trt,
+               model.rsp = model.rsp,
+               alignment = alignment,
+               te.hetero = te.hetero),
+             random.seed = random.seed)
+  
+  df <- bind_cols(base_df, df) %>%
+    rename_with(.cols = everything(), toupper) %>%
+    rename_with(.cols = everything(), ~str_remove(., "_")) %>%
+    rename_with(.cols = everything(), ~str_remove(., "\\.")) %>%
+    mutate(id = 1:n(), .before=X1,
+           Z = Z==1) %>%
+    as_tibble()
+  
+  return(df)
+}
+
+
+if (F) {
+  gen_df_acic(model.trt="linear", overlap.trt="one-term", 
+              model.rsp="linear", te.hetero="high",
+              random.seed=1)
+  
+  dgp_2016(input_2016[,1:10] %>% sample_n(1000,replace=F), 
+           parameters = list(model.trt="linear", 
+                             root.trt=0.35, 
+                             overlap.trt="full", 
+                             model.rsp="linear", 
+                             alignment=0.75, 
+                             te.hetero="none"), 
+           random.seed=1)
+}
 
 
 

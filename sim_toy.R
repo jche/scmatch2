@@ -60,6 +60,13 @@ for (i in 1:250) {
         dmvnorm(mean = c(0.5,0.5),
                 sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 4   # multiply for more slope!
       })
+  
+  dist_scaling <- df %>%
+    summarize(across(starts_with("X"),
+                     function(x) {
+                       if (is.numeric(x)) 8 / (max(x) - min(x))
+                       else 1000
+                     }))
 
   res <- tibble(
     runid = i,
@@ -82,11 +89,11 @@ for (i in 1:250) {
     ps_lm = get_att_ps_lm(df, zform2),
     ps_bart = get_att_ps_bart(df, covs=c(X1,X2)),
     
-    csm_scm = get_att_csm(df, num_bins=8, est_method="scm"),
-    csm_avg = get_att_csm(df, num_bins=8, est_method="average"),
+    csm_scm = get_att_csm(df, dist_scaling=dist_scaling, est_method="scm"),
+    csm_avg = get_att_csm(df, dist_scaling=dist_scaling, est_method="average"),
     cem_scm = get_att_cem(df, num_bins=8, est_method="scm"),
     cem_avg = get_att_cem(df, num_bins=8, est_method="average"),
-    onenn = get_att_1nn(df, num_bins=8),
+    onenn = get_att_1nn(df, dist_scaling=dist_scaling),
     
     tmle1 = get_att_tmle(df %>% mutate(X3 = X1*X2), 
                          covs=c(X1,X2,X3),
@@ -241,7 +248,7 @@ total_res %>%
 #     - challenges: avg is better than scm in terms of bias?? 
 #                   cem is better than csm in terms of bias??
 #  - toy_constant-tx-effects6: reduce noise again?
-#     - 
+#     - doesn't seem to change results
 
 
 

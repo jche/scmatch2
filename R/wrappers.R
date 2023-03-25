@@ -28,7 +28,7 @@ get_att_bal <- function(d,
   d %>% 
     mutate(wt = m_bal$weights) %>% 
     group_by(Z) %>% 
-    summarize(Y = mean(Y*wt)) %>% 
+    summarize(Y = mean(Y*wt)) %>%    # co weights sum to nc, tx weights = 1
     pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
     mutate(ATT = YTRUE - YFALSE) %>% 
     pull(ATT)
@@ -56,7 +56,8 @@ get_att_or_bart <- function(d,
                    pull(Y),
                  x.test = d %>% 
                    filter(Z==1) %>% 
-                   select({{covs}}))
+                   select({{covs}}),
+                 verbose=F)
   
   # output ATT estimate
   d %>% 
@@ -86,17 +87,8 @@ get_att_ps_bart <- function(d,
                    select({{covs}}), 
                  y.train = d$Z %>% as.numeric(),
                  x.test = d %>% 
-                   select({{covs}}))
-  
-  # Q: why is bart not even getting ps right? shape is right, but values are low
-  if (F) {
-    gen_df_ps
-    d %>% 
-      mutate(e = pnorm(colMeans(m_bart$yhat.test))) %>% 
-      ggplot(aes(X1,X2)) +
-      geom_point(aes(color=e, shape=Z)) +
-      facet_wrap(~Z)
-  }
+                   select({{covs}}),
+                 verbose=F)
   
   # output ATT estimate
   d %>% 
@@ -143,26 +135,45 @@ get_att_aipw <- function(d,
 }
 
 get_att_csm <- function(d,
-                        num_bins,
+                        metric = "maximum",
+                        dist_scaling,
+                        cal_method = "adaptive",
                         est_method = "scm") {
   preds_csm <- get_cal_matches(
     df = d,
-    metric = "maximum",
-    cal_method = "adaptive",
+    metric = metric,
+    dist_scaling = dist_scaling,
+    cal_method = cal_method,
     est_method = est_method,
-    dist_scaling = d %>%
-      summarize(across(starts_with("X"),
-                       function(x) {
-                         if (is.numeric(x)) num_bins / (max(x) - min(x))
-                         else 1000
-                       })),
     return = "sc_units",
     knn = 25)
+  
+  if (F) {
+    # when return = "all":
+    #  - in hain simulation, see that you get some
+    #    very extreme estimates from units with 1 or 2 matched controls...
+    preds_csm %>% 
+      group_by(subclass) %>% 
+      summarize(n = n(),
+                est = sum(weights*Y*Z) - sum(weights*Y*(1-Z))) %>% 
+      ggplot(aes(x=n-1, y=est)) +
+      geom_point()
+  }
+  
+  # output average number of matches per unit
+  if (F) {
+    n_matches <- attr(preds_csm, "scweights") %>% 
+      map_dbl(~nrow(.)-1)
+    print(paste("Average number of co units per tx unit:", mean(n_matches)))
+    p <- ggplot(tibble(x=n_matches)) +
+      geom_histogram(aes(x), color="black")
+    print(p)
+  }
   
   # get ATT estimate:
   preds_csm %>% 
     group_by(Z) %>% 
-    summarize(Y = mean(Y*weights)) %>% 
+    summarize(Y = mean(Y)) %>%   # return = "sc_units" so this is okay
     pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
     mutate(ATT = YTRUE - YFALSE) %>% 
     pull(ATT)
@@ -171,7 +182,10 @@ get_att_csm <- function(d,
 # estimates ATT!
 get_att_cem <- function(d,
                         num_bins,
+                        estimand = c("ATT", "CEM-ATT"),
                         est_method = "average") {
+  estimand <- match.arg(estimand)
+  
   preds_feasible <- get_cem_matches(
     df = d,
     num_bins = num_bins,
@@ -181,10 +195,14 @@ get_att_cem <- function(d,
   # get ATT estimate:
   att_feasible <- preds_feasible %>% 
     group_by(Z) %>% 
-    summarize(Y = mean(Y*weights)) %>% 
+    summarize(Y = mean(Y)) %>%   # return = "sc_units" so this is okay
     pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
     mutate(ATT = YTRUE - YFALSE) %>% 
     pull(ATT)
+  
+  if (estimand == "CEM-ATT") {
+    return(att_feasible)
+  }
   
   if (length(attr(preds_feasible, "feasible_units")) < sum(d$Z)) {
     preds_infeasible <- d %>% 
@@ -210,23 +228,17 @@ get_att_cem <- function(d,
     return((att_feasible * sum(preds_feasible$Z) + 
               att_infeasible * sum(preds_infeasible$Z)) / sum(d$Z))
   }
-  
   return(att_feasible)
 }
 
 
-get_att_1nn <- function(d, num_bins) {
+get_att_1nn <- function(d, dist_scaling) {
   preds_1nn <- get_cal_matches(
     df = d,
     metric = "maximum",
     cal_method = "1nn",
     est_method = "average",
-    dist_scaling = d %>%
-      summarize(across(starts_with("X"),
-                       function(x) {
-                         if (is.numeric(x)) num_bins / (max(x) - min(x))
-                         else 1000
-                       })),
+    dist_scaling = dist_scaling,
     return = "sc_units",
     cem_tx_units = d %>% 
       filter(Z==1) %>% 
@@ -236,7 +248,7 @@ get_att_1nn <- function(d, num_bins) {
   # get ATT estimate:
   preds_1nn %>% 
     group_by(Z) %>% 
-    summarize(Y = mean(Y*weights)) %>% 
+    summarize(Y = mean(Y)) %>%   # return = "sc_units" so this is okay
     pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
     mutate(ATT = YTRUE - YFALSE) %>% 
     pull(ATT)
