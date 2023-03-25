@@ -7,3 +7,7 @@ logit <- function(x) {
 invlogit <- function(x) {
   exp(x) / (1+exp(x))
 }
+
+expit <- function(x) {
+  1 / (1+exp(-x))
+}

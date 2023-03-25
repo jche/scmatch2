@@ -1,6 +1,8 @@
 
 # functions for simulating data
 
+require(aciccomp2016)
+
 
 # toy example -------------------------------------------------------------
 
@@ -151,8 +153,12 @@ gen_df_hain <- function(nt = 50,
   return(df_final)
 }
 
-gen_df_acic <- function(model.trt="linear", root.trt=0.35, overlap.trt="full",
-                        model.rsp="linear", alignment=0.75, te.hetero="none",
+gen_df_acic <- function(model.trt="step", 
+                        root.trt=0.35, 
+                        overlap.trt="full",
+                        model.rsp="linear", 
+                        alignment=0.75, 
+                        te.hetero="high",
                         random.seed=1,
                         n=1000, p=10) {
   # idea: input_2016 is a 4802 x 58 df of COVARIATES
@@ -173,18 +179,26 @@ gen_df_acic <- function(model.trt="linear", root.trt=0.35, overlap.trt="full",
   #    where numLevels <= 1...?
   
   set.seed(random.seed)
-  # base_df <- input_2016
-  if (n > nrow(input_2016)) {
-    error(glue("n too large; needs to be <= {nrow(input_2016)}"))
+
+  # only subset numeric columns
+  numeric_cols <- input_2016 %>% 
+    summarize(across(everything(), ~length(unique(.)))) %>% 
+    pivot_longer(everything()) %>% 
+    filter(value >= 20) %>% 
+    pull(name)
+  base_df <- input_2016[,numeric_cols]
+  
+  if (n > nrow(base_df)) {
+    error(glue("n too large; needs to be <= {nrow(base_df)}"))
   }
-  if (p > ncol(input_2016)) {
-    error(glue("p too large; needs to be <= {nrow(input_2016)}"))
+  if (p > ncol(base_df)) {
+    error(glue("p too large; needs to be <= {ncol(base_df)}"))
   }
-  base_df <- input_2016[,1:p] %>%
+  base_df <- base_df[,1:p] %>%
     sample_n(n, replace=F)
   
-  # NECESSARY: ensure that there aren't any factor levels without entries
-  base_df$x_2 <- as.factor(as.character(base_df$x_2))
+  # # NECESSARY: ensure that there aren't any factor levels without entries
+  # base_df$x_2 <- as.factor(as.character(base_df$x_2))
   
   # base_df %>%
   #   summarize(across(everything(), ~length(unique(.))))
@@ -211,20 +225,36 @@ gen_df_acic <- function(model.trt="linear", root.trt=0.35, overlap.trt="full",
   return(df)
 }
 
+gen_df_kang <- function(n=1000) {
+  as_tibble(rmvnorm(n, mean=rep(0,4), sigma=diag(4))) %>% 
+    mutate(Y = 210 + 27.4*V1 + 13.7*(V2+V3+V4) + rnorm(n),
+           e = expit(-V1 + 0.5*V2 - 0.25*V3 - 0.1*V4)) %>% 
+    mutate(X1 = exp(V1/2),
+           X2 = V2/(1+exp(V1)) + 10,
+           X3 = (V1*V3/25 + 0.6)^3,
+           X4 = (V2 + V4 + 20)^2) %>% 
+    rowwise() %>% 
+    mutate(Z = sample(c(T,F), size=1, replace=T, 
+                      prob=c(e,1-e))) %>% 
+    ungroup() %>% 
+    mutate(id = 1:n, .before=V1)
+}
+
 
 if (F) {
-  gen_df_acic(model.trt="linear", overlap.trt="one-term", 
-              model.rsp="linear", te.hetero="high",
-              random.seed=1)
+  gen_df_acic(n=1000, p=10)
   
-  dgp_2016(input_2016[,1:10] %>% sample_n(1000,replace=F), 
-           parameters = list(model.trt="linear", 
-                             root.trt=0.35, 
-                             overlap.trt="full", 
-                             model.rsp="linear", 
-                             alignment=0.75, 
-                             te.hetero="none"), 
-           random.seed=1)
+  input_2016[,1:10] %>% 
+    sample_n(1000,replace=F) %>% 
+    dgp_2016(
+      parameters = list(
+        model.trt="linear", 
+        root.trt=0.35, 
+        overlap.trt="full", 
+        model.rsp="linear", 
+        alignment=0.75, 
+        te.hetero="none"), 
+        random.seed=1)
 }
 
 

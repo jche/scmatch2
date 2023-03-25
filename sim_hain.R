@@ -1,5 +1,5 @@
 
-# Run things on some canonical examples
+# Hainmueller simulation
 
 require(tidyverse)
 require(mvtnorm)
@@ -170,6 +170,22 @@ total_res %>%
   rename(method = name) %>% 
   pivot_longer(c(# mse, 
                  rmse, bias, sd)) %>%
+  ggplot(aes(x=method)) +
+  geom_col(aes(y=value)) +
+  facet_wrap(~name, scales="free") +
+  coord_flip()
+
+total_res %>% 
+  pivot_longer(-(runid:true_ATT)) %>%
+  group_by(name) %>%
+  summarize(# mse = mean((value-true_ATT)^2),
+    rmse = sqrt(mean((value-true_ATT)^2)),
+    bias = mean(value-true_ATT),
+    sd   = sd(value)) %>% 
+  rename(method = name) %>% 
+  filter(method %in% c("tmle1", "tmle2", "aipw1", "aipw2", "onenn", "csm_scm", "cem_avg", "bal1")) %>% 
+  pivot_longer(c(# mse, 
+    rmse, bias, sd)) %>%
   ggplot(aes(x=method)) +
   geom_col(aes(y=value)) +
   facet_wrap(~name, scales="free") +
