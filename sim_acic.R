@@ -52,7 +52,7 @@ tic()
 # repeatedly run for all combinations of pars
 # for (i in 1:100) {
 res <- foreach(
-  i=1:100, 
+  i=sample(1:100000, 100),    # random seeds
   .packages = c("tidyverse", 
                 "mvtnorm", "optweight", "dbarts", "tmle", "AIPW", "tictoc",
                 "aciccomp2016"),
