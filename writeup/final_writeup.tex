@@ -324,8 +324,7 @@ though we note that $L_\infty$ metrics can be particularly intuitive in higher d
 % to check whether the distance between two units is less than $\epsilon$ scaled $L_\infty$ units, one may simply check whether the absolute differences in each of their coordinates $j$ is less than $\epsilon V_{jj}$.
 Specifically, with $L_\infty$ metrics, coordinates are ``independent'' in the sense that changing any non-maximal absolute difference in coordinates between two units does not affect the $L_\infty$ distance between them.
 This is naturally related to the Monotonic Imbalance Bounding \citep[MIB; ][]{iacus2011multivariate} property, which we discuss in Section \ref{sec:mib}.
-
-% Appendix \ref{app:metricchoice} provides further details about how to select an appropriate $V$ matrix.
+% Appendix \ref{app:metricchoice} provides further considerations for selecting an appropriate $V$ matrix.
 
 % https://math.stackexchange.com/questions/1927845/is-u-v-in-the-svd-of-a-symmetric-positive-semidefinite-matrix
 % [NOTE: could make $V$ be on the same scale in Equations \ref{eq:l2dist} and \ref{eq:linfdist}.
@@ -423,7 +422,7 @@ $$\hat{\tau}^{avg} = \frac{1}{n_t} \sum_{t \in \mathcal{T}} \big( Y_t - \frac{1}
 In practice, however, researchers typically view matching as a preprocessing step \citep{ho2007matching} before applying outcome models, e.g., weighted linear regression, to the matched dataset to adjust for residual covariate imbalances.
 
 In this paper, we use the synthetic control method \citep[SCM; ][]{abadie2010synthetic} within matched sets.
-For each treated unit $t$, we find convex weights\footnote{I.e., weights $w_{jt} \geq 0$ that sum to 1} for its matched control units that minimize covariate imbalance as measured by a scaled distance metric $d_V(\cdot, \cdot) = d_V^{(2)}(\cdot, \cdot)$ or $d_V^{(\infty)}(\cdot, \cdot)$:
+For each treated unit $t$, we find convex weights, i.e., weights $w_{jt} \geq 0$ that sum to 1, for its matched control units that minimize covariate imbalance as measured by a scaled distance metric $d_V(\cdot, \cdot) = d_V^{(2)}(\cdot, \cdot)$ or $d_V^{(\infty)}(\cdot, \cdot)$:
 \begin{align*}
     \argmin_{\{w_{jt} : j \in \Ct\}} 
         &\hspace{2mm} d_V(\Xt, \sum_{j \in \Ct}w_{jt} \Xj) \\
@@ -439,9 +438,9 @@ and the ATT estimate is taken as a simple difference-in-means between the outcom
 \end{align*}
 
 The setup above deviates from the standard SCM setup in a few ways.
-First, while \citet{abadie2010synthetic} introduces SCM as a quadratic programming problem using scaled $L_2$ distance, we also allow SCM to be implemented as a linear programming problem using scaled $L_\infty$ distance (see Appendix \ref{app:scm} for details).
+First, while \citet{abadie2010synthetic} introduces SCM as a quadratic programming problem using scaled $L_2$ distance, we also allow SCM to be implemented as a linear programming problem using scaled $L_\infty$ distance (see Remark \ref{rem:linf_opt} in Appendix \ref{app:scm} for details).
 Second, while synthetic controls are typically used in time-series settings with past outcomes as additional covariates, we directly apply them in our setting without past outcomes.
-Finally, the SCM introduced in \citet{abadie2010synthetic} includes an outer optimization to learn an ``optimal'' scaling matrix $V$, whereas we simply use the $V$ matrix implied by the given covariatewise caliper (as formalized in Proposition \ref{prop:distmetriccal}).
+Finally, the SCM introduced in \citet{abadie2010synthetic} includes an outer optimization to learn an ``optimal'' scaling matrix $V$, whereas we simply use the $V$ matrix implied by the given covariatewise caliper, which we will formalize in Proposition \ref{prop:distmetriccal}.
 
 Using synthetic controls in the analysis phase provides two primary benefits.
 First, synthetic controls are highly transparent.
@@ -462,7 +461,7 @@ Adapting the caliper enables clear diagnostic plots of the estimate-estimand tra
 \citet{iacus2011multivariate} introduces the Monotonic Imbalance Bounding (MIB) class of matching methods.
 MIB matching methods directly control covariate balance between the treated and matched control groups, independently for each covariate.\footnote{Technically, \cite{iacus2011multivariate} defines the MIB property with respect to a particular function of the data and a particular discrepancy measure.
 In the manuscript, however, the authors casually describe methods as MIB if they are MIB with respect to all covariatewise absolute differences between matched units.
-We use this convention here and relegate further discussion of technical details to Appendix \ref{app:mib}.}
+We use this convention here and relegate further discussion of technical MIB details to Appendix \ref{app:mib}.}
 As a result, MIB matching methods enjoy desirable properties such as bounded covariate imbalance and bounded estimation error, under reasonable assumptions.
 
 Distance-metric caliper matching methods are MIB as long as the caliper for each covariate may be tuned without affecting the caliper for any other covariate \citep{iacus2011multivariate}.
@@ -527,9 +526,9 @@ To do so, we introduce some notation.
 Write the empirical joint covariate distributions of the treated and control units as:
 \begin{align*}
     f_T(\mathbf{x}) 
-    &= \frac{1}{n_T} \sum_{t \in \mathcal{T}} \delta_{\Xt}(\mathbf{x}) \\
+    &\equiv \frac{1}{n_T} \sum_{t \in \mathcal{T}} \delta_{\Xt}(\mathbf{x}) \\
     f_C(\mathbf{x}) 
-    &= \frac{1}{n_T} \sum_{t \in \mathcal{T}} \sum_{j \in \Ct} w_{jt} \delta_{\Xj} (\mathbf{x}),
+    &\equiv \frac{1}{n_T} \sum_{t \in \mathcal{T}} \sum_{j \in \Ct} w_{jt} \delta_{\Xj} (\mathbf{x}),
 \end{align*}
 % Write the empirical joint covariate distributions of the treated and control units as:
 % \begin{align*}
@@ -540,7 +539,7 @@ Write the empirical joint covariate distributions of the treated and control uni
 % \end{align*}
 % where $\bX \preccurlyeq \mathbf{x}$ means that $X_k \leq x_k$ for all $k = 1, \dots, p$.
 where $\delta_{\bX}(\cdot)$ represents a Dirac delta function at $\bX$, i.e., $\delta_{\bX}(\mathbf{y}) = 1$ if $\mathbf{y} = \mathbf{X}$ and $0$ otherwise.
-The empirical distributions are simply weighted sums of point masses located at the matched units' covariates.
+These empirical distributions are simply weighted sums of point masses located at the matched units' covariates.
 
 To demonstrate how distance-metric calipers control the difference between $f_T$ and $f_C$, we use Wasserstein distance.
 Formally, the $q$-Wasserstein distance between probability distributions $P$ and $Q$ with distance metric $d(\cdot, \cdot)$ is:
@@ -548,9 +547,9 @@ Formally, the $q$-Wasserstein distance between probability distributions $P$ and
     \mathcal{W}_q(P, Q) = \inf_{\substack{\bX \sim P \\ \mathbf{Y} \sim Q}} E\big[ d(\bX, \mathbf{Y})^q \big]^{1/q},
 \end{align*}
 where the infimum is over all couplings of $P$ and $Q$, i.e., joint distributions with marginals $P$ and $Q$.
-Wasserstein distance is also known as ``earth-mover's distance'':
-viewing $P$ and $Q$ as piles of soil each with total mass 1, $W_q(P, Q)$ measures the minimum ``cost'' to move soil to make $P$ match $Q$ (or vice-versa), where the ``cost'' of moving $k$ units of soil from $\mathbf{x}$ to $\mathbf{y}$ is $k d(\mathbf{x}, \mathbf{y})$.
-Intuitively, Wasserstein distance extends distance metrics to measure distance between full probability distributions rather than distances between points in $\Rp$.
+More intuitively, Wasserstein distance is also known as ``earth-mover's distance'':
+viewing $P$ and $Q$ as piles of soil each with total mass 1, $W_q(P, Q)$ measures the minimum ``cost'' to move soil to make $P$ match $Q$ (or vice-versa), where the ``cost'' of moving $k$ units of soil from $\mathbf{x}$ to $\mathbf{y}$ is $k \cdot d(\mathbf{x}, \mathbf{y})$.
+Wasserstein distance therefore enables distance metrics between points in $\Rp$ to measure distance between full probability distributions.
 
 % Now let $X_1, \dots, X_n \overset{i.i.d.}{\sim} P$ and $Y_1, \dots, Y_n \overset{i.i.d.}{\sim} Q$.
 % Then the Wasserstein $p$-distance between the empirical distributions of $P$ and $Q$ may be written as:
@@ -618,7 +617,7 @@ For example, Proposition \ref{prop:meanbd} shows how distance-metric calipers al
     \end{align*}
 \end{proposition}
 \begin{proof}
-    See Appendix \ref{app:wass}.
+    See Appendix \ref{app:meanbd}.
 \end{proof}
 
 In summary, distance-metric calipers enable precise control of joint covariate imbalance.
@@ -758,7 +757,7 @@ If we assume homoskedasticity (i.e., $\sigma_i = \sigma$) and the conditions of 
 Equation \ref{eq:cmsebd} clarifies the relationship between caliper size and the bias-variance tradeoff.
 For a fixed estimand,\footnote{I.e., if we do not add or drop treated units as caliper size changes} increasing $\epsilon$ naturally exposes the resulting estimate to more bias.
 Increasing $\epsilon$ also generally reduces variance by dispersing weight across more control units, reducing $\sum_{j \in \mathcal{C}} (\sum_{t \in \mathcal{T}} w_{jt})^2$.
-Note, however, that variance is typically dominated by the variance associated with the treated units, which remains unchanged as control units are added.\footnote{In most cases, $\sum_{j \in \mathcal{C}} (\sum_{t \in \mathcal{T}} w_{jt})^2 \leq n_T$, since $\sum_{j \in \mathcal{C}} \sum_{t \in \mathcal{T}} w_{jt} = n_T$ and $w_{jt} \leq 1$ for all $j, t$.
+Note, however, that variance is often dominated by the variance associated with the treated units, which remains unchanged as control units are added.\footnote{In most cases, $\sum_{j \in \mathcal{C}} (\sum_{t \in \mathcal{T}} w_{jt})^2 \leq n_T$, since $\sum_{j \in \mathcal{C}} \sum_{t \in \mathcal{T}} w_{jt} = n_T$ and $w_{jt} \leq 1$ for all $j, t$.
 When matching with replacement, however, a single control $j$ may be assigned significant weight for multiple treated units $t$.
 In these cases, $\sum_{t \in \mathcal{T}} w_{jt}$ may be greater than 1, so the variance associated with the control units may not be dominated by the variance associated with the treated units.}
 For example, for a single treated unit $t$ with matched controls $j \in \Ct$ given uniform weights, the variance associated with the treated unit is
@@ -852,6 +851,7 @@ Second, we look at some canonical examples to see what CSM does.
 \subsection{Methods}
 
 We compare asdf against a wide range of methods.
+
 
 
 \subsection{Toy example simulation}
@@ -1150,8 +1150,9 @@ As a result, the resulting effect estimates are sensitive to the variance in the
 Researchers must navigate the bias-variance tradeoff shown by Table \ref{tab:lalonde_fsatt}.
 In some low-data settings, synthetic controls may not reduce bias enough to justify how they increase variance.
 Here, synthetic controls perform quite well.
-Relative to averaging, they reduce mean and median $d_V^{(\infty)}(\Xt, \sum_{j \in \Ct} w_{jt} \Xj)$ values by 54\% and 89\%, respectively, while only decreasing the ESS by 44\%.
-For settings in which the researcher is unsure how to navigate this bias-variance tradeoff, Appendix TODO includes guidelines for estimating $\sigma$ and $\lambda$ from the data so that researchers may apply the results in Section \ref{sec:bv} and minimize the estimated CMSE.
+Relative to averaging, they reduce mean and median $d_V^{(\infty)}(\Xt, \sum_{j \in \Ct} w_{jt} \Xj)$ values by 54\% and 89\%, respectively, while decreasing the ESS by 44\%.
+
+% For settings in which the researcher is unsure how to navigate this bias-variance tradeoff, Appendix TODO includes guidelines for estimating $\sigma$ and $\lambda$ from the data so that researchers may apply the results in Section \ref{sec:bv} and minimize the estimated CMSE.
 % https://link.springer.com/article/10.1007/BF00229304 ``Estimation of the Lipschitz constant of a function'' might be helpful lol
 
 \subsection{Results: FSATT and SATT estimates}
@@ -1247,20 +1248,20 @@ Misc. ideas stored here for now, but likely won't pursue
 
 \section{Practical considerations}
 
-\subsection{How to select a distance metric}
-\label{app:metricchoice}
+% \subsection{How to select a distance metric}
+% \label{app:metricchoice}
 
-Note that we use diagonal $V$ matrices for interpretability.
-Note that we'd ideally base it on a covariatewise caliper a la CEM, instead of letting it be data-driven.
-This hurts performance, but helps interpretability.
+% Note that we use diagonal $V$ matrices for interpretability.
+% Note that we'd ideally base it on a covariatewise caliper a la CEM, instead of letting it be data-driven.
+% This hurts performance, but helps interpretability.
 
-TODO: describe procedure using out-of-sample data to optimize $V$ matrix.
-Idea is to use predictability as our objective.
-See what MALTS paper does, just say we can copy that.
+% TODO: describe procedure using out-of-sample data to optimize $V$ matrix.
+% Idea is to use predictability as our objective.
+% See what MALTS paper does, just say we can copy that.
 
-Note that we can `exact match' on discrete covariates by one-hot encoding and setting a large constant for their distance scaling.
-This also lets us say things like: exact match on this covariate, unless you're super well-matched on everything else in which case we can relax the exact match here a bit.
-This is a nice thing to be able to say!
+% Note that we can `exact match' on discrete covariates by one-hot encoding and setting a large constant for their distance scaling.
+% This also lets us say things like: exact match on this covariate, unless you're super well-matched on everything else in which case we can relax the exact match here a bit.
+% This is a nice thing to be able to say!
 
 
 \subsection{How to select a caliper}
@@ -1272,30 +1273,18 @@ More generally, given a fixed distance metric, the choice of $c$ should be chose
 For example, a researcher who wants to ensure that all matches lie within 0.5 standard deviations of each other in each covariate, may restrict $d_V^{(\infty)}(\Xt, \Xj) \leq 0.5$ for $V = diag\{\frac{1}{sd(X_k)}, k=1, \dots, p\}$.
 
 In practice, however, researchers may want to select a caliper $c$ that ``optimally'' trades off data use and potential bias.
-To visualize this tradeoff, we suggest using a weighted distance-density plot.
-For example, consider the Lalonde dataset discussed in Section \ref{sec:lalonde}.
+To visualize this tradeoff, we suggest making a histogram of the distances between the treated and control units in the data.
 Given a distance metric, we must compute a $n_t \times n_c$ distance matrix to determine the within-caliper control units for each treated unit.
-We may directly visualize the density of the entries in this matrix to see, on average, how ``far'' the control units are from the treated units
-Figure \ref{fig:lalonde_calselect} visualizes this for the Lalonde dataset.
-
-We see that 
-
-
-Specifically...
-
-If it's really unclear, we can visualize the data to choose a reasonable caliper.
-Given a fixed distance metric, however, we may quantify things using a weighted density plot.
-The mode of the density for each unit might be a reasonable place to stop (perhaps conditional on the ecdf being big enough), or we can set a caliper based on visually examining the global density plot and guesstimating from there.
-
-IDEA: $p$-dimensional density estimation is a mess.
-$1$-dimensional density estimation is okay.
-So working with the density of $d_V$ for each unit can lead to some clean plots and simple intuitions.
-
-IDEAS:
-\begin{itemize}
-    \item Look at weighted density of $d_V$ for all tx/co combinations
-    \item Look at weighted density of $d_V$ for tx units without any within-caliper co units
-\end{itemize}
+We may directly visualize a histogram of the entries in this distance matrix to see, in general, how ``far'' the control units are from the treated units.\footnote{By doing this, we avoid needing to estimate the $p$-dimensional density of the treated and control units, which is generally challenging to do.}
+Figure \ref{fig:lalonde_calselect} visualizes this for the Lalonde dataset discussed in Section \ref{sec:lalonde}, for units that are exactly matched on the categorical covariates.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\textwidth]{writeup/figures/lalonde_calselect.png}
+    \caption{Histogram of distances between treated units and control units.}
+    \label{fig:lalonde_calselect}
+\end{figure}
+While most of the control units lie quite far from the treated units, a couple thousand still lie within a distance of 1, so we may achieve reasonable results using $c=1$.
+In other settings, there may be peaks around particular values of $d(\Xt, \Xj)$ which would suggest that expanding the fixed caliper to include those peaks can greatly increase the effective sample size of the data.
 
 % \subsection{TODO: other caliper ideas}
 
@@ -1522,6 +1511,11 @@ $$f(\Xj) = f(\Xt) + d_V(\Xj, \Xt) \nabla_{\vj} f(\Xt) + o(d_V(\Xj, \Xt))$$
     So $g_a(x) = o(d_V(x,a))$.
 \end{proof}
 
+Lemma \ref{lem:bias} is technical, but it captures a very simple intuition.
+Standard multivariate Taylor expansion takes the dot product of the $p$-dimensional gradient of $f(\cdot)$ with the $p$-dimensional vector of differences between $\mathbf{x}$ and the point $a$.
+Calipers, however, only control the scalar quantities $d(\Xt, \Xj)$.
+Lemma \ref{lem:bias} simply rewrites standard multivariate Taylor expansion to better utilize the fact that Lipschitz functions control scalar directional derivatives (as discussed in Appendix \ref{app:lipschitz}).
+
 Similar to \citet{iacus2011multivariate}, we may also prove a statement similar to Proposition \ref{prop:biasbd_lip} under slightly weaker conditions.
 \begin{proposition}
 Let $d_V(\cdot, \cdot)$ = $d^{(2)}_V(\cdot, \cdot)$ or $d^{(\infty)}_V(\cdot, \cdot)$.
@@ -1635,7 +1629,7 @@ Slightly more formally:
     Convex weights ensure that this is interpolation, not extrapolation.
 \end{proof}
 
-\note{TODO: add interpolation/extrapolation bias appendix here...?}
+% \note{TODO: add interpolation/extrapolation bias appendix here...?}
 
 In summary, synthetic controls linearly interpolate the donor-pool units' outcomes to the point on the convex hull closest to the treated unit.
 As a result, they are subject to linear interpolation bias \citep{kellogg2021combining} in this first stage, though it is controlled by the maximum distance across which they are allowed to interpolate.
