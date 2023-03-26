@@ -18,6 +18,11 @@
 \usepackage{caption}
 \usepackage{subcaption}
 
+% table next to figure
+\usepackage{floatrow}
+% Table float box with bottom caption, box width adjusted to content
+\newfloatcommand{capbtabbox}{table}[][\FBwidth]
+
 % \usepackage{xcolor}
 \usepackage[table,xcdraw]{xcolor}
 \usepackage{hyperref}
@@ -80,23 +85,22 @@ Matching provides a simple approach for drawing causal conclusions from observat
 In a basic setting, matching methods pair each treated unit with a similar control unit, producing a matched control sample that mirrors the treated sample in terms of observable covariates.
 Under standard assumptions, the samples may then be analyzed as if treatment were randomly assigned.
 % TODO: above sentence is imprecise
-The simplicity of this approach has led matching to be used in a wide range of fields, from aaa to zzz (CITE).
-\note{(Can perhaps just remove this paragraph entirely?)}
+The simplicity of this approach has led matching to be a popular method for observational causal inference \citep{imbens2004nonparametric}.
 
 The gold standard of matching methods is exact matching.
 For each treated unit, exact matching finds a control unit with the same observed covariates.
 Exact matching therefore perfectly balances the joint covariate distribution between the treated and matched control units,
-eliminating any potential bias due to associations between observable covariates and potential outcomes \citep{imai2008misunderstandings}.
-Exact matching also produces highly transparent matched datasets,
-since the difference in outcomes between a treated unit and its exactly matched control is an unbiased, albeit noisy, estimate of the treatment effect for that treated unit.
-This leads to the familiar statistical notion of averaging noisy observations to better estimate a target estimand, e.g., the average treatment effect among all (or some subset) of the treated units.
+eliminating any potential bias due to associations between observable covariates and potential outcomes \citep{imai2008misunderstandings, rosenbaum1985bias}.
+Exact matching also produces transparent matched datasets,
+since the difference in outcomes between a treated unit and its exactly matched control is an unbiased (albeit noisy) estimate of the treatment effect for that unit.
+This leads to the familiar statistical idea of averaging noisy observations to estimate a target estimand, e.g., the average treatment effect among all (or some subset) of the treated units.
 
 In practice, however, exact matching is impossible.
 Researchers have therefore developed a variety of methods for conducting principled causal inference without exact joint covariate balance.
 For example, in practice, standard matching approaches aim for balance on the marginal distributions.
-Researchers construct a matched dataset, check the marginal means of the matched sets, and repeat this process if the means are too different (CITE).
-Balancing approaches (e.g., CITE a bunch, including Eli and Jose's ``Balancing act in causal inference'' paper) improve on this ad-hoc procedure by directly targeting approximate balance on specified features of the joint distribution.
-Semiparametric modeling approaches, such as doubly robust (CITE a bunch), double machine learning (CITE a bunch), and outcome modeling methods (CITE a bunch), use model-assisted averages to target the estimand of interest, leading to provably efficient and unbiased estimates if the models perform reasonably well (CITE).
+Researchers construct a matched dataset, check the marginal means of the matched sets, and repeat this process if the means are too different.
+Balancing approaches \citep[e.g., ][]{hainmueller2012entropy, zubizarreta2015stable, ben2021balancing} improve on this ad-hoc procedure by directly targeting approximate balance on specified features of the joint distribution.
+Semiparametric modeling approaches, such as doubly robust \citep{robins1994estimation, rotnitzky1998semiparametric}, double machine learning \citep{chernozhukov2018dml}, targeted maximum likelihood estimation \citep{van2006targeted}, and outcome modeling methods \citep[e.g., ][]{hill2011bayesian} use model-assisted averages to target the estimand of interest, leading to provably efficient and unbiased estimates if the models perform reasonably well.
 
 These modern methods produce effective causal estimates by targeting overall objectives across all units, such as overall covariate balance or good model fit.
 In doing so, however, they lose many of the simple intuitions underlying exact matching.
@@ -110,19 +114,25 @@ We provide four opinionated maxims for methods in this literature:
 \end{enumerate}
 and we directly construct Caliper Synthetic Matching (CSM) to effectively and clearly address each of these ideas.
 
-CSM may be viewed as an extension to Coarsened Exact Matching \citep[CEM; ][]{iacus2012causal}, a popular method that first coarsens continuous covariates (e.g., splitting an age covariate into four buckets: 0-25, 25-50, 50-75, 75+) before exactly matching observations on their coarsened covariates.
+CSM may be viewed as an extension to Coarsened Exact Matching \citep[CEM; ][]{iacus2012causal}, a popular method that coarsens\footnote{E.g., splitting an age covariate into four buckets: 0-25, 25-50, 50-75, 75+.} continuous covariates before exactly matching observations on these coarsened covariates.
 As a result, CSM inherits and improves upon the Monotonic Imbalance Bounding \citep[MIB; ][]{iacus2011multivariate} properties of CEM while preserving its simplicity and intuitiveness.
 
-The rest of the paper proceeds as follows...
-Via simulation and real data applications, we show that CSM can exhibit comparable performance to modern methods in various settings while maintaining the intuitive transparency of exact-matching-based methods.
+The rest of the paper proceeds as follows.
+In Section \ref{sec:background}, we provide background and motivate CSM with a toy example.
+In Section \ref{sec:CSM}, we introduce CSM by incrementally augmenting it to address the four maxims proposed above.
+We then discuss the properties of CSM in Section \ref{sec:properties}.
+In Section \ref{sec:simulation}, we conduct a variety of simulation studies to illustrate how CSM performs compared to other observational causal inference methods.
+Finally, we step through an applied example in Section \ref{sec:lalonde} to demonstrate how CSM may be used on a real dataset.
+
 
 \section{Background}
+\label{sec:background}
 
 \subsection{Setup}
 
 Suppose we have $n$ independent and identically distributed observations, with $n_t$ treated units and $n_c$ control units.
-For each unit $i$, let $Z_i \in \{0,1\}$ denote its binary treatment status, $Y_i \in \mathbb{R}$ denote its observed real-valued outcome, and $\mathbf{X}_i \equiv \{X_{1i}, \dots, X_{pi} \}^T \in \mathbb{R}^p$ denote its $p$-dimensional real-valued covariate vector.
-We use the potential outcomes framework (CITE) and denote the observed outcome for unit $i$ as $Y_i \equiv (1-Z_i) Y_i(0) + Z_i Y_i(1)$, for potential outcomes $Y_i(1)$ and $Y_i(0)$ under the stable unit treatment value assumption (CITE).
+For each unit $i$, let $Z_i \in \{0,1\}$ denote its binary treatment status, $Y_i \in \R$ denote its observed real-valued outcome, and $\mathbf{X}_i \equiv \{X_{1i}, \dots, X_{pi} \}^T \in \Rp$ denote its $p$-dimensional real-valued covariate vector.
+We use the potential outcomes framework and denote the observed outcome for unit $i$ as $Y_i \equiv (1-Z_i) Y_i(0) + Z_i Y_i(1)$, for potential outcomes $Y_i(1)$ and $Y_i(0)$ under the stable unit treatment value assumption.
 We make the standard conditional ignorability assumption:
 \begin{align*}
     (Y(1), Y(0)) \indep Z \mid \bX,
@@ -150,7 +160,7 @@ While matching methods can easily be extended to estimate sample and population 
 To motivate the importance of locality and joint balance, we provide a pair of toy examples.
 Figure \ref{fig:toy} plots the covariates $X_1$ and $X_2$ of control units $c_i$ and treated units $t_j$.
 The colors and contours visualize $f_0(\cdot)$, which takes on greater values in orange within the innermost contour.
-To conduct causal inference, we hope to use the observed outcomes of the control units $c_i$ to impute the unobserved counterfactual outcomes of the treated units $t_j$.
+To conduct causal inference, we use the observed outcomes of the control units $c_i$ to impute the unobserved counterfactual outcomes of the treated units $t_j$.
 \begin{figure}[t]
     \centering
     \begin{subfigure}[ht]{0.4\textwidth}
@@ -176,16 +186,16 @@ Many causal inference methods, however, would fail to acknowledge this problem.
 For example, a matching or balancing approach may exactly balance both $X_1$ and $X_2$ by assigning weights of 1 to all four units.
 Similarly, an outcome model may fit a flat response surface to the observed outcomes of $c_1$ and $c_2$.
 Because the usual marginal balance checks and outcome models appear good, the analyst is left unaware that these analyses significantly underestimate counterfactual outcomes, i.e., overestimate the SATT.
-Of course, approximate exact matching would also fail here, as there are no control units close to the treated units.
-Failing to find local matches, however, alerts the analyst to ``known unknowns,'' i.e., a lack of overlap which indicates potential extrapolation biases.
+Approximate exact matching would also fail here, as there are no control units close to the treated units.
+Failing to find local matches, however, alerts the analyst to ``known unknowns,'' i.e., a lack of overlap which may lead to biased estimates.
 
 Example 2 (Figure \ref{fig:toy2}) highlights the role of transparent local matches.
-Because $f_0(\cdot)$ is smooth, using only the outcomes of local control units (i.e., controls $c_3$ and $c_4$ within the dotted circles) to impute counterfactual outcomes leads to accurate estimates.
+Because $f_0(\cdot)$ is smooth, using only the outcomes of local control units (i.e., controls $c_3$ and $c_4$ within the dotted circles) leads to accurate counterfactual estimates.
 Local matches also produce transparent estimates;
-unlike using a black-box outcome model, it is immediately clear how each of the control units contribute to the estimates of each treated unit's counterfactual outcome.
+unlike using a black-box outcome model, it is immediately clear how each control unit contributes to each treated unit's counterfactual estimate.
 Finally, local matches encourage joint balance.
-In Example 2, assigning weights of 1 to $c_1$ and $c_2$ again leads to perfect marginal balance in $X_1$ and $X_2$.
-Clearly, however, it is worth sacrificing some marginal balance to upweight $c_3$ and $c_4$, since doing so greatly improves joint balance and downstream estimates.
+In Example 2, assigning weights of 1 to $c_1$ and $c_2$ again leads to perfect marginal balance.
+Clearly, however, it is worth sacrificing some marginal balance to upweight $c_3$ and $c_4$, since doing so greatly improves joint balance and the resulting treatment-effect estimates.
 
 % Example 2 (Figure \ref{fig:toy2}) highlights the role of joint covariate balance.
 % As humans, we cannot visually assess joint balance in more than a few dimensions, so we turn to low-dimensional summaries, e.g., marginal means, to build intuition.
@@ -196,21 +206,13 @@ Clearly, however, it is worth sacrificing some marginal balance to upweight $c_3
 
 These toy examples illustrate how following ``the spirit of exact matching'' by finding local matches can help both improve causal estimates and diagnose when they may be biased.
 In some situations, focusing on joint balance in this way is unnecessary or even harmful;
-for example, if the conditional expectation function is additive in its covariates, i.e., $f_0(\bX) = \sum_{j=1}^p g_j(X_j)$ for functions $g_j(\cdot):\mathbb{R} \to \mathbb{R}$, marginal balance suffices (CITE Jose's paper).
+for example, if the conditional expectation function is additive in its covariates, i.e., $f_0(\bX) = \sum_{j=1}^p g_j(X_j)$ for functions $g_j(\cdot):\R \to \R$, marginal balance suffices \citep{zubizarreta2015stable}.
 In such settings, attempting to balance the full joint covariate distribution is excessively conservative, as it protects estimates from bias that does not exist (e.g., bias due to imbalances in all covariate interactions).
 
 Observational causal inference, however, is often conducted in settings where little is known or assumed about $f_0(\cdot)$, and there are many covariates which may interact with each other in unknown ways.
+Because we cannot visually assess joint balance in more than a few dimensions, researchers are advised to check low-dimensional summaries, e.g., marginal means and two-way interactions, to build intuition for whether covariate imbalance is a concern.
+While these low-dimensional summaries help identify significant departures from joint covariate balance, they cannot confirm when joint balance is approximately achieved, particularly when there are many covariates and possible interactions.
 The toy examples illustrate how, in these settings, leveraging local matches protects analyses against bias that may be otherwise difficult to detect or diagnose.
-
-
-\note{TODO: figure out how to include the following sentences.
-As humans, we cannot visually assess joint balance in more than a few dimensions, so we turn to low-dimensional summaries, e.g., marginal means, to build intuition.
-While these low-dimensional summaries help identify significant departures from joint covariate balance, they cannot confirm when joint balance is approximately achieved.
-Overemphasizing particular low-dimensional summaries, however, may hurt the resulting causal inferences.
-}
-
-\note{TODO: figure out how to add ``minimax'' intuition: by focusing on joint balance we're minimizing the worst-case bias}
-
 
 % From \href{https://arxiv.org/pdf/2110.14831.pdf}{The Balancing Act in Causal Inference (Ben-Michael et al. 2021)}:
 % ``We need balance in the mean outcome conditional on treatment and covariates for IPW,
@@ -227,40 +229,37 @@ Overemphasizing particular low-dimensional summaries, however, may hurt the resu
 % as such, approximately balancing the joint distributions serves as a sufficient conditional for approximately balancing the $m_1(\cdot)$.
 % In general, outcome models aren't very transparent about where they're less certain, and it's hard to back this out, particularly in moderate dimensions.
 
-\note{TODO: see what balancing does when we're just given control units everywhere, and treated units only in certain places.}
-
-
 \subsection{Related work}
 \label{sec:related}
 
-TODO: some sort of ``family tree'' or a chronology of methods.
-Like exact matching $\implies$ CEM, propensity score matching and diagnostics $\implies$ balancing approaches, etc.?
+% TODO: some sort of ``family tree'' or a chronology of methods.
+% Like exact matching $\implies$ CEM, propensity score matching and diagnostics $\implies$ balancing approaches, etc.?
 
-Matching methods have a long history in observational causal inference (CITE Rosenbaum, Imbens and Rubin, etc).
-Rather than attempt an exhaustive review, we briefly trace how these methods have operationalized the spirit of exact matching over time and then provide more detailed surveys in Section \ref{sec:CSM} as we develop the method introduced in this paper.
+% \note{Writeup also mentions \href{https://scholar.google.com/scholar?q=raking+survey+sampling&hl=en&as_sdt=0&as_vis=1&oi=scholart}{raking} (i.e., finding weights that balance marginals in survey samples) within calipers, though this is closer to balancing than to matching.}
+% \note{Writeup also suggests possibly using kernel approaches within calipers, which I should mention somewhere.}
 
-Early work in matching incorporated locality via nearest-neighbor (CITE), caliper (CITE), and radius matching (CITE) approaches.
-These methods were typically combined with dimension reduction, e.g., via propensity scores (CITE), to circumvent the challenge of near-exact matching with multiple covariates,
-though some approaches, e.g., Mahalanobis distance matching (CITE), directly operated on a scaled version of the original covariate space.
-To evaluate their matched sets, researchers would typically conduct iterative balance checks, revising their matching scheme if it led to poor marginal mean balance (CITE?)
+% TODO: cite Eli's balancing act to note that all that needs to be balanced is the conditional expectation function.
+
+Matching methods have a long history in observational causal inference \citep{stuart2010matching}.
+Rather than attempt an exhaustive review, we briefly trace how these methods have operationalized the spirit of exact matching over time and provide details in Section \ref{sec:CSM} as we develop the method introduced in this paper.
+
+Early work in matching incorporated locality via nearest-neighbor \citep{rubin1973matching}, caliper \citep{cochran1973controlling, rosenbaum1985constructing}, and radius matching \citep{dehejia2002propensity} approaches.
+These methods were typically combined with dimension reduction, e.g., via propensity scores \citep{rosenbaum1983central}, to circumvent the challenge of near-exact matching with multiple covariates,
+though some approaches, e.g., Mahalanobis distance matching \citep{rubin2000combining}, directly operated on a scaled version of the original covariate space.
+To evaluate their matched sets, researchers would typically conduct iterative balance checks, revising their matching scheme if it led to poor marginal mean balance.
 
 To circumvent the need for these iterative balance checks, \citet{iacus2012causal} introduced Coarsened Exact Matching (CEM), which we discuss in further detail in Section \ref{sec:close}.
 Instead of fixing the sample and returning the resulting level of balance, CEM fixes a user-specified level of joint balance and returns the resulting sample.
 By making local matches a primary rather than a secondary criterion, CEM enjoys the desirable transparency and joint balance properties of exact matching.
 
-In recent years, significant work has been developed in the field of ``almost-exact'' matching, which attempts to more precisely (or exactly) match covariates that appear to be more predictive of the potential outcomes.
-\citet{dieng2019interpretable} and \citet{wang2021flame} do so for discrete covariates, and \citet{morucci2020adaptive} and \citet{parikh2022malts} extend this work to continuous covariates.
-% TODO: cite Eli's balancing act to note that all that needs to be balanced is the conditional expectation function.
+More recently, researchers have developed matching methods that flexibly learn notions of locality rather than using user-specified defaults, as we discuss in Section \ref{sec:dists}.
+Genetic matching \citep{diamond2013genetic} learns to more precisely match covariates that appear to be important for overall covariate balance, while ``almost-exact'' matching methods for discrete \citep{dieng2019interpretable, wang2021flame} and continuous \citep{morucci2020adaptive, parikh2022malts} data aim to more precisely (or exactly) match covariates that are more predictive of the potential outcomes.
 
-Recent work outside of matching has also noted the importance of locality in observational causal inference.
-\citet{abadie2021penalized} augments the popular synthetic controls methodology with a penalty for using units far from the treated unit.
-In a similar synthetic controls setting, \citet{ben2021augmented} tunes extrapolation away from the convex hull of control units.
-\citet{kellogg2021combining} explicitly trades off bias due to extrapolating beyond local matches with bias due to linearly interpolating between distant units.
-\note{TODO: other papers to note?}
-
-\note{Writeup also mentions \href{https://scholar.google.com/scholar?q=raking+survey+sampling&hl=en&as_sdt=0&as_vis=1&oi=scholart}{raking} (i.e., finding weights that balance marginals in survey samples) within calipers, though this is closer to balancing than to matching.}
-\note{Writeup also suggests possibly using kernel approaches within calipers, which I should mention somewhere.}
-
+Work outside of matching has also noted the importance of locality in observational causal inference.
+For example, \citet{abadie2021penalized} augments the popular synthetic controls methodology with a penalty for using control units far from the treated unit.
+In a similar setting, \citet{ben2021augmented} tunes the extent to which synthetic controls may extrapolate away from the control units.
+More generally, \citet{kellogg2021combining} explicitly trades off the bias from extrapolating beyond local matches with the bias from linearly interpolating between distant units.
+While these approaches do not attempt to directly emulate exact matching, they highlight the use of local data for principled causal inference.
 
 \section{Caliper Synthetic Matching}
 \label{sec:CSM}
@@ -276,6 +275,7 @@ at each stage, we increase the complexity of the method to improve its use of th
 While we believe that the final proposed method simultaneously maximizes transparency and performance, in practice researchers may make different choices at each stage to limit complexity as necessary.
 
 \subsection{Principle 1: Distances should be intuitive}
+\label{sec:dists}
 
 In the absence of exact matches, matching algorithms find control units as ``close'' as possible to their treated counterparts to improve joint covariate balance and reduce potential bias \citep{rosenbaum1985bias}.
 For matching, one popular distance measure is propensity score distance:
@@ -286,8 +286,8 @@ For matching, one popular distance measure is propensity score distance:
 where the propensity score $e(\cdot) = P(Z_i = 1 \mid \bX_i)$ represents the probability that a unit is treated, given its covariates \citep{rosenbaum1983central}.
 
 While matching units with similar propensity scores leads to principled causal estimates, it does not construct intuitive matched sets.
-Propensity score distance is not formally a distance metric on $\mathbb{R}^p$,\footnote{For example, $d^{(e)}(\bX_i, \bX_j) = 0$ does not imply that $\bX_i = \bX_j$.
-For a simple introduction to distance metrics on $\mathbb{R}^p$, see Appendix \ref{app:biasbd}.}
+Propensity score distance is not formally a distance metric on $\Rp$,\footnote{For example, $d^{(e)}(\bX_i, \bX_j) = 0$ does not imply that $\bX_i = \bX_j$.
+For a simple introduction to distance metrics on $\Rp$, see Appendix \ref{app:distmetrics}.}
 so it can violate our natural understanding of ``closeness.''
 For example, two units that are ``close'' in terms of propensity score distance may have very different covariate values.
 If a researcher matches two such units, it can be unclear whether they should trust this match, fit a better propensity-score model, or find a closer propensity-score match.
@@ -313,7 +313,7 @@ The matrix $V$ scales the raw differences in the covariates and their two-way in
 For example, if $V_{11}$ were large, then the resulting distance metric would magnify, i.e., upweight, differences in the first covariate.
 
 A variety of scaled distance metrics have been proposed in the literature.
-One popular scaled $L_2$ distance metric is Mahalanobis distance, which uses $V^T V = \Sigma^{-1}$, the inverse covariance matrix estimated from the control group (CITE).
+One popular scaled $L_2$ distance metric is Mahalanobis distance, which uses $V^T V = \Sigma^{-1}$, the inverse covariance matrix estimated from the control group \citep{rubin1980bias}.
 Other $L_2$ approaches restrict the scale matrix $V^T V$ to be diagonal and directly optimize it.
 To learn optimal covariate weights from the data, genetic matching \citep{diamond2013genetic} optimizes covariate balance, Matching After Learning to Stretch \citep{parikh2022malts} minimizes the resulting predictive error over a hold-out training set, and synthetic controls \citep{abadie2010synthetic} minimize the resulting predictive error across hold-out outcome variables in a time-series setting.
 
@@ -409,7 +409,7 @@ We also summarize characteristics of units with different $c_t$ values to better
 Overall, rather than using diagnostic plots to attempt to assess joint balance using low-dimensional summaries, we use them to clearly characterize the estimate-estimand tradeoff, allowing researchers to qualitatively assess the potential bias they are willing to accept to estimate the SATT.
 
 % [Random idea:
-% for $C$ the region of $\mathbb{R}^p$ covered by the caliper of width $c$ and $dens(\cdot)$ some density estimator of the control units:
+% for $C$ the region of $\Rp$ covered by the caliper of width $c$ and $dens(\cdot)$ some density estimator of the control units:
 % \begin{align*}
 %     \min_c \int_C 1 - \lambda dens(x) dx
 % \end{align*}
@@ -420,10 +420,10 @@ Overall, rather than using diagnostic plots to attempt to assess joint balance u
 Given matched units from the design phase of a matching analysis, the final step is to produce an estimate.
 With high-quality matches, the SATT may be estimated with a simple average:
 $$\hat{\tau}^{avg} = \frac{1}{n_t} \sum_{t \in \mathcal{T}} \big( Y_t - \frac{1}{|\Ct|} \sum_{j \in \Ct} Y_j \big).$$
-Typically, however, researchers apply outcome models, e.g., weighted linear regression, to the matched dataset to adjust for residual covariate imbalances (CITE).
+In practice, however, researchers typically view matching as a preprocessing step \citep{ho2007matching} before applying outcome models, e.g., weighted linear regression, to the matched dataset to adjust for residual covariate imbalances.
 
 In this paper, we use the synthetic control method \citep[SCM; ][]{abadie2010synthetic} within matched sets.
-For each treated unit $t$, we find convex weights for its matched control units that minimize covariate imbalance as measured by a scald distance metric $d_V(\cdot, \cdot) = d_V^{(2)}(\cdot, \cdot)$ or $d_V^{(\infty)}(\cdot, \cdot)$:
+For each treated unit $t$, we find convex weights\footnote{I.e., weights $w_{jt} \geq 0$ that sum to 1} for its matched control units that minimize covariate imbalance as measured by a scaled distance metric $d_V(\cdot, \cdot) = d_V^{(2)}(\cdot, \cdot)$ or $d_V^{(\infty)}(\cdot, \cdot)$:
 \begin{align*}
     \argmin_{\{w_{jt} : j \in \Ct\}} 
         &\hspace{2mm} d_V(\Xt, \sum_{j \in \Ct}w_{jt} \Xj) \\
@@ -442,8 +442,6 @@ The setup above deviates from the standard SCM setup in a few ways.
 First, while \citet{abadie2010synthetic} introduces SCM as a quadratic programming problem using scaled $L_2$ distance, we also allow SCM to be implemented as a linear programming problem using scaled $L_\infty$ distance (see Appendix \ref{app:scm} for details).
 Second, while synthetic controls are typically used in time-series settings with past outcomes as additional covariates, we directly apply them in our setting without past outcomes.
 Finally, the SCM introduced in \citet{abadie2010synthetic} includes an outer optimization to learn an ``optimal'' scaling matrix $V$, whereas we simply use the $V$ matrix implied by the given covariatewise caliper (as formalized in Proposition \ref{prop:distmetriccal}).
-
-\note{TODO: within-caliper extrapolation?}
 
 Using synthetic controls in the analysis phase provides two primary benefits.
 First, synthetic controls are highly transparent.
@@ -473,7 +471,7 @@ For example, if $p=2$ and we want to ensure $|X_{t1} - X_{j1}| \leq 2$ and $|X_{
 This idea is formalized by Proposition \ref{prop:distmetriccal}.
 \begin{proposition}
 \label{prop:distmetriccal}
-    Given covariatewise caliper $\boldsymbol{\pi} \in \mathbb{R}^p_{+}$ on units $t$ and $j$, for scaling matrix $V = diag\{\frac{1}{\boldsymbol{\pi}}\}$:
+    Given covariatewise caliper $\boldsymbol{\pi} \in \Rp_{+}$ on units $t$ and $j$, for scaling matrix $V = diag\{\frac{1}{\boldsymbol{\pi}}\}$:
     \begin{enumerate}[label=(\alph*)]
         \item $d^{(2)}_V(\Xt, \Xj) \leq 1 \implies |X_{tk}-X_{jk}| \leq \pi_k \text{ for } k=1,\dots,p $
         \label{prop:dmca}
@@ -549,10 +547,10 @@ Formally, the $q$-Wasserstein distance between probability distributions $P$ and
 \begin{align*}
     \mathcal{W}_q(P, Q) = \inf_{\substack{\bX \sim P \\ \mathbf{Y} \sim Q}} E\big[ d(\bX, \mathbf{Y})^q \big]^{1/q},
 \end{align*}
-where the infimum is over couplings of $P$ and $Q$, i.e., all joint distributions with marginals $P$ and $Q$.
+where the infimum is over all couplings of $P$ and $Q$, i.e., joint distributions with marginals $P$ and $Q$.
 Wasserstein distance is also known as ``earth-mover's distance'':
-viewing $P$ and $Q$ as piles of soil each with total mass 1, $W_q(P, Q)$ measures the minimum ``cost'' to move soil to make $P$ match $Q$ (or vice-versa), where the ``cost'' of moving $k$ units of soil from $\mathbf{x}$ to $\mathbf{y}$ is $k\cdot d(\mathbf{x}, \mathbf{y})$.
-Wasserstein distance naturally extends distance metrics to measure distance between full probability distributions rather than distances between points.
+viewing $P$ and $Q$ as piles of soil each with total mass 1, $W_q(P, Q)$ measures the minimum ``cost'' to move soil to make $P$ match $Q$ (or vice-versa), where the ``cost'' of moving $k$ units of soil from $\mathbf{x}$ to $\mathbf{y}$ is $k d(\mathbf{x}, \mathbf{y})$.
+Intuitively, Wasserstein distance extends distance metrics to measure distance between full probability distributions rather than distances between points in $\Rp$.
 
 % Now let $X_1, \dots, X_n \overset{i.i.d.}{\sim} P$ and $Y_1, \dots, Y_n \overset{i.i.d.}{\sim} Q$.
 % Then the Wasserstein $p$-distance between the empirical distributions of $P$ and $Q$ may be written as:
@@ -602,7 +600,7 @@ With this notation in hand, Proposition \ref{prop:wass} shows that radius matchi
 We make two remarks about Proposition \ref{prop:wass}.
 First, while the notation is technical, the intuition is straightforward.
 Distance-metric calipers control how far each treated unit's covariates can be from its matched controls' covariates.
-Since $f_T$ and $f_C$ are simply weighted sums of the point masses associated with these covariates, the calipers must also control the distance between $f_T$ and $f_C$.
+Since $f_T$ and $f_C$ are weighted sums of the point masses associated with these covariates, the calipers must also control the distance between $f_T$ and $f_C$.
 % For example, consider a treated unit $t$ and its single matched control $j$ such that $d^{(\infty)}_V(\Xt, \Xj) = \epsilon$.
 % Then the point mass corresponding to the treated unit's covariates needs to be moved $\epsilon$ $d_V^{(\infty)}$-units to coincide with the point mass corresponding to the control unit's covariates, 
 % i.e., $\mathcal{W}_q^{(\infty)}(\delta(\Xt-\mathbf{x}), \delta(\Xj-\mathbf{x})) = d^{(\infty)}_V(\Xt, \Xj) = \epsilon$.
@@ -610,23 +608,33 @@ Second, note that for an exact caliper $c=0$, Proposition \ref{prop:wass} simply
 In practice, however, reducing the caliper size to $c=0$ drops all of the treated units, leaving the proposition to be vacuously true, so $c$ must be chosen with the estimate-estimand tradeoff in mind.
 
 Control over joint covariate imbalance naturally implies control over marginal imbalances.
-For example, Appendix Proposition \ref{prop:meanbd} shows how distance-metric calipers also bound the distance between the empirical weighted covariate means of the treated and matched control units.
+For example, Proposition \ref{prop:meanbd} shows how distance-metric calipers also bound the distance between the ($p$-dimensional) empirical weighted covariate means of the treated and matched control units, respectively denoted $\bar{\bX}_T$ and $\Bar{\bX}_C$.
+\begin{proposition}
+\label{prop:meanbd}
+    For $\epsilon > 0$, $d_V(\cdot, \cdot)$ = $d^{(2)}_V(\cdot, \cdot)$ or $d^{(\infty)}_V(\cdot, \cdot)$:
+    \begin{align*}
+        \text{For all } t, d_V(\Xt, \Xj) \leq \epsilon \text{ for all } j \in \Ct
+        \implies d_V(\bar{\bX}_T, \Bar{\bX}_C) \leq \epsilon
+    \end{align*}
+\end{proposition}
+\begin{proof}
+    See Appendix \ref{app:wass}.
+\end{proof}
+
 In summary, distance-metric calipers enable precise control of joint covariate imbalance.
-This leads to a variety of desirable properties illustrated in the following sections.
-% Propositions \ref{prop:meanbd} and \ref{prop:wass} demonstrate the utility of caliper-based methods by formalizing their basic intuition:
-% if the covariates for each treated unit are required to be similar to the covariates of its matched controls, then the treated and matched control covariate distributions must be close to each other.
-% This joint covariate balance may be summarized using the marginal means, or it may be directly demonstrated using Wasserstein distance.
+While these bounds are not necessarily small in practice, they guarantee that observed imbalance cannot be too great, even in the worst case.
+This leads to a variety of desirable properties which we illustrate in the following sections.
 
 
 \subsection{Bounded bias}
 \label{sec:biasbd}
 
-Because MIB matching methods bound the distance between the covariates of matched units, they naturally bound the distance between smooth functions $f:\mathbb{R}^p \to \mathbb{R}$ of those covariates as well.
+Because MIB matching methods bound the distance between the covariates of matched units, they naturally bound the distance between smooth functions $f:\Rp \to \R$ of those covariates as well.
 Recall that we may write write the control potential outcome for unit $i$ as $Y_i(0) = f_0(\bX_i) + \epsilon_i$.
 Then assuming that $f_0(\cdot)$ is smooth (i.e., Lipschitz) immediately bounds the bias of any FSATT estimate produced by a method using distance-metric calipers.
 \begin{proposition}
 \label{prop:biasbd_lip}
-Suppose $f_0: \mathbb{R}^p \to \mathbb{R}$ is Lipschitz$(\lambda)$ with respect to $d_V(\cdot, \cdot)$ = $d^{(2)}_V(\cdot, \cdot)$ or $d^{(\infty)}_V(\cdot, \cdot)$.
+Suppose $f_0: \Rp \to \R$ is Lipschitz$(\lambda)$ with respect to $d_V(\cdot, \cdot)$ = $d^{(2)}_V(\cdot, \cdot)$ or $d^{(\infty)}_V(\cdot, \cdot)$.
 Then for a matching procedure such that for all $t$, $d_V(\Xt, \Xj) \leq c$ for all $j \in \Ct$:
 \begin{equation*}
     \big|E[\tau_\mathcal{F} - \hat{\tau}_\mathcal{F}] \big| \leq \lambda c.
@@ -635,7 +643,7 @@ Then for a matching procedure such that for all $t$, $d_V(\Xt, \Xj) \leq c$ for 
 \begin{proof}
     \begin{align*}
         \big| E &[\tau_\mathcal{F} - \hat{\tau}_\mathcal{F} ] \big| \\
-        &= \bigg| E\Big[\frac{1}{n_T}\sum_{t \in \mathcal{T}} \big( Y_t(1) - Y_t(0) \big) - \frac{1}{n_T}\sum_{t \in \mathcal{T}} \big( Y_t(1) - \sum_{j \in \Ct} w_{jt} Y_j(0) \big) \Big] \bigg| \\
+        % &= \bigg| E\Big[\frac{1}{n_T}\sum_{t \in \mathcal{T}} \big( Y_t(1) - Y_t(0) \big) - \frac{1}{n_T}\sum_{t \in \mathcal{T}} \big( Y_t(1) - \sum_{j \in \Ct} w_{jt} Y_j(0) \big) \Big] \bigg| \\
         % &= \bigg| \frac{1}{n_T} \sum_{t \in \mathcal{T}} 
         %     E\Big[ \sum_{j \in \Ct} w_{jt} Y_j(0) - Y_t(0) \Big]\bigg| \\
         &= \bigg| \frac{1}{n_T} \sum_{t \in \mathcal{T}} 
@@ -645,12 +653,13 @@ Then for a matching procedure such that for all $t$, $d_V(\Xt, \Xj) \leq c$ for 
         &\leq \lambda c.
     \end{align*}
 \end{proof}
+Appendix \ref{app:lipschitz} provides technical details about Lipschitz functions in $\Rp$.
 
 Proposition \ref{prop:biasbd_lip} states that for distance-metric caliper matching methods, worst-case bias is proportional to the caliper size $c$.\footnote{Proposition \ref{prop:biasbd_lip} applies to a slightly different set of methods than Proposition 1 from \citet{iacus2011multivariate}, which proves a similar bias bound for MIB matching methods.}
 As in Proposition \ref{prop:wass}, setting $c=0$ shows that exact matching leads to unbiased estimates, but in practice we must use $c > 0$ to navigate the estimate-estimand tradeoff without dropping all of the treated units.
 
-Of course, we rarely know the Lipschitz constant $\lambda$ in practice, so it is difficult to use Proposition \ref{prop:biasbd_lip} to generate empirical bias bounds.
-Nonetheless, Proposition \ref{prop:biasbd_lip} illustrates how distance-metric calipers control bias:
+Of course, we rarely know the Lipschitz constant $\lambda$ in practice, so Proposition \ref{prop:biasbd_lip} does not generate empirical bias bounds.
+Nonetheless, Proposition \ref{prop:biasbd_lip} illustrates how distance-metric calipers control bias.
 If each treated unit is close to all of its matched controls in covariate space, its expected counterfactual outcome must be close to their expected outcomes, for reasonable (i.e., smooth) outcome functions.
 As a result, any weighted average of the control units' outcomes cannot differ too much in expectation from the treated unit's true counterfactual outcome, regardless of the specific form of $f_0(\cdot)$.
 
@@ -667,7 +676,7 @@ Proposition \ref{prop:scbiasbd} more precisely shows how exact synthetic control
 \begin{proposition}
 \label{prop:scbiasbd}
 Let $d_V(\cdot, \cdot)$ = $d^{(2)}_V(\cdot, \cdot)$ or $d^{(\infty)}_V(\cdot, \cdot)$.
-Suppose $f_0: \mathbb{R}^p \to \mathbb{R}$ is differentiable and Lipschitz($\lambda$) with respect to $d_V$.
+Suppose $f_0: \Rp \to \R$ is differentiable and Lipschitz($\lambda$) with respect to $d_V$.
 Then for a matching procedure such that for all $t$, $d_V(\Xt, \Xj) \leq c$ for all $j \in \Ct$,
 if $\sum_{j \in \Ct} w_{jt} \Xj = \Xt$ for all $t$:
 \begin{equation*}
@@ -676,7 +685,7 @@ if $\sum_{j \in \Ct} w_{jt} \Xj = \Xt$ for all $t$:
 \end{equation*}
 \end{proposition}
 \begin{proof}
-    See Appendix \ref{app:biasbd}.
+    See Appendix \ref{app:scbiasbd}.
 \end{proof}
 
 In Proposition \ref{prop:scbiasbd}, the $o(c)$ term represents higher-order terms which go to zero more quickly than does the caliper $c$ as $c$ shrinks toward zero.
@@ -687,7 +696,7 @@ restricting the donor-pool units to be within a caliper distance from the treate
 Proving Proposition \ref{prop:scbiasbd} requires some additional mathematical exposition.
 Specifically, we require $f_0(\cdot)$ to be differentiable in order to Taylor expand it with respect to the given distance metric.
 The resulting expansion differs from the usual multivariate Taylor expansion, since it uses directional derivatives to better utilize the distance-metric calipers.
-We provide further details in Appendix \ref{app:biasbd}.
+We provide further details in Appendix \ref{app:scbiasbd}.
 
 
 \subsection{Comparison to CEM}
@@ -718,15 +727,17 @@ Overall, however, radius matching preserves the transparency and interpretabilit
 
 
 \subsection{Bias-variance tradeoff}
+\label{sec:bv}
 
-Reducing caliper sizes reduces the potential bias of the resulting SATT estimate, as shown by Proposition \ref{prop:biasbd}, but may increase the estimate's variance.
+Reducing caliper sizes reduces the potential bias of the resulting SATT estimate, as shown by Proposition \ref{prop:biasbd_lip}, but may increase the estimate's variance.
 To formalize this idea, we introduce the (conditional) mean-squared error for the SATT $\tau$:
 \begin{align*}
     CMSE = E[(\hat{\tau} - \tau)],
 \end{align*}
-where the expectation is implicitly conditioned on the observed covariates and treatment assignments \citep{kallus2020generalized}.
-Standard algebraic manipulation then shows that $CMSE = B^2 + V^2$, for:
+where the expectation is implicitly conditioned on the observed covariates and treatment assignments.
+Standard algebraic manipulation then shows that:
 \begin{align*}
+    CMSE &= B^2 + V^2 \\
     B^2 &= 
         \Big(\frac{1}{n_T} \sum_{t \in \mathcal{T}} \sum_{j \in \Ct} 
             w_{jt} \big( f_0(\Xt) - f_0(\Xj) \big) \Big)^2 \\
@@ -734,7 +745,7 @@ Standard algebraic manipulation then shows that $CMSE = B^2 + V^2$, for:
         \frac{1}{n_T^2} \sum_{t \in \mathcal{T}} \sigma_t^2 +
         \frac{1}{n_T^2} \sum_{j \in \mathcal{C}} (\sum_{t \in \mathcal{T}} w_{jt})^2 \sigma_j^2,
 \end{align*}
-where $\sigma_i$ represents the population sampling variance of unit $i$ conditional on its covariates $\bX_i$.
+where $\sigma_i$ represents the population sampling variance of unit $i$ conditional on its covariates $\bX_i$ \citep{kallus2020generalized}.
 % Here we allow any weights such that $\sum_{j \in \mathcal{C}} w_{jt} = 1$ for all $t$.
 If we assume homoskedasticity (i.e., $\sigma_i = \sigma$) and the conditions of Proposition \ref{prop:biasbd_lip} with caliper $\epsilon$, we can bound CMSE as:
 \begin{equation}
@@ -757,69 +768,43 @@ Increasing caliper size therefore has diminishing returns on variance reduction,
 
 \subsection{Inference}
 
-% Idea: they bootstrap their (bias-corrected) observations along with their weights. We just bootstrap the weighted observations. We don't do any bias correction, with some ad-hoc justification for bias being small due to synthetic controls.
+% http://eprints.lse.ac.uk/84170/1/bootstrap%20inference_Accepted_Final.%20.pdf for correct equations lol
+% https://www.tandfonline.com/doi/pdf/10.1080/01621459.2016.1231613?casa_token=Dyp9KkSTIvsAAAAA:A7rMpPCejmJmS8jbDMS4X9mB2bI7P8tH71W09fByJxxE9Tbf91dmgtXVpuX2nTK9Jd-XTHxs_kA
 
-Variance estimation for matching procedures has historically been a challenging problem.
+Variance estimation for matching procedures requires careful treatment.
 For example, bootstrapping nearest-neighbors matching famously does not lead to consistent variance estimates \citep{abadie2008failure}.
-Intuitively, this is because the naive bootstrap fails to appropriately reproduce the distribution of unit-level weights.\footnote{The naive bootstrap randomly drops and duplicates control observations, which changes the matched sets associated with each treated unit, thus changing the total weight assigned to each control unit by the matching procedure.}
-To address these challenges, \citet{otsu2017bootstrap} proposed a weighted bootstrap procedure.
+Intuitively, this is because the naive bootstrap fails to reproduce the distribution of unit-level weights;
+the random dropping and duplication of control observations changes the treated units' matched sets, which affects the total weight assigned to each control unit.\footnote{Interestingly, for synthetic controls, duplicating a control unit does not affect the total weight assigned to it; for each synthetic control, the same weight would simply be divided between the control unit and its duplicates. Dropping units, however, still affects the total weight assigned to control units.}
+To address these challenges, \citet{otsu2017bootstrap} propose a weighted bootstrap procedure.
 The weighted bootstrap resamples units along with their weights, preserving the distribution of unit-level weights and therefore producing consistent variance estimates.
 
-In this paper, we estimate the variance of the point estimate produced by CSM using a weighted bootstrap based on ideas from \citet{otsu2017bootstrap}.
-We leave the precise theoretical treatment of this procedure for future work, though we demonstrate its empirical effectiveness in our simulations.
-\note{E.g., repeatedly simulate with constant ATT of 0, run bootstrap, and check coverage across simulations. Can use Otsu simulation as our example?}
-Our weighted bootstrap procedure is conducted as follows:
+In this paper, we estimate the variance of the point estimate produced by CSM using a weighted bootstrap based on ideas from \citet{otsu2017bootstrap}.\footnote{
+    Our procedure differs in two primary ways. 
+    First, we use synthetic control weights rather than average $k$-nearest-neighbors weights. 
+    Second, we exclude the model-based bias-correction term $\hat{f}_0(\Xt) - \sum_{j \in \Ct} w_{jt} \hat{f}_0(\Xj)$.
+    While this leads to asymptotic bias, we argue that because synthetic controls minimize extrapolation bias $\hat{f}_0(\Xt) - \hat{f}_0(\sum_{j \in \Ct} w_{jt} \Xj)$ and calipers bound linear interpolation bias $\hat{f}_0(\sum_{j \in \Ct} w_{jt} \Xj) - \sum_{j \in \Ct} w_{jt} \hat{f}_0(\Xj))$, this bias is well-controlled.}
+The proposed bootstrap procedure is conducted as follows:
 \begin{enumerate}
-    \item (Run CSM) Run CSM on the full dataset and record the total weight assigned to each control unit $j$, $w_j = \sum_{t \in \mathcal{T}} w_{jt}$.
+    \item (Run CSM) Run CSM on the full dataset and record the total weight assigned to each control unit $j$, $w_j \equiv \sum_{t \in \mathcal{T}} w_{jt}$.
     \item (Run a weighted bootstrap) For each bootstrap sample $b = 1, \dots, B$:
     \begin{enumerate}
         \item Sample bootstrap weights $w^{(b)}_1, \dots, w^{(b)}_n \sim \text{Dirichlet}\Big((1, \dots, 1)\Big)$.
         % \footnote{We choose to use ``Bayesian bootstrap'' weights here \citep{rubin1981bayesian}.
         % See \citet{otsu2017bootstrap} for other possible bootstrap weight distributions.}
-        \item Compute an ATT estimate as $\hat{\tau}^{(b)} = \sum_{t \in \mathcal{T}} w_t^{(b)} Y_t - \sum_{j \in \mathcal{C}} w_j^{(b)} w_j Y_j$
+        \item Compute an SATT estimate as $\hat{\tau}^{(b)} = \sum_{t \in \mathcal{T}} w_t^{(b)} Y_t - \sum_{j \in \mathcal{C}} w_j^{(b)} w_j Y_j$
     \end{enumerate}
-    \item (Aggregate results) Use the $\frac{\alpha}{2}$ and $1-\frac{\alpha}{2}$ quantiles of $\{\hat{\tau}^{(b)}\}_{b = 1, \dots, B}$ as the $(1-\alpha)$\% confidence interval for the ATT. \note{Obviously could estimate standard deviation too and tack that onto the point estimate? Maybe that's nicer?}
+    \item (Aggregate results) Estimate the standard error of $\hat{\tau}$ as the standard deviation of the bootstrapped SATT estimates $\{\hat{\tau}^{(b)}\}_{b = 1, \dots, B}$
+    % Use the $\frac{\alpha}{2}$ and $1-\frac{\alpha}{2}$ quantiles of $\{\hat{\tau}^{(b)}\}_{b = 1, \dots, B}$ as the $(1-\alpha)$\% confidence interval for the ATT.
 \end{enumerate}
+We leave the precise theoretical treatment of this procedure for future work, though we demonstrate its empirical effectiveness in our simulations.
 
-We highlight the computational efficiency of the bootstrap procedure proposed above.
-Rather than repeatedly resampling the data and constructing local synthetic controls, the procedure only requires the synthetic controls to be constructed once, for the initial ATT estimate using the full dataset.
-In other words, conditioning on the unit weights produces a bootstrap procedure that is both valid and computationally efficient.
+We highlight the computational efficiency of this bootstrap procedure.
+Rather than repeatedly resampling and constructing local synthetic controls, the procedure constructs the synthetic controls only once for the initial ATT estimate using the full dataset.
+We also note that in step 2(a), we sample Bayesian bootstrap weights \citep{rubin1981bayesian}.
+\citet{otsu2017bootstrap} use wild bootstrap weights, noting that under standard conditions, many different bootstrap weight distributions can lead to valid inference.
+% Notably, even the usual Multinomial weight distribution\footnote{I.e., $w^{(b)}_1, \dots, w^{(b)}_n \sim \text{Multinomial}\Big(n, (\frac{1}{n}, \dots, \frac{1}{n})\Big)$} implied by the naive bootstrap leads to correct results.
 
-In step 2(a) of our proposed procedure, we choose to sample Bayesian bootstrap weights \citep{rubin1981bayesian}.
-\citet{otsu2017bootstrap} use wild bootstrap weights, noting that as long as the original unit weights $w_j$ are preserved, many different bootstrap weight distributions can lead to valid inference.
-Notably, even the usual Multinomial weight distribution\footnote{I.e., $w^{(b)}_1, \dots, w^{(b)}_n \sim \text{Multinomial}\Big(n, (\frac{1}{n}, \dots, \frac{1}{n})\Big)$} implied by the naive bootstrap leads to correct results.
-
-\note{Remark 1: SCM doesn't care about duplicates (since it spreads weight in some arbitrary way between the duplicated observations), and SCM forces bias to be small (since the bias term in the Abadie and Imbens paper is basically just linear bias from using control outcomes instead of the tx unit outcomes).}
-
-\note{Remark 2: We can also use a parametric bootstrap to more directly propagate uncertainty in the control unit weights. We don't do this because we're just fully nonparametric in this paper, but it's worth considering.}
-
-% The question of variance estimation for matching procedures is tricky.
-% In particular, for nearest-neighbors approaches, it has been shown that the usual bootstrap leads to non-consistent variance estimates \citep{abadie2008failure}.
-% We base our inferential procedure on the weighted bootstrap proposed by \citet{otsu2017bootstrap}.
-
-% Our bootstrap is extremely computationally efficient.
-% Bootstrapping the original sample leads to major annoyances;
-% while we can avoid recomputing the distance matrix, we would have to recompute the synthetic control weights, since for a given treated unit, we may fail to resample one of its control units.
-
-% Rather than doing the standard bootstrap, we do a Bayesian bootstrap.
-% This just has the effect of smoothing out our unit weights.
-
-% We bootstrap the treated units and the synthetic-control-weighted control units, where each control unit receives a weight of $w_j = \sum_{t \in \mathcal{T}} w_{jt}$;
-% that is, we assign each control unit a weight equal to the sum of its weights associated with all treated units.
-
-% The intuition for this being okay is as follows:
-% suppose we have one treated unit, and it has 5 within-caliper controls.
-% Now suppose we add a replicate of the fifth within-caliper control (perhaps with a new outcome).
-% Then the synthetic controls procedure will re-assign weights, but importantly, without any weighting penalty, it will assign the same weights to the other four controls!
-% The weight for the original fifth control will just be split with its replicate in some arbitrary fashion.
-
-% By using the Bayesian bootstrap, we avoid assigning zero weights.
-% This means that we're never dropping units, so our matching procedure remains unperturbed.
-
-% (We relegate theoretical treatment of this procedure to future work.)
-
-% \note{TODO: try some of these, see what happens. Results should be pretty similar if our intuitions are correct, so if they're massively different we should look into it.}
-% So this means that our final procedure is:
+% \note{Remark 2: We can also use a parametric bootstrap to more directly propagate uncertainty in the control unit weights. We don't do this because we're just fully nonparametric in this paper, but it's worth considering.}
 
 % \begin{enumerate}
 %     \item Fixed number of tx and co units: sample Dirichlet$(n_T; \alpha)$ weights for treated units, Dirichlet$(n_C; \alpha)$ weights for control units.
@@ -843,23 +828,110 @@ Notably, even the usual Multinomial weight distribution\footnote{I.e., $w^{(b)}_
 % We can also combine the two, by parametric-bootstrapping controls and Bayesian-bootstrapping treateds.
 
 
+\section{Simulation Studies}
+\label{sec:simulation}
 
-\section{Applications}
+A few simulations to run:
+\begin{itemize}
+    \item On 2D adversarial dataset: horse-race CSM against other methods
+    \item On canonical datasets: horse-race CSM against other methods
+\end{itemize}
 
-% \subsection{Implementation}
+On all simulations, check calibration of bootstrap intervals.
+E.g., for 1000 simulated datasets, 950 of the 95\% bootstrap intervals should cover the truth.
 
-% Describe our optimization.
-% Currently, just SCM for each tx unit.
-% It's slow but not horrible, since there are not so many matches for each tx unit so each SC is pretty easy.
+% \note{TODO: see what balancing does when we're just given control units everywhere, and treated units only in certain places.}
 
-\subsection{Simulation Study}
 
-\note{TODO: add simulation study here.}
+It would be straightforward to engineer a simulation where we show that CSM outperforms everything.
+This is not helpful.
+Instead, we run two sets of simulations.
+First, based on the toy example, we show a situation where matching is helpful and important.
+Second, we look at some canonical examples to see what CSM does.
 
-Current sim study: shows CSM better than CEM on ACIC dataset.
-Ideal sim study: shows CSM works well even compared to balancing/doubly robust approaches on an adversarially designed dataset, a la the toy problems in the intro. DONE.
+\subsection{Methods}
 
-\note{TODO: check out the simulation in \href{https://arxiv.org/pdf/0804.2958.pdf}{this famous paper} to see if it illustrates anything nice, just so we don't have to be faulted for arbitrary choices}
+We compare asdf against a wide range of methods.
+
+
+\subsection{Toy example simulation}
+
+
+Issue: 1nn and CEM are outperforming CSM! Why?
+
+\subsection{Canonical simulations}
+
+To illustrate the performance of CSM, we use simulated datasets from \citet{kang2007demystifying}, \citet{hainmueller2012entropy}, and the 2016 American Causal Inference Conference competition \citep{dorie2019automated}.
+These datasets have canonically been used to compare methods for observational causal inference.
+Table \ref{tab:simdata} contains basic information about the settings we used for each dataset.
+We refer readers to the original papers for further details.
+
+% Please add the following required packages to your document preamble:
+% \usepackage[table,xcdraw]{xcolor}
+% If you use beamer only pass "xcolor=table" option, i.e. \documentclass[xcolor=table]{beamer}
+\begin{table}[]
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+\rowcolor[HTML]{C0C0C0} 
+Dataset                   & $p$ & $n_t$         & $n_c$         & \begin{tabular}[c]{@{}l@{}}Heterogeneous \\ effects?\end{tabular} \\ \hline
+Kang \& Schafer, (2007)   & 4             & $\approx 1$   & $\approx 1$   & No                                                                          \\ \hline
+Hainmueller et al. (2012) & 6             & 50            & 250           & No                                                                          \\ \hline
+ACIC 2016                 & 10            & $\approx 350$ & $\approx 650$ & Yes                                                                         \\ \hline
+\end{tabular}
+\caption{Basic descriptions of simulated datasets. 
+    We use the \citet{kang2007demystifying} as-is from the original paper. 
+    We use the ``high overlap'' and ``highly nonlinear'' outcome model condition for the data from \citet{hainmueller2012entropy}. 
+    Finally, we use the ``step-function'' propensity and treatment model conditions for the ACIC 2016 data, and additionally subset the total number of covariates to 10.}
+\label{tab:simdata}
+\end{table}
+
+We compare CSM to a variety of popular methods.
+These include:
+\begin{itemize}
+    \item Difference in means
+    \item Outcome regression models: 
+    \begin{itemize}
+        \item Linear regression on all two-way interactions of covariates
+        \item Bayesian additive regression trees \citep[BART][]{chipman2009bart} on all covariates 
+    \end{itemize}
+    \item Inverse propensity score weighting, with propensity score models:
+    \begin{itemize}
+        \item logistic regression on all two-way interactions of covariates
+        \item BART with binary outcomes on all covariates
+    \end{itemize}
+    \item Balancing: stable balancing weights \citep{zubizarreta2015stable} on marginal means (bal1) and on means of all two-way interactions (bal2)
+    \item Matching:
+    \begin{itemize}
+        \item One nearest-neighbor matching
+        \item Coarsened exact matching \citep{iacus2012causal}
+    \end{itemize}
+    \item Targeted maximum likelihood estimation \citep[TMLE; ][]{van2006targeted} using SuperLearner \citep{van2007super} on linear models (tmle1) and machine-learning models (tmle2).
+    \item Augmented inverse propensity score weighting \citep[AIPW; ][]{robins1994estimation} using SuperLearner on linear models (aipw1) and machine-learning models (aipw2).
+\end{itemize}
+% TODO: compare to PS and mahalanobis distance matching...?
+
+We implement BART, TMLE, and AIPW in \texttt{R} using default settings in the \texttt{dbarts} \citep{dorie2023dbarts}, \texttt{tmle} \citep{gruber2012tmle}, and \texttt{AIPW} \citep{zhong2021aipw} packages, respectively.
+For SuperLearner, the linear models include a simple mean, linear regression, and generalized linear regression models; the machine-learning models include the linear models as well as combinations of generalized additive models, random forests, BART, and XGBoost \citep{chen2016xgboost}, based on default settings in the \texttt{tmle}, and \texttt{AIPW} packages.
+
+To standardize these comparisons for CSM and one-nearest-neighbor matching, for each dataset we use the distance metric implied by the covariatewise caliper generated by coarsening each numeric covariate into five equally spaced bins.\footnote{I.e., for covariate $k$, $V_{kk} = 5 / (max(X_k) - min(X_k))$.}
+We do not tune the covariatewise caliper, assuming zero domain knowledge about variable importance.
+We conduct CEM using the same uniform coarsening of each covariate into five bins.
+
+Figure asdf summarizes the results of these simulations.
+
+
+We see both strengths and shortcomings.
+Better than other matching methods, worse than modern methods.
+
+In general, with simulated data, we're going to have pretty strong, long-distance, marginal trends.
+Modeling approaches are allowed to pick these up.
+Any approximate exact matching approach, however, uses ONLY local information.
+This will hurt performance!
+Also, in simulated data, we rarely see big joint interactions, since it's difficult for us as humans to conceptualize why they may appear in the real world, and how they may affect things.
+
+
+
+
 
 % Conclusions:
 % \begin{itemize}
@@ -915,20 +987,20 @@ Ideal sim study: shows CSM works well even compared to balancing/doubly robust a
 
 % TODO: is there a way to simulate data such that the CEM-ATT is significantly different from the overall ATT?
 
-\subsection{Example: Lalonde (1986)}
+\section{Applied example: Lalonde (1986)}
 \label{sec:lalonde}
 
-\subsubsection{Background}
+\subsection{Background}
 
-To illustrate the use of CSM, we analyze the canonical Lalonde datasets \citep{lalonde1986evaluating}.
+To illustrate the use of CSM, we analyze the canonical Lalonde dataset \citep{lalonde1986evaluating}.
 The goal is to estimate the effect of a job training program on participants' 1978 earnings.
 Measured covariates include demographic information and past earnings, as shown in Table \ref{tab:lalonde}.
 
-Researchers typically augment the experimental National Supported Work Demonstration (NSWD) data with observational data to study whether methods can recover the experimental difference-in-means SATT estimate of \$1,794.
+Researchers typically augment the experimental National Supported Work Demonstration (NSWD) data with observational data to study whether methods recover the experimental difference-in-means SATT estimate of \$1,794.
 For this example, we use the 185 NSWD treated units studied by \citet{dehejia1999causal} and 15,992 observational controls from the Current Population Survey (CPS) dataset.
-Unlike many analyses of these datasets, we exclude the 260 experimental NSWD control units.
-As seen in Table \ref{tab:lalonde}, the treated units are generally much more similar to the NSWD controls than they are to the CPS controls;
-in this example, however, we consider a more standard observational setting where we do not have access to such high-quality control units.
+Unlike many analyses of these data, we purposely exclude the 260 experimental NSWD control units.
+As seen in Table \ref{tab:lalonde}, the treated units are, on average, quite similar to the NSWD controls, as expected for a randomized experiment.
+In this example, we focus on a more typical observational setting where we do not have such high-quality controls.
 
 
 % \begin{table}[]
@@ -961,11 +1033,11 @@ in this example, however, we consider a more standard observational setting wher
 \label{tab:lalonde}
 \end{table}
 
-\subsubsection{Methods}
+\subsection{Methods}
 
 To conduct CSM, we first select a distance metric and a covariatewise caliper.
 We choose to use scaled $L_\infty$ distance.
-For illustration, we exactly match on binary covariates ($X_1 =$ indicator for black, $X_2 =$ indicator for hispanic, $X_3 =$ marital status, $X_4 =$ degree status) and set covariatewise calipers of 3 years on $X_5 =$ age, 1 year on $X_6 =$ years of education, and \$5,000 on $X_7$ and $X_8$, real earnings in 1974 and 1975, respectively.\footnote{Appendix \ref{app:caliperchoice} provides guidance on caliper selection in the absence of prior preferences and domain knowledge.}
+We exactly match on binary covariates ($X_1 =$ indicator for black, $X_2 =$ indicator for hispanic, $X_3 =$ marital status, $X_4 =$ degree status) and set covariatewise calipers of 3 years on $X_5 =$ age, 1 year on $X_6 =$ years of education, and \$5,000 on $X_7$ and $X_8$, real earnings in 1974 and 1975, respectively.\footnote{Appendix \ref{app:caliperchoice} provides guidance on caliper selection in the absence of prior preferences and domain knowledge.}
 According to Proposition \ref{prop:distmetriccal}, for a distance-metric caliper of $c=1$ this implies a diagonal scaling matrix of:
 $$V = \text{diag} \{K_1, K_2, K_3, K_4, \frac{1}{3}, 1, \frac{1}{5000}, \frac{1}{5000}\},$$
 where $K_i$, $i=1,\dots,4$ are large constants ensuring that units are exactly matched on $X_1$, $X_2$, $X_3$, and $X_4$.\footnote{In general, $K_i$ may be chosen to reflect the importance of exactly matching binary covariate $X_i$.
@@ -976,75 +1048,117 @@ We then conduct CSM using $d_V^{(\infty)}$ as defined above.
 For each treated unit $t$, we use an adaptive caliper $c_t = \max \{1, d_t\}$, so that treated units without any matches within the chosen covariatewise caliper are matched to their nearest neighbor.
 We finally construct synthetic control units using the linear program described in Appendix \ref{app:scm} and estimate the FSATT and SATT.
 
-\subsubsection{Model Assessment}
+\subsection{Model Assessment: covariate balance}
 
-As discussed in Section \ref{sec:avoid} and shown in Proposition \ref{prop:wass}, distance-metric calipers directly guarantee approximate joint covariate balance, obviating the need to the usual marginal balance checks.
-Nonetheless, Figure \ref{fig:lalonde_love} visualizes the ``love plot'' of marginal covariate means to highlight a few ideas.
+% As discussed in Section \ref{sec:avoid} and shown in Proposition \ref{prop:wass}, distance-metric calipers directly guarantee approximate joint covariate balance, obviating the need for marginal balance checks to ensure validity.
+% Nonetheless, we visualize the marginal balance in Figure \ref{fig:lalonde_love} to illustrate a few key ideas.
 
+Our chosen distance-metric caliper results in 174 feasible treated units with at least one control within the fixed caliper $c=1$.
+Figure \ref{fig:lalonde_love} shows how marginal mean balance changes as we add treated units and their corresponding matched controls, in order of increasing adaptive caliper size (not shown), until all 185 treated units are included.
 \begin{figure}
     \centering
-    \includegraphics{writeup/figures/lalonde_love2.png}
+    \includegraphics[width=\textwidth]{writeup/figures/lalonde_love2.png}
     \caption{Love plot of marginal covariate means}
     \label{fig:lalonde_love}
 \end{figure}
 
-Distance-metric calipers directly guarantee approximate joint covariate balance, so we do not need to check balance.
-Regardless, we include love plots here for completeness.
+The caliper ensures that the 174 feasible matched units are within 3 years of age, 1 year of education, and \$5,000 of earnings in 1974 and 1975 of each other, so by Proposition \ref{prop:meanbd} average imbalance in the respective marginal means must also be bounded at these levels.
+Clearly, Figure \ref{fig:lalonde_love} shows that observed marginal balance is actually much better.
+This will generally be the case in practice.
+The bounds in Section \ref{sec:properties} provide worst-case guarantees; 
+e.g., marginal mean imbalance in age is at most 3 years, which occurs when \textit{every} treated unit is matched to a control that is 3 years older.
+More typically, imbalances can cancel out across matched sets, e.g., in Figure 3, the marginal mean imbalance in age is less than 0.2 years for the feasible units.
 
-LOVE PLOTS.
+Researchers typically use marginal balance plots like Figure \ref{fig:lalonde_love} to assess match quality.
+% if the marginal means of the matched sets are similar, we assume that joint balance (which is much more difficult to visualize) is good and proceed to estimate causal effects.
+As discussed in Section \ref{sec:avoid} and shown in Proposition \ref{prop:wass}, distance-metric calipers directly guarantee approximate joint covariate balance, obviating the need for marginal balance checks to ensure validity.
+As such, we emphasize that the purpose of Figure \ref{fig:lalonde_love} is not to assess approximate balance, which is guaranteed by the caliper for the feasible units, but rather to help researchers assess the estimate-estimand tradeoff, as we discuss in greater detail in Section \ref{sec:lalonde_bv}.
 
-These love plots show that, marginally, balance is generally much better than our guarantees.
-Importantly, marginal balance isn't the whole story.
-While we visualize it because we're bad at visualizing higher dimensions, seeing good love plots here doesn't give us good joint balance!
-Our calipers have already done that for us.
+\subsection{Model Assessment: synthetic controls}
 
-As we describe further in the following section, these love plots are, however, helpful for comparing the characteristics of the feasible and infeasible treated units, as well as their matched controls.
-We emphasize that the role of these balance plots differs from their usual role.
-By using distance-metric calipers, we ensure that the feasible joint distributions are close to each other.
-We are using balance plots not to diagnose match quality, but to conduct exploratory data analysis into how the feasible units differ from the infeasible units.
-We see that our feasible units tend to have better balance in terms of asdf and asdf.
-
-
-To build intuition for the use of synthetic controls, we may assess how well our synthetic controls perform.
-While these plots are not generally necessary, we find them helpful for building intuition here.
-Figures \ref{fig:lalonde_dist} and \ref{fig:lalonde_ess} illustrate how synthetic controls impact the bias and variance of the FSATT estimate.
-For reference, we compare synthetic controls to two baseline estimation strategies: 
+Table \ref{tab:lalonde_fsatt} illustrates how synthetic controls impact the bias and variance of the FSATT estimate,
+comparing them to two common estimation strategies which also impute the counterfactual outcome of each treated unit $t$ using $\sum_{j \in \Ct} w_{jt} Y_j$ for convex weights $w_{jt}$:
 \begin{enumerate}
-    \item Simple average: for each treated unit $t$, estimate $Y_t(0)$ using $\frac{1}{|\Ct|} \sum_{j \in \Ct} Y_j$.
-    \item One-nearest-neighbor: for each treated unit $t$, estimate $Y_t(0)$ using $Y_{j^*}$, where $j^*$ indexes its nearest control-unit neighbor in $\Ct$.
+    \item Simple average: let $w_{jt} = \frac{1}{|\Ct|}$ for each control unit.
+    \item One-nearest-neighbor\footnote{If unit $t$ has $k$ tied-for-nearest neighbors, we assign each a weight of $w_{jt} = \frac{1}{k}$.}: 
+        let $w_{jt} = \begin{cases}
+            1 & \text{if unit } j \text{ is closest to unit } t \\
+            0 & \text{otherwise}
+        \end{cases}$ 
 \end{enumerate}
 
-Figure \ref{fig:lalonde_dist} visualizes potential extrapolation bias.
+% % https://tex.stackexchange.com/questions/6850/table-and-figure-side-by-side-with-independent-captions
+% \begin{figure}
+% \begin{floatrow}
+%     \ffigbox{%
+%         \includegraphics[width=0.5\textwidth]{writeup/figures/lalonde_dist.png}
+%     }{%
+%       \caption{Extrapolation bias for three methods, as indicated by density of $d_V^{(\infty)}(\Xt, \sum_{j \in \Ct} w_j \Xj)$ values}%
+%       \label{fig:lalonde_dist}
+%     }
+%     \capbtabbox{%
+%         \begin{tabular}{|l|l|}
+%         \hline
+%         \rowcolor[HTML]{C0C0C0} 
+%         Set of units                                                               & ESS   \\ \hline
+%         Treated units                                                              & 174   \\ \hline
+%         \begin{tabular}[c]{@{}l@{}}Control units \\ (SCM weights)\end{tabular}     & 72.6  \\ \hline
+%         \begin{tabular}[c]{@{}l@{}}Control units \\ (average weights)\end{tabular} & 129.9 \\ \hline
+%         \begin{tabular}[c]{@{}l@{}}Control units \\ (1-NN weights)\end{tabular}    & 67.0  \\ \hline
+%         \end{tabular}
+%     }{%
+%       \caption{Variance of three methods, as indicated by the ESS}%
+%       \label{tab:lalonde_ess}
+%     }
+% \end{floatrow}
+% \end{figure}
 
-Generally speaking, convex weighted sums imply a linear interpolation to the covariates of the corresponding control ().\footnote{See Appendix \ref{app:scm} for details.}
+\begin{table}[t]
+\begin{tabular}{|l|c|c|c|}
+    \hline
+    \rowcolor[HTML]{C0C0C0} 
+    \multicolumn{1}{|c|}{\cellcolor[HTML]{C0C0C0}Set of units}
+        & \begin{tabular}[c]{@{}c@{}}Mean \\ $d_V^{(\infty)}(\Xt, \sum_{j \in \Ct} \Xj)$\end{tabular} 
+        & \begin{tabular}[c]{@{}c@{}}Median \\ $d_V^{(\infty)}(\Xt, \sum_{j \in \Ct} \Xj)$\end{tabular} 
+        & ESS   \\ 
+    \hline
+    Treated units
+        & N/A & N/A & 174   \\ \hline
+    \begin{tabular}[c]{@{}l@{}}Control units \\ (SCM weights)\end{tabular}
+        & 0.219 & 0.048 & 72.6  \\ \hline
+    \begin{tabular}[c]{@{}l@{}}Control units \\ (average weights)\end{tabular} 
+        & 0.472 & 0.444 & 129.9 \\ \hline
+    \begin{tabular}[c]{@{}l@{}}Control units \\ (1-NN weights)\end{tabular}    
+        & 0.476 & 0.333 & 67.0  \\ \hline
+\end{tabular}
+\caption{Effect of synthetic controls on potential bias and variance of FSATT estimate.}
+\label{tab:lalonde_fsatt}
+\end{table}
 
-Figure \ref{fig:lalonde_dist} shows density plots of the $d_V^{(\infty)}$ distances between the covariates of each treated unit $t$ and its corresponding control, constructed as $\sum_{j \in \Ct} w_{jt} \Xj$, $\frac{1}{|\Ct|} \sum_{j \in \Ct} \Xj$, and $\mathbf{X}_{j^*}$, for the ``SCM,'' ``Average,'' and ``1-NN'' estimation methods, respectively.
-As expected, we see that these distances are much smaller for the synthetic controls, which are constructed precisely to minimize $d_V^{(\infty)}(\Xt, \sum_{j \in \Ct} w_{jt} \Xj)$.
+The first two columns of Table \ref{tab:lalonde_fsatt} show potential extrapolation bias \citep{kellogg2021combining}.
+Intuitively, the farther $\sum_{j \in \Ct} w_{jt} \Xj$ is from $\Xt$, the worse $\sum_{j \in \Ct} w_{jt} Y_j$ may be as an approximation of $Y_t(0)$ (see Appendix \ref{app:scm} for further details).
+Since synthetic controls are constructed precisely to minimize $d_V^{(\infty)}(\Xt, \sum_{j \in \Ct} w_{jt} \Xj)$, they strongly reduce its mean and median values for the feasible treated units.
 
-\begin{figure}[t]
-     \centering
-     \begin{subfigure}[t]{0.48\textwidth}
-         \centering
-         \includegraphics[width=\textwidth]{writeup/figures/lalonde_dist.png}
-         \caption{Density plots of covariate distances between treated units and their corresponding controls.}
-         \label{fig:lalonde_dist}
-     \end{subfigure}
-     \hfill
-     \begin{subfigure}[t]{0.48\textwidth}
-         \centering
-         \includegraphics[width=\textwidth]{writeup/figures/lalonde_ess.png}
-         \caption{Effective sample size}
-         \label{fig:lalonde_ess}
-     \end{subfigure}
-     % \caption{Three simple graphs}
-     \label{fig:lalonde_bv}
-\end{figure}
+The final column of Table \ref{tab:lalonde_fsatt} shows effective sample size (ESS) values for the Lalonde data, where we define the ESS of a set $\mathcal{S}$ of units with weights $w_i$ as: 
+$$ESS(\mathcal{S}) = \frac{(\sum_{i \in \mathcal{S}} w_i)^2}{\sum_{i \in \mathcal{S}} w_i^2}.$$
+Section \ref{sec:bv} shows that under homoskedasticity, the variances associated with the treated and control units equal $\frac{\sigma^2}{ESS(\mathcal{T})}$ and $\frac{\sigma^2}{ESS(\mathcal{C})}$, respectively, where $w_i = 1$ for $i \in \mathcal{T}$ and $w_i = \sum_{t \in \mathcal{T}} w_{it}$ for $i \in \mathcal{C}$.
+Evenly dispersing weights across many units increases ESS, so average weights typically lead to greater ESS values, i.e., lower variance.
+In this example, however, all three methods produce control samples with ESS values \textit{less} than the ESS of the treated units.\footnote{This behavior may not be unusual when the control units are very dissimilar to the treated units. When the NSWD controls are included, the ESS values for the SCM, average, and 1-NN methods rise to 122, 381, and 108, respectively.}
+Because nearly all of the CPS control units are very different from the NSWD treated units, distance-metric calipers match the few high-quality control units to multiple treated units.
+As a result, the resulting effect estimates are sensitive to the variance in these control units' outcomes.
 
+Researchers must navigate the bias-variance tradeoff shown by Table \ref{tab:lalonde_fsatt}.
+In some low-data settings, synthetic controls may not reduce bias enough to justify how they increase variance.
+Here, synthetic controls perform quite well.
+Relative to averaging, they reduce mean and median $d_V^{(\infty)}(\Xt, \sum_{j \in \Ct} w_{jt} \Xj)$ values by 54\% and 89\%, respectively, while only decreasing the ESS by 44\%.
+For settings in which the researcher is unsure how to navigate this bias-variance tradeoff, Appendix TODO includes guidelines for estimating $\sigma$ and $\lambda$ from the data so that researchers may apply the results in Section \ref{sec:bv} and minimize the estimated CMSE.
+% https://link.springer.com/article/10.1007/BF00229304 ``Estimation of the Lipschitz constant of a function'' might be helpful lol
 
-\subsubsection{Results}
+\subsection{Results: FSATT and SATT estimates}
+\label{sec:lalonde_bv}
 
-Analyses of the Lalonde datasets typically show that causal-inference procedures recover estimates close to the experimental benchmark of \$1,794 while naive approaches (e.g., raw difference-in-means, linear regression) underestimate it.
-Because individuals in the CPS dataset tend to have features associated with greater earnings, naive procedures often overestimate the counterfactual outcomes for the NSWD treated units, i.e., underestimate the treatment effect for those units.
+Analyses of the Lalonde datasets typically show that causal-inference procedures recover estimates close to the experimental benchmark of \$1,794 while naive approaches (e.g., difference-in-means, linear regression) underestimate it.
+Because individuals in the CPS dataset tend to have features associated with greater earnings (Table \ref{tab:lalonde}), naive procedures overestimate the counterfactual outcomes for the NSWD treated units, i.e., underestimate their treatment effects.
 
 Figure \ref{fig:lalonde_att} visualizes the main results of our analysis.
 Without using the experimental controls, CSM estimates an FSATT of \$1,595, as represented by the leftmost point estimate, similar to the experimental benchmark.\footnote{For the same caliper using the experimental controls along with the observational controls, the FSATT and SATT estimates are \$1,826 and \$1,771, respectively.}
@@ -1059,27 +1173,59 @@ though we note that this decrease is negligible compared to the uncertainty repr
 \end{figure}
 
 Moving toward the right-hand side of Figure \ref{fig:lalonde_att} makes an estimate-estimand tradeoff: the estimand approaches the full SATT, but the estimate is exposed to more potential bias.
-If the FSATT and SATT intervals differ significantly, it is worth thinking about why this may be the case.
-In our example, lower-quality matches may bias our effect estimates downward.
-The differences between the NSWD and CPS datasets shown by Table \ref{tab:lalonde} lead us to expect that low-quality matches would pair NSWD individuals with low-earning characteristics to CPS individuals with higher-earning characteristics.
-For example, we can check that the worst match (where $c_t = 2.62$) pairs an individual with zero earnings in 1974 and 1975 to someone with more than \$10,000 of earnings in both years.
-This naturally leads to a very negative effect estimate for that individual, reducing the cumulative ATT estimate.
+If the FSATT and SATT intervals differ significantly, it is worth exploring why this may be the case.
+In some settings, the infeasible treated units may look very different from the feasible treated units, suggesting that the true FSATT and SATT values differ due primarily to heterogeneous treatment effects;
+here, we may lean more heavily on the SATT estimate if we are interested in studying average effects across the full treated sample.
+In other settings, we may see trends in how match quality deteriorates, suggesting a direction in which the SATT estimate is biased and leading us to trust the FSATT estimate more.
 
-More generally, we would turn to exploratory plots such as figure LOVE PLOTS to continue with our diagnostics here.
-Beyond checking imbalances, we can check if the feasible and infeasible treated units seem to significantly differ: if yes, heterogeneous effects might be at play, so the change in estimand might be a big deal.
-If, on the other hand, it appears that it's mostly the feasible and infeasible control units that differ, we might be more worried about estimate bias.
+In this example, we suspect that the difference between the estimated FSATT and SATT is largely due to bias, though there is some evidence that their true values differ.
+Table \ref{tab:lalonde} suggests that low-quality matches would generally pair NSWD individuals with low-earning characteristics to CPS individuals with higher-earning characteristics.
+For example, the worst match (where $c_t = 2.62$) pairs a NSWD individual with zero earnings in 1974 and 1975 to a CPS individual with more than \$10,000 of earnings in both years, naturally leading to a very negative effect estimate.
+Figure \ref{fig:lalonde_love} shows that the marginal imbalances in 1974 and 1975 earnings grow as we add treated units, strengthening this hypothesis.
+On the other hand, Figure \ref{fig:lalonde_love} also shows that infeasible treated units tend to be slightly older and less educated, with greater prior earnings, and we may suspect lesser treatment effects for these types of individuals.
+While it is worth exploring this potential heterogeneity, the clear patterns in potential bias in our SATT estimate lead us to trust our FSATT estimate more, which suggest that for the majority of individuals, the NSWD job training program slightly increased 1978 earnings.
 
 
+\section{Discussion}
 
-\section{Conclusion}
+Matching methods enable researchers to simply and intuitively draw causal conclusions from observational data.
+In practice, however, standard matching approaches typically need to sacrifice either performance or transparency to achieve results comparable to modern optimization and machine-learning methods for causal inference.
+To address this challenge, this paper introduces Caliper Synthetic Matching.
+CSM builds on the spirit of exact matching by preserving four key principles: intuitive distances, local matches, avoiding "unknown unknowns," and transparent estimates.
+Even so, we show that CSM can achieve comparable performance to modern methods on standard benchmark datasets while provably preserving approximate joint covariate balance, avoiding the common pitfalls of marginal balancing approaches.
 
-\note{TODO}
+We design a dataset to show a case where we'd do well.
+This is not an unreasonable thing we may expect to see in a real dataset.
+We do better than the most transparent methods, but not quite as well as machine learning on simulated datasets.
+
+Idea: matching is still rough.
+With matching, we're ONLY using local information.
+This means that if any global information is useful, e.g., a marginal or joint additive trend in a single covariate, we're unable to take advantage of it.
+On the flip side, we'll never be biased by expolating these marginal or joint trends.
+Matching also automatically identifies overlap.
+
+We emphasize that CSM provides a framework for transparent causal inference, and may be extended in a variety of ways.
+Future work may reconsider the question of caliper selection and adaptation, perhaps incorporating the estimated covariate density to optimize the number of within-caliper control units.
+Other estimation methods may also be used.
+Abadie and l'hour is nice, or some other more regularized SCM approach that still produces interpretable weights. 
+The optimization may also be addressed.
+While we separately fit for each treated unit, other procedures may nicely optimize a bunch of tx units at once.
+
+In conclusion, CSM represents a promising addition to the toolkit for researchers conducting causal inference using matching methods.
 
 
 \section{Researchy stuff to think about}
 
 Misc. ideas stored here for now, but likely won't pursue
 \begin{itemize}
+    \item Better outcome regression:
+    \begin{enumerate}
+        \item In our setting, we're doing "high-dimensional" regression (p > n)
+        \item lasso and ridge penalties directly penalize weights, which minimizes variance, at the cost of bias
+        \item Can we instead just penalize the weights' distances from uniform weights?
+        \item This is likely equivalent to Jose's stable balancing weights, which minimizes the variance of the weights? since wbar has to be $\frac{1}{n}$, i.e., average weights...?
+
+    \end{enumerate}
     \item ``Optimal'' caliper:
     \begin{enumerate}
         \item Estimate multivariate density of covariates, $p(\bX)$ (turns out this is hard to do well...)
@@ -1127,6 +1273,14 @@ For example, a researcher who wants to ensure that all matches lie within 0.5 st
 
 In practice, however, researchers may want to select a caliper $c$ that ``optimally'' trades off data use and potential bias.
 To visualize this tradeoff, we suggest using a weighted distance-density plot.
+For example, consider the Lalonde dataset discussed in Section \ref{sec:lalonde}.
+Given a distance metric, we must compute a $n_t \times n_c$ distance matrix to determine the within-caliper control units for each treated unit.
+We may directly visualize the density of the entries in this matrix to see, on average, how ``far'' the control units are from the treated units
+Figure \ref{fig:lalonde_calselect} visualizes this for the Lalonde dataset.
+
+We see that 
+
+
 Specifically...
 
 If it's really unclear, we can visualize the data to choose a reasonable caliper.
@@ -1160,34 +1314,90 @@ IDEAS:
 
 % TODO: read Stuart 3.1.2 for some background on how to pick the number of matches (bias-variance tradeoff).
 
-
-
-
-
-
 \section{Technical details}
 
-In this section, we elaborate the technical details required for the formal statements of Propositions \ref{prop:wass} and \ref{prop:biasbd}.
+\subsection{Distance metrics in $\Rp$}
+\label{app:distmetrics}
 
-\subsection{Details for Proposition \ref{prop:wass}}
+Formally, a distance metric on $\Rp$ is a (non-negative) function $d(\cdot, \cdot): \Rp \times \Rp \to \R$ that satisfies the following for $x,y,z \in \Rp$:
+\begin{enumerate}
+    \item $d(x,y) = 0 \iff x = y$
+    \item $d(x,y) = d(y,x)$
+    \item $d(x,z) \leq d(x,y) + d(y,z)$ [Triangle inequality]
+\end{enumerate}
+These three properties satisfy our intuitive understanding of measuring distance between two points: we measure a distance of zero if and only if the two points concide with each other; the distance is the same regardless of which point we start measuring from; and the distance cannot be made shorter by passing through a third point.
+
+Now consider a scaled $L_2$ norm on $\Rp$, which measures the length of a given vector $u \in \Rp$ as:
+$$||u||_V^{(2)} = \sqrt{u^t (V^T V) u}.$$
+We say that the scaled distance metric in Equation \ref{eq:l2dist} is \textit{induced} by the scaled $L_2$ norm defined above, since for $x,y \in \Rp$ we can write:
+$$d_V^{(2)}(x,y) = ||x - y||_V^{(2)}.$$
+The same relationship holds for the scaled distance metric in Equation \ref{eq:linfdist} and the scaled $L_2$ norm $||u||_V^{(\inf)} = \max|Vu|.$
+
+Induced distance metrics in $\Rp$ possess desirable properties for $x,y \in \R$:
+\begin{itemize}
+    \item Translation invariance: for $c \in \R$, $d(x,y) = d(x+c, y+c)$
+    \item Absolute homogeneity: for $c \in \R$, $d(cx, cy) = |c| d(x,y)$
+\end{itemize}
+Again, these properties are intuitive: moving two points by the same amount does not change the distance between them, and scaling two points scales the distance between them.
+
+\subsection{Lipschitz functions in $\Rp$}
+\label{app:lipschitz}
+
+Recall that if a function $f: \R \to \R$ is Lipschitz($\lambda$), then for any $x, a \in \R$:
+\begin{equation*}
+    |f(x) - f(a)| \leq \lambda |x-a|.
+\end{equation*}
+This implies that the function's derivatives are bounded by $\lambda$.
+
+In higher dimensions, $|x-a|$ is no longer scalar-valued;
+as a result, Lipschitz functions must be defined with respect to a distance metric.
+Formally speaking, we equip $\Rp$ with a distance metric $d(\cdot, \cdot)$ of the form given by Equation \ref{eq:l2dist} or \ref{eq:linfdist}.
+Then $f(\cdot): (\R^n, d(\cdot, \cdot)) \to (\R, |\cdot - \cdot|)$ is Lipschitz($\lambda$) if for any $x, \Tilde{x} \in \R$:
+\begin{equation*}
+    \frac{|f(x) - f(\Tilde{x})|}{d(x, \Tilde{x})} \leq \lambda.
+\end{equation*}
+Notably, this implies that a function can only be Lipschitz \textbf{relative to a given distance metric},
+% Different metrics $d(x,y)$ are more/less sensitive to changes in different directions.
+so, e.g., a function that is Lipschitz$(\lambda)$ with respect to $L_\infty$ distance may not be Lipschitz$(\lambda)$ with respect to Euclidean distance.
+
+Multivariate Lipschitz functions have bounded derivatives like their unidimensional counterparts.
+In particular, Lemma \ref{lem:lipbdsdd} shows that the directional derivatives of any Lipschitz function are bounded.
+\begin{lemma}[Lipschitz bound on directional derivative]
+\label{lem:lipbdsdd}
+Suppose $f: (\Rp, d(\cdot, \cdot)) \to (\R, |\cdot - \cdot|)$ is Lipschitz($\lambda$).
+Then for unit vector $v = \frac{x-a}{d(x,a)}$:
+\begin{equation*}
+    \nabla_v f(a) \leq \lambda
+\end{equation*}
+\end{lemma}
+\begin{proof}
+\begin{align*}
+    \nabla_v f(a) 
+    &= \lim_{h \to 0} \frac{f(a + hv) - f(a)}{h} &\text{[def. directional derivative]}\\
+    &= \lim_{h \to 0} \frac{f(a + hv) - f(a)}{d(a + hv, a)} &\text{Lemma }\ref{lem:unitdist}\\
+    &\leq \lambda. &\text{def. Lipschitz}
+\end{align*}
+\end{proof}
+
+\begin{lemma}
+\label{lem:unitdist}
+For any translation-invariant, absolutely homogeneous distance metric $d(\cdot, \cdot)$ on a metric space, $d(a + cv, a) = c$ for $c \in \R$ and unit vector $v \in \Rp$.
+\end{lemma}
+\begin{proof}
+\begin{align*}
+    d(a + cv, a)
+    &= d(cv, 0) &\text{[translation invariance]} \\
+    &= |c| \cdot d(v, 0) &\text{[absolute homogeneity]} \\
+    &= c \cdot ||v|| &\text{[def. metric-induced norm]} \\
+    &= c &\text{[unit vector } v\text{]}
+\end{align*}
+\end{proof}
+
+\subsection{Proof of Proposition \ref{prop:wass}}
 \label{app:wass}
 
 % Great resource on this stuff: \href{https://www.stat.cmu.edu/~larry/=sml/Opt.pdf}{from Larry Wasserman}
 
-Recall that the $q$-Wasserstein distance between two probability distributions $P$ and $Q$ given a distance metric $d(\cdot, \cdot)$ is:
-\begin{align*}
-    \mathcal{W}_q(P, Q) = \inf_{\substack{X \sim P \\ Y \sim Q}} E\big[ d(X, Y)^q \big]^{1/q},
-\end{align*}
-where the infimum is taken over all couplings of $X$ and $Y$ such that their marginal distributions equal $P$ and $Q$, respectively.
-
-% Now let $X_1, \dots, X_n \overset{i.i.d.}{\sim} P$ and $Y_1, \dots, Y_n \overset{i.i.d.}{\sim} Q$.
-% Then the Wasserstein $p$-distance between the empirical distributions of $P$ and $Q$ may be written as:
-% \begin{align*}
-%     \mathcal{W}_p(P, Q) = \inf_{\pi} \big( \frac{1}{n} d(X_i, Y_{\pi(i)})^p \big)^{1/p},
-% \end{align*}
-% where $\pi(\cdot): \{1, \dots, n\} \to \{1, \dots, n\}$ represents a permutation of $n$ elements.
-
-We now provide a formal proof of Proposition \ref{prop:wass}.
 \begin{proposition}
 \label{prop:wass_real}
     For a matching method:
@@ -1222,11 +1432,13 @@ We now provide a formal proof of Proposition \ref{prop:wass}.
     The Proposition is stated for caliper $c=1$.
 \end{proof}
 
-Proposition \ref{prop:meanbd} shows how the bound on the Wasserstein distance between $f_T$ and $f_C$ directly leads to a bound on the distance between the marginal means of the treated and matched control units' covariates.
+\subsection{Proof of Proposition \ref{prop:meanbd}}
+\label{app:meanbd}
+
 Denote the ($p$-dimensional) weighted marginal covariate means of the treated and matched control units using $\bar{\bX}_T$ and $\Bar{\bX}_C$, respectively.
-Then:
+Proposition \ref{app:meanbd} is trivially proved using the fact that $d^{(2)}_V(\cdot, \cdot)$ and $d^{(\infty)}_V(\cdot, \cdot)$ are induced norms (see Appendix \ref{app:distmetrics}).
 \begin{proposition}
-\label{prop:meanbd}
+\label{prop:meanbd_app}
     For $\epsilon > 0$, $d_V(\cdot, \cdot)$ = $d^{(2)}_V(\cdot, \cdot)$ or $d^{(\infty)}_V(\cdot, \cdot)$:
     \begin{align*}
         \text{For all } t, d_V(\Xt, \Xj) \leq \epsilon \text{ for all } j \in \Ct
@@ -1248,75 +1460,17 @@ Then:
         &= \epsilon
     \end{align*}
 \end{proof}
-% Proposition \ref{prop:meanbd} shows that radius matching balances the p-dimensional covariate means of the treated and matched control samples.\footnote{Proposition \ref{prop:meanbd} nearly shows that radius matching is MIB for the covariate mean; Appendix \ref{app:mib} explicitly relates Proposition \ref{prop:meanbd} to the MIB class of matching methods.}
-% As in Proposition \ref{prop:distmetriccal}, the level of balance in Proposition \ref{prop:meanbd} is controlled via the the scaled distance metric induced by the given covariatewise caliper.
 
-\note{Could perhaps add moment, quantile, etc. bounds as MIB paper does, but it doesn't feel highly necessary?
-Perhaps bounded Wasserstein distance directly gives us bounded moment differences via some joint moment-generating function argument (since covergence in Wass. implies convergence in dist. implies convergence in moments), but I haven't figured that out.}
-
-
-\subsection{Details for Proposition \ref{prop:biasbd}}
-\label{app:biasbd}
-
-\note{TODO: add a blurb about distance metrics}
-
-We begin by briefly reviewing Lipschitz functions on $\mathbb{R}$ and $\mathbb{R}^p$.
-Recall that if a function $f: \mathbb{R} \to \mathbb{R}$ is Lipschitz($\lambda$), then for any $x, a \in \R$:
-\begin{equation*}
-    |f(x) - f(a)| \leq \lambda |x-a|.
-\end{equation*}
-This implies that the function's derivatives are bounded by $\lambda$.
-In higher dimensions, $|x-a|$ is no longer scalar-valued;
-as a result, Lipschitz functions must be defined with respect to a distance metric.
-Formally speaking, we equip $\Rp$ with a distance metric $d(\cdot, \cdot)$ of the form given by Equation \ref{eq:l2dist} or \ref{eq:linfdist}.
-Then $f(\cdot): (\mathbb{R}^n, d(\cdot, \cdot)) \to (\mathbb{R}, |\cdot - \cdot|)$ is Lipschitz($\lambda$) if for any $x, \Tilde{x} \in \R$:
-\begin{equation*}
-    \frac{|f(x) - f(\Tilde{x})|}{d(x, \Tilde{x})} \leq \lambda.
-\end{equation*}
-Notably, this implies that a function can only be Lipschitz \textbf{relative to a given distance metric},
-% Different metrics $d(x,y)$ are more/less sensitive to changes in different directions.
-so, e.g., a function that is Lipschitz$(\lambda)$ with respect to $L_\infty$ distance may not be Lipschitz$(\lambda)$ with respect to Euclidean distance.
-
-Multivariate Lipschitz functions have bounded derivatives like their unidimensional counterparts.
-In particular, Lemma \ref{lem:lipbdsdd} shows that the directional derivatives of any Lipschitz function are bounded.
-\begin{lemma}[Lipschitz bound on directional derivative]
-\label{lem:lipbdsdd}
-Suppose $f: (\mathbb{R}^p, d(\cdot, \cdot)) \to (\mathbb{R}, |\cdot - \cdot|)$ is Lipschitz($\lambda$).
-Then for unit vector $v = \frac{x-a}{d(x,a)}$:
-\begin{equation*}
-    \nabla_v f(a) \leq \lambda
-\end{equation*}
-\end{lemma}
-\begin{proof}
-\begin{align*}
-    \nabla_v f(a) 
-    &= \lim_{h \to 0} \frac{f(a + hv) - f(a)}{h} &\text{[def. directional derivative]}\\
-    &= \lim_{h \to 0} \frac{f(a + hv) - f(a)}{d(a + hv, a)} &\text{Lemma }\ref{lem:unitdist}\\
-    &\leq \lambda. &\text{def. Lipschitz}
-\end{align*}
-\end{proof}
-
-\begin{lemma}
-\label{lem:unitdist}
-For any translation-invariant, absolutely homogeneous distance metric $d(\cdot, \cdot)$ on a metric space, $d(a + cv, a) = c$ for $c \in \mathbb{R}$ and unit vector $v \in \mathbb{R}^p$.
-\end{lemma}
-\begin{proof}
-\begin{align*}
-    d(a + cv, a)
-    &= d(cv, 0) &\text{[translation invariance]} \\
-    &= |c| \cdot d(v, 0) &\text{[absolute homogeneity]} \\
-    &= c \cdot ||v|| &\text{[def. metric-induced norm]} \\
-    &= c &\text{[unit vector } v\text{]}
-\end{align*}
-\end{proof}
+\subsection{Details for Proposition \ref{prop:scbiasbd}}
+\label{app:scbiasbd}
 
 To effectively use the Lipschitz property, standard multivariable Taylor expansion does not suffice.
-Instead, we have to use Taylor expansion in a distance metric.
+Instead, we use Taylor expansion in a distance metric.
 
 \begin{lemma}[Taylor expansion in a distance metric]
 \label{lem:bias}
-Suppose $f: \mathbb{R}^p \to \mathbb{R}$ is differentiable.
-Let $\Xj, \Xt \in \mathbb{R}^p$, and write $\vj \equiv \frac{\Xj - \Xt}{d(\Xj, \Xt)}$ for a scaled distance metric of the form given by Equations \ref{eq:l2dist} or \ref{eq:linfdist}.
+Suppose $f: \Rp \to \R$ is differentiable.
+Let $\Xj, \Xt \in \Rp$, and write $\vj \equiv \frac{\Xj - \Xt}{d(\Xj, \Xt)}$ for a scaled distance metric of the form given by Equations \ref{eq:l2dist} or \ref{eq:linfdist}.
 % for distance metric $d(\cdot, \cdot)$ such that $\ddt d(\Xt+t\vj,\Xt) \propto 1$.
 Then:
 % If f is continuously diff'ble, i.e., its derivative is diff'ble:
@@ -1368,13 +1522,13 @@ $$f(\Xj) = f(\Xt) + d_V(\Xj, \Xt) \nabla_{\vj} f(\Xt) + o(d_V(\Xj, \Xt))$$
     So $g_a(x) = o(d_V(x,a))$.
 \end{proof}
 
-Similar to \citet{iacus2011multivariate}, we may also prove Proposition \ref{prop:biasbd} under slightly weaker conditions.
+Similar to \citet{iacus2011multivariate}, we may also prove a statement similar to Proposition \ref{prop:biasbd_lip} under slightly weaker conditions.
 \begin{proposition}
-\label{prop:biasbd}
 Let $d_V(\cdot, \cdot)$ = $d^{(2)}_V(\cdot, \cdot)$ or $d^{(\infty)}_V(\cdot, \cdot)$.
-Suppose $f_0: \mathbb{R}^p \to \mathbb{R}$ is differentiable, with bounded directional derivatives $\nabla_{\mathbf{u}} f_0(\mathbf{X}) \leq \lambda$.
+Suppose $f_0: \Rp \to \R$ is differentiable, with bounded directional derivatives $\nabla_{\mathbf{u}} f_0(\mathbf{X}) \leq \lambda$.
 Then for a matching procedure such that $d_V(\Xt, \Xj) \leq \epsilon$ for all $t,j$:
 \begin{equation*}
+\label{prop:biasbd_diff}
     \big|E[\tau - \hat{\tau}] \big| \leq \lambda \epsilon + o(d_V).
 \end{equation*}
 \end{proposition}
@@ -1406,7 +1560,7 @@ Then for a matching procedure such that $d_V(\Xt, \Xj) \leq \epsilon$ for all $t
     In the final step, we use the notation $o(d_V)$ to represent a function that approaches 0 more quickly than $d_V(\Xj, \Xt)$ approaches 0 as $\Xj$ approaches $\Xt$ for any $j, t$.\footnote{Because $d_V(\cdot, \cdot)$ is translation-invariant, the rate at which it approaches 0 remains constant regardless of the values of $\Xj$ and $\Xt$.}
 \end{proof}
 
-Proposition \ref{prop:biasbd} states that for distance-metric caliper matching methods, bias is proportional to the Lipschitz constant $\lambda$ as the distance between the control units and treated units approaches 0.\footnote{Proposition \ref{prop:biasbd} applies to a slightly different set of methods than Proposition 1 from \citet{iacus2011multivariate}, which proves a similar bias bound for MIB matching methods.}
+Proposition \ref{prop:biasbd_diff} states that for distance-metric caliper matching methods, bias is proportional to the Lipschitz constant $\lambda$ as the distance between the control units and treated units approaches 0.\footnote{Proposition \ref{prop:biasbd_diff} applies to a slightly different set of methods than Proposition 1 from \citet{iacus2011multivariate}, which proves a similar bias bound for MIB matching methods.}
 The bias bound on the overall $\hat{\tau}$ directly arises from the bias bounds on the estimated control potential outcome for each treated unit, 
 which in turn arise from the local matches and the assumed smoothness of $f_0$.
 
@@ -1432,67 +1586,67 @@ where we use the fact that by Lemma \ref{lem:lipbdsdd}, Lipschitz functions have
 \end{proof}
 
 
-
 \subsection{Synthetic controls}
 \label{app:scm}
 
-Intuitively, we expect synthetic controls to control linear bias, due to the following observation:
+Synthetic controls naturally control linear bias, due to the following observations.
+
 \begin{proposition}
 \label{prop:scm_is_projection}
 Synthetic control weights project the treated unit's covariates onto the convex hull of the donor pool units' covariates.
 \end{proposition}
 \begin{proof}
-    Recall that the convex hull of $X = \{\mathbf{X}_1, \dots, \mathbf{X}_J\}$ for $\Xj \in \mathbb{R}^p$ is:
+    Recall that the convex hull of $X = \{\mathbf{X}_1, \dots, \mathbf{X}_J\}$ for $\Xj \in \Rp$ is:
     \begin{equation*}
         conv(X) = \{\sum_{j=1}^J w_{jt} \Xj \mid \sum w_{jt} = 1, w_{jt} \geq 0 \text{ for } j = 1, \dots, J\}
     \end{equation*}
     (See, e.g., \citet{boyd2004convex}.)
     % Page 34
     
-    Recall also that the projection of $\Xt$ onto the set $conv(X)$ in the norm $||\cdot||$ is defined as:
+    Recall also that the Euclidean projection of $\Xt$ onto the set $conv(X)$ in the norm $||\cdot||$ is defined as:
     \begin{align*}
-        \text{minimize} &\hspace{2mm} ||\Xt - u|| \\
-        \text{subject to} &\hspace{2mm} u \in conv(X)
+        \argmin_\mathbf{u} &\hspace{2mm} ||\Xt - \mathbf{u}||_2 \\
+        \text{subject to} &\hspace{2mm} \mathbf{u} \in conv(X)
     \end{align*}
     % Page 292
     
     Note that the resulting optimization problem is equivalent to standard SCM.
 \end{proof}
-% Note in a separate lemma that SCM linearly interpolates to the closest point within the convex hull defined by donor pool.
-% Proof idea: show that x-coordinates that minimize distance of SC to tx is on convex hull? Yep!
+The covariates of the donor pool generally form a $p$-dimensional convex hull,\footnote{Assuming that there are at least $p+1$ non-collinear donor-pool units. Otherwise, the dimension of the convex hull may be less than $p$.} i.e., a $p$-dimensional polygon (i.e., polytope) that contains the points corresponding to each of the donor pool units' covariates, as well as the lines between those points.
+Geometrically, synthetic controls simply find the point in this convex hull that is ``closest'' to the treated unit's covariates (i.e., ``project'' the treated unit onto the convex hull), where ``closeness'' is defined using the given distance metric.
+Importantly, every point in a convex hull can be written as a convex weighted average of the points generating the hull, so the ``closest'' point corresponds to a set of non-negative donor-pool-unit weights that sums to one.
 
+To impute the counterfactual outcome for the treated unit (i.e., the outcome for the constructed synthetic control unit), synthetic controls linearly interpolate the donor-pool units' outcomes to the projected point.
+Slightly more formally:
 \begin{remark}
-As a result of Proposition \ref{prop:scm_is_projection}, we note that the synthetic control outcome is simply the linear interpolation of donor pool outcomes to the synthetic control covariates.
+\label{rem:lin_interp}
+    Suppose we use $Y_t^* \equiv \sum_{j \in \Ct} w_{jt} Y_j$ as our estimate of the counterfactual outcome for treated unit $t$, for control units $j$ with convex weights $w_{jt}$.
+    Then we may interpret $Y_t^*$ as a linear interpolation of the control units' outcomes to $\sum_{j \in \Ct} w_{jt} \Xj$.
 \end{remark}
 \begin{proof}
-    % Idea: SCM assumes that (balancing covariates implies matching outcomes).
-    % Want to say: SCM assumption is equivalent to linear map assumption.
-    % Assume $Y=f(X)$ is a linear map $\implies$ SCM assumption works.
-    % Assume SCM assumption works $\implies$? $Y=f(X)$ is a linear map.
-    
-    % Basically, as soon as we write $Y=f(X)$, we're done by definition.
-    % We could perhaps imagine writing things some other way, but this is such a general way to write things that we should just be done.
-    Informally: the logic behind synthetic controls is that
-    \begin{equation*}
-        d(X_t, \sum_{j \in Co} w_{jt} X_j) \text{ small}
-        \implies Y_t \approx \sum_{j \in Co} w_{jt} Y_j
-    \end{equation*}
-    If we write $Y = f(X)$ then we're done (Recall: a map $f(X)$ is linear iff $f(\sum_j w_{jt} \Xj = \sum_j w_{jt} f(\Xj)$.)
-    
-    Formally: a synthetic control aims to minimize:
-    \begin{equation*}
-        ||X_t - \sum_{j \in Co} w_{jt} X_j||
-    \end{equation*}
-    for $X_t, X_j \in \mathbb{R}^p$ and $w_{jt} \in \mathbb{R}, \sum w_{jt} = 1$.
-    The unobserved control potential outcome for the treated unit is then imputed as:
-    \begin{equation*}
-        \hat{Y}_t = \sum_{j \in Co} w_{jt} Y_j.
-    \end{equation*}
+    Write $Y_j = f(\Xj)$, without noise.
+    If we suppose that $f(\cdot)$ is linear, by the definition of a linear map we have:
+    \begin{align*}
+        \sum_{j \in \Ct} w_{jt} Y_j
+        &= \sum_{j \in \Ct} w_{jt} f(\Xj) \\
+        &= f(\sum_{j \in \Ct} w_{jt} \Xj).
+    \end{align*}
+    I.e., $Y_j^*$ may be interpreted as the evaluation of $f(\cdot)$ at $\sum_{j \in \Ct} w_{jt} \Xj$.
+    Convex weights ensure that this is interpolation, not extrapolation.
 \end{proof}
 
-% TODO: see \href{https://en.wikipedia.org/wiki/Multivariate_interpolation#Irregular_grid_(scattered_data)}{this link} for general interpolation methods...
+\note{TODO: add interpolation/extrapolation bias appendix here...?}
 
-For a scaled $L_2$ distance, the SCM optimization may be directly solved as a quadratic programming problem.
+In summary, synthetic controls linearly interpolate the donor-pool units' outcomes to the point on the convex hull closest to the treated unit.
+As a result, they are subject to linear interpolation bias \citep{kellogg2021combining} in this first stage, though it is controlled by the maximum distance across which they are allowed to interpolate.
+Synthetic controls then flatly extrapolate this outcome to the treated unit, i.e., impute the treated unit's outcome as the linearly interpolated value.
+This second step is subject to potential extrapolation bias \citep{kellogg2021combining} proportional to $d_V(\Xt, \sum_{j \in \Ct} w_{jt} \Xj)$, assuming the potential outcome function is Lipschitz.
+Both interpolation and extrapolation bias are therefore controlled by the caliper size in CSM.
+
+Finally, we write out the linear program used to find synthetic controls under a scaled $L_\infty$ distance.
+\begin{remark}
+\label{rem:linf_opt}
+For a scaled $L_2$ distance, the SCM optimization is typically directly solved as a quadratic programming problem.
 For a scaled $L_\infty$ distance, we may transform the SCM optimization into a linear programming problem:
 \begin{align*}
     \text{minimize} &\hspace{2mm} y \\
@@ -1500,6 +1654,8 @@ For a scaled $L_\infty$ distance, we may transform the SCM optimization into a l
     &\hspace{2mm} \sum_{j \in \Ct} w_{jt} = 1 \\
     &\hspace{2mm} 0 \leq w_{jt} \leq 1 \text{ for } j \in \Ct
 \end{align*}
+\end{remark}
+
 
 \section{Monotonic Imbalance Bounding}
 \label{app:mib}
