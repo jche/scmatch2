@@ -93,6 +93,7 @@ get_cal_matches <- function(df,
   # keep a bunch of data around, just in case
   attr(res, "scweights") <- scweights
   attr(res, "dm") <- scmatches$dm
+  attr(res, "dm_uncapped") <- scmatches$dm_uncapped
   
   return(res)
 }
@@ -206,7 +207,7 @@ gen_matches <- function(df,
                treatment={{treatment}}, 
                scaling=scaling, 
                metric=metric)
-  
+  dm_uncapped <- dm   # store uncapped distance matrix!
   
   ### step 1: get caliper for each treated unit
   
@@ -290,7 +291,8 @@ gen_matches <- function(df,
   
   return(list(matches = df_list %>% discard(is.null),   # drop unmatched tx units
               adacalipers = min_dists,
-              dm = dm
+              dm = dm,
+              dm_uncapped = dm_uncapped
               # num_matches = num_matches
               ))
 }

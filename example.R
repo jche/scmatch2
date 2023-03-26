@@ -145,6 +145,20 @@ ess_plot(feasible)
 ggsave("writeup/figures/lalonde_ess.png", height=3, width=4)
 
 
+
+# (optional) visualize density --------------------------------------------
+
+require(latex2exp)
+tibble(d = as.numeric(attr(calada_scm, "dm_uncapped"))) %>% 
+  filter(d < 1000) %>% 
+  ggplot(aes(d)) +
+  geom_histogram(color="black", binwidth=0.5) +
+  theme_classic() +
+  labs(y = "Count",
+       x = TeX("$d(X_t, X_j)$"))
+ggsave("writeup/figures/lalonde_calselect.png", height=2.5, width=5)
+
+
 # estimate-estimand tradeoff diagnostics ----------------------------------
 
 # maximum caliper vs. # co units added
