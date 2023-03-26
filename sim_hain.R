@@ -24,7 +24,7 @@ if (T) {
   library(foreach)
   library(doParallel)
   cores=detectCores()
-  cl <- makeCluster(cores[1]-1) #not to overload your computer
+  cl <- makeCluster(cores[1]-1, outfile="") #not to overload your computer
   registerDoParallel(cl)
 }
 

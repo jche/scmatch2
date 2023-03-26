@@ -24,8 +24,9 @@ if (T) {
   library(foreach)
   library(doParallel)
   cores=detectCores()
-  cl <- makeCluster(cores[1]-1) #not to overload your computer
+  cl <- makeCluster(cores[1]-1, outfile="") #not to overload your computer
   registerDoParallel(cl)
+  # registerDoSEQ()   # sequential, for easier debugging
 }
 
 # set superlearner libraries
@@ -43,6 +44,7 @@ SL.library2 <- c("SL.glm", #"SL.gam",
 SL.library3Q <- c("SL.glm", "tmle.SL.dbarts2", "SL.glmnet")   # default tmle Q.SL.library
 SL.library3g <-  c("SL.glm", "tmle.SL.dbarts.k.5", "SL.gam")  # default tmle g.SL.library
 
+tic()
 
 
 # run simulations ---------------------------------------------------------
@@ -50,7 +52,7 @@ SL.library3g <-  c("SL.glm", "tmle.SL.dbarts.k.5", "SL.gam")  # default tmle g.S
 # repeatedly run for all combinations of pars
 # for (i in 1:100) {
 res <- foreach(
-  i=23:100, 
+  i=1:100, 
   .packages = c("tidyverse", 
                 "mvtnorm", "optweight", "dbarts", "tmle", "AIPW", "tictoc",
                 "aciccomp2016"),
@@ -181,7 +183,9 @@ res <- foreach(
   } else {
     write_csv(res, FNAME)
   }
-}
+  }
+
+toc()
 
 
 # analyze results ---------------------------------------------------------

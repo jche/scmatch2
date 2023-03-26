@@ -54,7 +54,7 @@ form2 <- as.formula("Y ~ X1*X2")
 
 # repeatedly run for all combinations of pars
 res <- foreach(
-  i=23:100, 
+  i=1:100, 
   .packages = c("tidyverse", 
                 "mvtnorm", "optweight", "dbarts", "tmle", "AIPW", "tictoc",
                 "aciccomp2016"),
@@ -94,12 +94,39 @@ res <- foreach(
                        if (is.numeric(x)) num_bins / (max(x) - min(x))
                        else 1000
                      }))
+  
+  
+  # for acic simulation: drop units that don't get a within-caliper matches
+  preds_csm <- get_cal_matches(
+    df = df,
+    metric = "maximum",
+    dist_scaling = dist_scaling,
+    cal_method = "fixed",
+    est_method = "average",
+    return = "all",
+    knn = 25)
+  preds_cem <- get_cem_matches(
+    df = df,
+    num_bins = nbins,
+    est_method = "average",
+    return = "all")
+  
+  # record number of infeasible units
+  ninf <- length(attr(preds_csm, "unmatched_units"))
+  ninf_cem <- sum(df$Z) - length(attr(preds_cem, "feasible_units"))
+  
+  # for all methods: filter out unmatched csm units
+  df <- df %>% 
+    filter(!id %in% attr(preds_csm, "unmatched_units"))
+  
 
   res <- tibble(
     runid = i,
     nc = nc,
     nt = nt,
     f0_sd = f0_sd,
+    ninf = ninf,
+    ninf_cem = ninf_cem,
 
     true_ATT = df %>%
       filter(Z) %>%
@@ -116,10 +143,14 @@ res <- foreach(
     ps_lm = get_att_ps_lm(df, zform2),
     ps_bart = get_att_ps_bart(df, covs=c(X1,X2)),
     
-    csm_scm = get_att_csm(df, dist_scaling=dist_scaling, est_method="scm"),
-    csm_avg = get_att_csm(df, dist_scaling=dist_scaling, est_method="average"),
-    cem_scm = get_att_cem(df, num_bins=num_bins, est_method="scm"),
-    cem_avg = get_att_cem(df, num_bins=num_bins, est_method="average"),
+    csm_scm = get_att_csm(df, dist_scaling=dist_scaling, est_method="scm",
+                          cal_method = "fixed"),
+    csm_avg = get_att_csm(df, dist_scaling=dist_scaling, est_method="average",
+                          cal_method = "fixed"),
+    cem_scm = get_att_cem(df, num_bins=num_bins, est_method="scm",
+                          estimand = "CEM-ATT"),
+    cem_avg = get_att_cem(df, num_bins=num_bins, est_method="average",
+                          estimand = "CEM-ATT"),
     onenn = get_att_1nn(df, dist_scaling=dist_scaling),
     
     tmle1 = get_att_tmle(df, 
@@ -144,7 +175,7 @@ res <- foreach(
   # res %>% 
   #   pivot_longer(-c(runid:true_ATT))
   
-  FNAME <- "sim_toy_results/toy_spaceship.csv"
+  FNAME <- "sim_toy_results/toy_spaceship2.csv"
   if (file.exists(FNAME)) {
     write_csv(res, FNAME, append=T)
   } else {
@@ -159,6 +190,9 @@ stopCluster(cl)
 
 
 # analyze results ---------------------------------------------------------
+
+# spaceship2 uses fixed calipers, not adaptive.
+
 
 # plot sample data
 set.seed(1)
@@ -219,7 +253,7 @@ if (F) {
 
 
 
-total_res <- read_csv("sim_toy_results/toy_spaceship.csv")
+total_res <- read_csv("sim_toy_results/toy_spaceship2.csv")
 
 total_res %>% 
   pivot_longer(-(runid:true_ATT)) %>%

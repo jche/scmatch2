@@ -24,7 +24,7 @@ if (T) {
   library(foreach)
   library(doParallel)
   cores=detectCores()
-  cl <- makeCluster(cores[1]-1) #not to overload your computer
+  cl <- makeCluster(cores[1]-1, outfile="") #not to overload your computer
   registerDoParallel(cl)
 }
 
@@ -128,10 +128,10 @@ res <- foreach(
     
     csm_scm = get_att_csm(df, dist_scaling=dist_scaling, est_method="scm",
                           cal_method = "fixed"),
-    # csm_avg = get_att_csm(df, dist_scaling=dist_scaling, est_method="average",
-    #                       cal_method = "fixed"),
-    # cem_scm = get_att_cem(df, num_bins=nbins, est_method="scm",
-    #                       estimand = "CEM-ATT"),
+    csm_avg = get_att_csm(df, dist_scaling=dist_scaling, est_method="average",
+                          cal_method = "fixed"),
+    cem_scm = get_att_cem(df, num_bins=nbins, est_method="scm",
+                          estimand = "CEM-ATT"),
     cem_avg = get_att_cem(df, num_bins=nbins, est_method="average",
                           estimand = "CEM-ATT"),
     onenn = get_att_1nn(df, dist_scaling=dist_scaling),
