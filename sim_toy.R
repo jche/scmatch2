@@ -54,7 +54,7 @@ form2 <- as.formula("Y ~ X1*X2")
 
 # repeatedly run for all combinations of pars
 res <- foreach(
-  i=1:100, 
+  i=1:40, 
   .packages = c("tidyverse", 
                 "mvtnorm", "optweight", "dbarts", "tmle", "AIPW", "tictoc",
                 "aciccomp2016"),
@@ -71,22 +71,22 @@ res <- foreach(
     
   tic()
   
-  nc <- 1000
-  nt <- 200
-  f0_sd <- 0.1
+  nc <- 500
+  nt <- 100
+  f0_sd <- 0.5
   df <- gen_df_adv(
     nc=nc, 
     nt=nt, 
     f0_sd = f0_sd,
-    tx_effect_fun = function(X1, X2) {0.2},
+    tx_effect_fun = function(X1, X2) {3*X1+3*X2},
     # f0_fun = function(x,y) {abs(x-y)})
     f0_fun = function(x,y) {
       matrix(c(x,y), ncol=2) %>%
         dmvnorm(mean = c(0.5,0.5),
-                sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 4   # multiply for more slope!
+                sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
       })
   
-  num_bins <- 8
+  num_bins <- 6
   
   dist_scaling <- df %>%
     summarize(across(starts_with("X"),
@@ -107,7 +107,7 @@ res <- foreach(
     knn = 25)
   preds_cem <- get_cem_matches(
     df = df,
-    num_bins = nbins,
+    num_bins = num_bins,
     est_method = "average",
     return = "all")
   
@@ -125,6 +125,7 @@ res <- foreach(
     nc = nc,
     nt = nt,
     f0_sd = f0_sd,
+    num_bins = num_bins,
     ninf = ninf,
     ninf_cem = ninf_cem,
 
@@ -175,7 +176,7 @@ res <- foreach(
   # res %>% 
   #   pivot_longer(-c(runid:true_ATT))
   
-  FNAME <- "sim_toy_results/toy_spaceship2.csv"
+  FNAME <- "sim_toy_results/toy_spaceship7.csv"
   if (file.exists(FNAME)) {
     write_csv(res, FNAME, append=T)
   } else {
@@ -192,12 +193,27 @@ stopCluster(cl)
 # analyze results ---------------------------------------------------------
 
 # spaceship2 uses fixed calipers, not adaptive.
+# spaceship3 increases slope and cuts sample size and decreases nbins
+#  - cem does even better here...?
+# spaceship4: more noise, heterogeneous tx effects
+#  - right direction
+# spaceship5: even more noise, more heterogeneous tx effects
+#  - more in the right direction (csm better than cem now in terms of rmse),
+#    but well-specified outcome regression lm is pretty great too
+# spaceship6: double noise, less het tx effects
+#  - similar? avg is still better than scm, which is annoying...
+# spaceship7: more slope in f0, looks great, avg still better
+
+# spaceship8: cut noise in half to try to get scm to do better
+#  - nope, just makes onenn good. avg still better...
+
+# spaceship7 final!
 
 
 # plot sample data
 set.seed(1)
 df <- gen_df_adv(
-  nc=1000, 
+  nc=500, 
   nt=100, 
   f0_sd = 0.1,
   tx_effect_fun = function(X1, X2) {0.2},
@@ -205,7 +221,7 @@ df <- gen_df_adv(
   f0_fun = function(x,y) {
     matrix(c(x,y), ncol=2) %>%
       dmvnorm(mean = c(0.5,0.5),
-              sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 4   # multiply for more slope!
+              sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 10   # multiply for more slope!
   })
 vlines <- seq(min(df$X1),max(df$X1),length.out=9)
 hlines <- seq(min(df$X2),max(df$X2),length.out=9)
@@ -216,6 +232,18 @@ df %>%
   geom_vline(xintercept=vlines, lty="dotted") +
   geom_hline(yintercept=hlines, lty="dotted") +
   facet_wrap(~Z)
+
+d1 <- (vlines[2]-vlines[1])/2
+d2 <- (hlines[2]-hlines[1])/2
+df %>% 
+  ggplot(aes(x=X1, y=X2, color=Y)) +
+  geom_rect(data=. %>% filter(Z) %>% slice(1:5),
+            aes(xmin=X1-d1, xmax=X1+d1, ymin=X2-d2, ymax=X2+d2),
+            fill = NA, color="black", alpha=0.1) +
+  geom_point(aes(pch=Z)) +
+  scale_color_continuous(low="blue", high="orange") +
+  geom_vline(xintercept=vlines, lty="dotted") +
+  geom_hline(yintercept=hlines, lty="dotted")
 
 if (F) {
   # for seed(1): cem does better! it drops a bunch though.
@@ -253,7 +281,7 @@ if (F) {
 
 
 
-total_res <- read_csv("sim_toy_results/toy_spaceship2.csv")
+total_res <- read_csv("sim_toy_results/toy_spaceship7.csv")
 
 total_res %>% 
   pivot_longer(-(runid:true_ATT)) %>%
