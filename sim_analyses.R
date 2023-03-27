@@ -53,6 +53,7 @@ res_toy %>%
   summarize(
     RMSE = sqrt(mean((value-true_ATT)^2)),
     Bias = abs(mean(value-true_ATT)),
+    # Bias = mean(value-true_ATT)
   ) %>% 
   mutate(method = fct_reorder(method, RMSE, min)) %>% 
   pivot_longer(c(RMSE, Bias)) %>% 
