@@ -13,6 +13,35 @@ METHODS <- c("diff", "onenn", "csm_scm", "cem_avg", "bal1", "bal2",
 res_toy <- read_csv("sim_toy_results/toy_spaceship7.csv")
 
 
+# plot dataset ------------------------------------------------------------
+
+nc <- 500
+nt <- 100
+f0_sd <- 1
+set.seed(4)
+df <- gen_df_adv(
+  nc=nc, 
+  nt=nt, 
+  f0_sd = f0_sd,
+  tx_effect_fun = function(X1, X2) {3*X1+3*X2},
+  # f0_fun = function(x,y) {abs(x-y)})
+  f0_fun = function(x,y) {
+    matrix(c(x,y), ncol=2) %>%
+      dmvnorm(mean = c(0.5,0.5),
+              sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
+  })
+df %>% 
+  ggplot(aes(x=X1, y=X2, color=Y)) +
+  geom_point(aes(pch=Z)) +
+  scale_color_continuous(low="blue", high="orange") +
+  theme_classic() +
+  labs(x = TeX("$X_1$"),
+       y = TeX("$X_2$"))
+
+ggsave("writeup/figures/sim_toy_ex.png", width=4, height=3)
+
+
+
 # check rmse stuff --------------------------------------------------------
 
 res_toy %>% 
