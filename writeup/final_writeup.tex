@@ -23,6 +23,9 @@
 % Table float box with bottom caption, box width adjusted to content
 \newfloatcommand{capbtabbox}{table}[][\FBwidth]
 
+\usepackage{multirow}
+
+
 % \usepackage{xcolor}
 \usepackage[table,xcdraw]{xcolor}
 \usepackage{hyperref}
@@ -37,6 +40,7 @@
 \newtheorem{lemma}[theorem]{Lemma}
 \newtheorem{proposition}[theorem]{Proposition}
 \newtheorem{remark}{Remark}
+\newtheorem{definition}{Definition}[section]
 
 \newcommand{\ddt}{\frac{d}{dt}}
 \newcommand{\ddtn}[1]{\frac{d^{#1}}{dt^{#1}}}
@@ -654,7 +658,7 @@ Then for a matching procedure such that for all $t$, $d_V(\Xt, \Xj) \leq c$ for 
 \end{proof}
 Appendix \ref{app:lipschitz} provides technical details about Lipschitz functions in $\Rp$.
 
-Proposition \ref{prop:biasbd_lip} states that for distance-metric caliper matching methods, worst-case bias is proportional to the caliper size $c$.\footnote{Proposition \ref{prop:biasbd_lip} applies to a slightly different set of methods than Proposition 1 from \citet{iacus2011multivariate}, which proves a similar bias bound for MIB matching methods.}
+Proposition \ref{prop:biasbd_lip} states that for distance-metric caliper matching methods, worst-case bias is proportional to the caliper size $c$.\footnote{Proposition \ref{prop:biasbd_lip} applies to a slightly different set of methods than Proposition 1 from \citet{iacus2011multivariate}, which proves a similar bias bound for MIB matching methods (see Appendix \ref{app:mib}).}
 As in Proposition \ref{prop:wass}, setting $c=0$ shows that exact matching leads to unbiased estimates, but in practice we must use $c > 0$ to navigate the estimate-estimand tradeoff without dropping all of the treated units.
 
 Of course, we rarely know the Lipschitz constant $\lambda$ in practice, so Proposition \ref{prop:biasbd_lip} does not generate empirical bias bounds.
@@ -830,39 +834,77 @@ We also note that in step 2(a), we sample Bayesian bootstrap weights \citep{rubi
 \section{Simulation Studies}
 \label{sec:simulation}
 
-A few simulations to run:
-\begin{itemize}
-    \item On 2D adversarial dataset: horse-race CSM against other methods
-    \item On canonical datasets: horse-race CSM against other methods
-\end{itemize}
-
-On all simulations, check calibration of bootstrap intervals.
-E.g., for 1000 simulated datasets, 950 of the 95\% bootstrap intervals should cover the truth.
-
 % \note{TODO: see what balancing does when we're just given control units everywhere, and treated units only in certain places.}
 
-
-It would be straightforward to engineer a simulation where we show that CSM outperforms everything.
-This is not helpful.
-Instead, we run two sets of simulations.
-First, based on the toy example, we show a situation where matching is helpful and important.
-Second, we look at some canonical examples to see what CSM does.
+To understand how CSM performs, we consider a range of simulation studies.
+First, we examine a simple simulation based on the toy examples in Section \ref{sec:toy}, where local matches tend to be important.
+We then consider a few canonical simulated datasets to assess general performance.
 
 \subsection{Methods}
 
-We compare asdf against a wide range of methods.
+We compare CSM to a variety of popular matching, balancing, outcome regression, propensity score, and doubly robust methods, as described in Table \ref{tab:sim_methods}.\footnote{We also conduct CEM using synthetic controls within each cell (and caliper matching using simple averages within each caliper), but we exclude these results since their performances typically lie between the performances of CSM and CEM.}
+% Please add the following required packages to your document preamble:
+% \usepackage{multirow}
+% \usepackage[table,xcdraw]{xcolor}
+% If you use beamer only pass "xcolor=table" option, i.e. \documentclass[xcolor=table]{beamer}
+\begin{table}[]
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor[HTML]{C0C0C0} 
+Method class                         & Method name & Description  \\ \hline
+Baseline                             & diff & Difference-in-means estimator \\ \hline
+                                     & match-1NN   & One nearest neighbor matching \\ \cline{2-3} 
+\multirow{-2}{*}{Matching}           & match-CEM   & Coarsened exact matching \\ \hline
+                                     & or-lm       & Linear model on all two-way interactions  \\ \cline{2-3} 
+\multirow{-2}{*}{Outcome model} & or-BART     & Bayesian additive regression tree (BART) \\ \hline
+                                     & ps-lm       & \begin{tabular}[c]{@{}l@{}}Logistic model for propensity score \\ 
+                                     on all two-way interactions\end{tabular} \\ \cline{2-3} 
+\multirow{-2}{*}{Propensity score}   & ps-BART     & BART with binary outcome (probit link) \\ \hline
+                                     & bal-SBW1    & \begin{tabular}[c]{@{}l@{}}Stable balancing weights (SBW) \\ 
+                                     on marginal means \end{tabular} \\ \cline{2-3} 
+\multirow{-2}{*}{Balancing}          & bal-SBW2    & \begin{tabular}[c]{@{}l@{}}SBW on marginal and two-way \\ 
+                                     interaction means \end{tabular} \\ \hline
+                                     & dr-AIPW1    & \begin{tabular}[c]{@{}l@{}}Augmented inverse propensity weighting \\ 
+                                     (AIPW) using SuperLearner on \\ 
+                                     linear models\end{tabular} \\ \cline{2-3} 
+                                     & dr-AIPW2    & \begin{tabular}[c]{@{}l@{}}AIPW using SuperLearner on \\ 
+                                     machine-learning models \end{tabular} \\ \cline{2-3} 
+                                     & dr-TMLE1    & \begin{tabular}[c]{@{}l@{}}Targeted maximum likelihood estimation \\ 
+                                     (TMLE) using SuperLearner on \\
+                                     linear models\end{tabular} \\ \cline{2-3} 
+\multirow{-4}{*}{Doubly robust}      & dr-TMLE2    & \begin{tabular}[c]{@{}l@{}}TMLE using SuperLearner on \\ 
+                                     machine-learning models \end{tabular} \\ \hline
+\end{tabular}
+\caption{Methods used in simulation studies. References for methods are: CEM \citep{iacus2012causal}, BART \citep{chipman2009bart}, SBW \citep{zubizarreta2015stable}, AIPW \citep{robins1994estimation}, SuperLearner \citep{van2007super}, and TMLE \citep{van2006targeted}.}
+\label{tab:sim_methods}
+\end{table}
+We use default settings for all of the algorithms to standardize comparisons.
+We implement BART, TMLE, and AIPW in \texttt{R} using defaults from the \texttt{dbarts} \citep{dorie2023dbarts}, \texttt{tmle} \citep{gruber2012tmle}, and \texttt{AIPW} \citep{zhong2021aipw} packages, respectively.
+For SuperLearner, the linear models include a simple mean, linear regression, and generalized linear regression models; the machine-learning models include the linear models as well as combinations of generalized additive models, random forests, BART, and XGBoost \citep{chen2016xgboost}, based on defaults in the \texttt{tmle}, and \texttt{AIPW} packages.
 
+To standardize comparisons for the matching methods, for each dataset we use the distance metric implied by the covariatewise caliper generated by coarsening each numeric covariate into five equally spaced bins.\footnote{I.e., we use $d_V^{(\infty)}$ for diagonal $V$ with entries $V_{kk} = 5 / (max(X_k) - min(X_k))$.}
+We do not tune the covariatewise caliper, assuming zero domain knowledge about variable importance.
+We conduct CEM using the same uniform coarsening of each covariate into five bins.
 
 
 \subsection{Toy example simulation}
 
+We illustrate the data
+
+Figure asdf plots a sample simulated dataset.
+
+The goal here is to distill when and w  hy local matching might be important in a setting.
+It's not to show that CSM performs the best.
 
 Issue: 1nn and CEM are outperforming CSM! Why?
 
+TODO: CEM-scm and csm-avg tend to be in the middle in terms of performance.
+
+
+
 \subsection{Canonical simulations}
 
-To illustrate the performance of CSM, we use simulated datasets from \citet{kang2007demystifying}, \citet{hainmueller2012entropy}, and the 2016 American Causal Inference Conference competition \citep{dorie2019automated}.
-These datasets have canonically been used to compare methods for observational causal inference.
+The datasets from \citet{kang2007demystifying}, \citet{hainmueller2012entropy}, and the 2016 American Causal Inference Conference competition \citep{dorie2019automated} have canonically been used to compare methods for observational causal inference.
 Table \ref{tab:simdata} contains basic information about the settings we used for each dataset.
 We refer readers to the original papers for further details.
 
@@ -874,63 +916,43 @@ We refer readers to the original papers for further details.
 \hline
 \rowcolor[HTML]{C0C0C0} 
 Dataset                   & $p$ & $n_t$         & $n_c$         & \begin{tabular}[c]{@{}l@{}}Heterogeneous \\ effects?\end{tabular} \\ \hline
-Kang \& Schafer, (2007)   & 4             & $\approx 1$   & $\approx 1$   & No                                                                          \\ \hline
+Kang \& Schafer, (2007)   & 4             & $\approx 500$   & $\approx 500$   & No                                                                          \\ \hline
 Hainmueller et al. (2012) & 6             & 50            & 250           & No                                                                          \\ \hline
 ACIC 2016                 & 10            & $\approx 350$ & $\approx 650$ & Yes                                                                         \\ \hline
 \end{tabular}
 \caption{Basic descriptions of simulated datasets. 
-    We use the \citet{kang2007demystifying} as-is from the original paper. 
-    We use the ``high overlap'' and ``highly nonlinear'' outcome model condition for the data from \citet{hainmueller2012entropy}. 
-    Finally, we use the ``step-function'' propensity and treatment model conditions for the ACIC 2016 data, and additionally subset the total number of covariates to 10.}
+    We use the \citet{kang2007demystifying} as-is from the original paper; the ``high overlap'' and ``highly nonlinear'' outcome model condition for the data from \citet{hainmueller2012entropy}; and the ``step-function'' propensity and treatment model conditions for the ACIC 2016 data using only 10 numeric covariates.}
 \label{tab:simdata}
 \end{table}
 
-We compare CSM to a variety of popular methods.
-These include:
-\begin{itemize}
-    \item Difference in means
-    \item Outcome regression models: 
-    \begin{itemize}
-        \item Linear regression on all two-way interactions of covariates
-        \item Bayesian additive regression trees \citep[BART][]{chipman2009bart} on all covariates 
-    \end{itemize}
-    \item Inverse propensity score weighting, with propensity score models:
-    \begin{itemize}
-        \item logistic regression on all two-way interactions of covariates
-        \item BART with binary outcomes on all covariates
-    \end{itemize}
-    \item Balancing: stable balancing weights \citep{zubizarreta2015stable} on marginal means (bal1) and on means of all two-way interactions (bal2)
-    \item Matching:
-    \begin{itemize}
-        \item One nearest-neighbor matching
-        \item Coarsened exact matching \citep{iacus2012causal}
-    \end{itemize}
-    \item Targeted maximum likelihood estimation \citep[TMLE; ][]{van2006targeted} using SuperLearner \citep{van2007super} on linear models (tmle1) and machine-learning models (tmle2).
-    \item Augmented inverse propensity score weighting \citep[AIPW; ][]{robins1994estimation} using SuperLearner on linear models (aipw1) and machine-learning models (aipw2).
-\end{itemize}
-% TODO: compare to PS and mahalanobis distance matching...?
+Figure \ref{fig:sim_results} summarizes the results of these simulations and illustrates the tradeoffs made by CSM.
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{writeup/figures/sim_results.png}
+    \caption{Method results on canonical simulated datasets across 250 simulations. 
+        Results for CSM highlighted in bold font.}
+    \label{fig:sim_results}
+\end{figure}
+We see that CSM tends to outperform the simple matching, balancing, and outcome or propensity-score modeling approaches, but that it is outperformed by the complex machine-learning approaches known to do well on these types of datasets \citep{dorie2019automated}.
+CSM is designed to maximize performance while preserving the simple intuitions underlying exact matching.
+Under such constraints, it is remarkable that CSM performs nearly as well as black-box machine-learning approaches on the \citet{kang2007demystifying} and \citet{hainmueller2012entropy} datasets.
 
-We implement BART, TMLE, and AIPW in \texttt{R} using default settings in the \texttt{dbarts} \citep{dorie2023dbarts}, \texttt{tmle} \citep{gruber2012tmle}, and \texttt{AIPW} \citep{zhong2021aipw} packages, respectively.
-For SuperLearner, the linear models include a simple mean, linear regression, and generalized linear regression models; the machine-learning models include the linear models as well as combinations of generalized additive models, random forests, BART, and XGBoost \citep{chen2016xgboost}, based on default settings in the \texttt{tmle}, and \texttt{AIPW} packages.
+The trends in Figure \ref{fig:sim_results} highlight important concepts regarding locality in observational causal inference.
+As the number of covariates increases, the matching methods tend to deteriorate in performance relative to the complex modeling methods.
+Caliper-based matching methods only use local information.
+This behavior protects them against incorrect extrapolation, but also prevents them from correctly extrapolating.
 
-To standardize these comparisons for CSM and one-nearest-neighbor matching, for each dataset we use the distance metric implied by the covariatewise caliper generated by coarsening each numeric covariate into five equally spaced bins.\footnote{I.e., for covariate $k$, $V_{kk} = 5 / (max(X_k) - min(X_k))$.}
-We do not tune the covariatewise caliper, assuming zero domain knowledge about variable importance.
-We conduct CEM using the same uniform coarsening of each covariate into five bins.
+In many simulated (and real) datasets, extrapolating marginal effects can improve counterfactual predictions.
+For example, suppose increasing $X_1$ clearly increases outcomes among controls which have low values of $X_2$, and we would like to predict counterfactual outcomes for treated units with high values of $X_2$.
+A linear model fit to the controls would extrapolate and assume that increasing $X_1$ always increases outcomes, while an exact matching estimator would find a neighbor which may not necessarily have a high value of $X_1$.
+Increasing the number of covariates exaggerates this behavior, since models extrapolate more marginal trends.
+Figure \ref{fig:sim_results} shows us that this type of model-based marginal extrapolation improves results for these simulated datasets, since there are few high-dimensional interactions to falsify such extrapolation.
 
-Figure asdf summarizes the results of these simulations.
-
-
-We see both strengths and shortcomings.
-Better than other matching methods, worse than modern methods.
-
-In general, with simulated data, we're going to have pretty strong, long-distance, marginal trends.
-Modeling approaches are allowed to pick these up.
-Any approximate exact matching approach, however, uses ONLY local information.
-This will hurt performance!
-Also, in simulated data, we rarely see big joint interactions, since it's difficult for us as humans to conceptualize why they may appear in the real world, and how they may affect things.
-
-
-
+Matching aims to produce transparent, model-free causal inferences.
+As shown by Figure \ref{fig:sim_results}, this transparency generally comes with a cost in terms of performance.
+The simulations also show that while avoiding model-based extrapolation controls bias in the worst case (e.g., Proposition \ref{prop:biasbd_lip}), it can be too conservative in settings where such extrapolation is helpful.
+Whether these costs are outweighed by the ability to clearly explain how counterfactual predictions are made depends on the particular causal inference setting.
+Nonetheless, CSM performs competitively in these canonical simulations, making it an attractive option in settings where explainability is paramount.
 
 
 % Conclusions:
@@ -1654,31 +1676,36 @@ For a scaled $L_\infty$ distance, we may transform the SCM optimization into a l
 \section{Monotonic Imbalance Bounding}
 \label{app:mib}
 
-\begin{remark}
-    A matching method is MIB for $f(\cdot)$ w.r.t. $d(\cdot, \cdot)$ if $\exists$ some ``monotonically increasing'' $\gamma_{f,d}(\cdot)$  such that:
-    $$d(f(\chi_{m_T(\pi)}), f(\chi_{m_C(\pi)})) \leq \gamma_{f,d}(\pi)$$
-\end{remark}
-The MIB property handles distances relating to covariate space.
-So, e.g., CEM is proved to be MIB in $\Bar{X}$.
+\citet{iacus2011multivariate} defines the monotonic imbalance bounding (MIB) class of matching methods as follows:
+\begin{definition}
+\label{def:mib}
+    A matching method is MIB for a function $f(\chi)$ of the dataset $\chi$ with respect to distance metric $d(\cdot, \cdot)$ if there exists some ``monotonically increasing'' $\gamma_{f,d}(\cdot)$  such that:
+    $$d(f(\chi_{m_T(\boldsymbol{\pi})}), f(\chi_{m_C(\boldsymbol{\pi})})) \leq \gamma_{f,d}(\boldsymbol{\pi})$$
+    for given tuning parameter $\boldsymbol{\pi} \in \R^k$ which produces matched sets of treated units $m_T(\boldsymbol{\pi})$ and control units $m_C(\boldsymbol{\pi})$.
+\end{definition}
+The calipering function $\gamma_{f,d}(\cdot)$ is defined to be monotonically increasing if it is increasing in each of its inputs.
 
-The MIB property is then used to prove bias bounds and model dependence bounds, though they really futz with definitions here.
-They state that if a method is MIB in $f(x) = x$ then their condition holds, but $f(x)=x$ is not a function of the dataset!
-Regardless, we can take it to mean MIB in $f(x) = \Bar{X}$, which leads to the same results.
-Also, they never use a vector distance as their $d(\cdot, \cdot)$ metric, since they do all of this stuff marginally, once for each covariate.
+As given, Definition \ref{def:mib} is difficult to work with, so in practice \citet{iacus2011multivariate} focuses on methods that are marginally MIB in each covariate.
+In other words, rather than using a $p$-dimensional distance metric, they focus on the one-dimensional distance metric $d(x,y) = |x-y|$ in conjunction with functions that may be marginally written as $f(\chi) = \begin{bmatrix}
+    f_1(\chi_1) & \dots & f_p(\chi_p)
+\end{bmatrix}^T$ for $f_j(\cdot): \mathbb{R}^n \to \mathbb{R}$, e.g., the function that inputs all observations of one covariate and outputs the mean of that covariate, and tuning parameters $\boldsymbol{\pi} \in \R^p$, e.g., covariatewise calipers.
+Notably, changing any element of the tuning parameter $\boldsymbol{\pi}$ now does not affect the MIB condition for any other covariate.
 
+The distance-metric calipers in Proposition \ref{prop:distmetriccal} imply that the matching method  is marginally MIB in each covariate, for each treated unit and its matched controls (i.e., for $d(x,y)=|x-y|$, $f(\chi)$ = observation of interest, $\gamma(\boldsymbol{\pi})=\boldsymbol{\pi}$).
+Using $p$-dimensional distance-metric calipers greatly simplifies notation compared to marginally calipering imbalances in each covariate;
+rather than working with the monotonic function $\gamma(\cdot)$, we directly work with a scalar caliper $c$ using scaled distance metric $d_V(\cdot, \cdot)$.
 
-Proposition \ref{prop:meanbd} is similar to Proposition 2 in \citet{iacus2011multivariate}, but directly bounds the multivariate distance $d_V(\cdot,\cdot)$ between $\bar{\bX}_T$ and $\Bar{\bX}_C$ rather than individually bounding each marginal distance.
-Technically, Proposition \ref{prop:meanbd} nearly shows that caliper matching is MIB with respect to $f(\chi)=\Bar{X}$, but the caliper is now implicitly defined using the diagonal $V$ matrix in the distance metric.
+As a result, Proposition \ref{prop:meanbd} nearly shows that caliper matching is MIB with respect to $f(\chi)=\Bar{X}$, but the caliper is now implicitly defined using the diagonal $V$ matrix in the distance metric.
+Proposition \ref{prop:biasbd_lip} is also very similar to Proposition 1 in \citet{iacus2011multivariate}, though it generalizes Proposition 1 to allow for any $p$-dimensional distance-metric caliper rather than only considering marginal calipers in each covariate.
 
-
-The MIB paper is simply incorrect in various places.
-I'll use this appendix to try to generously salvage important pieces.
-Some issues to address:
-\begin{itemize}
-    \item They say that a method ``is MIB'' at various points, even though MIB is clearly defined with respect to some function of the data.
-    \item They prove properties for methods MIB with respect to ``$f(x)=x$'', which is clearly not a well-defined function of the dataset $\chi$.
-    \item The model-dependence-bounding section assumes the conclusion...
-\end{itemize}
+% The MIB paper is simply incorrect in various places.
+% I'll use this appendix to try to generously salvage important pieces.
+% Some issues to address:
+% \begin{itemize}
+%     \item They say that a method ``is MIB'' at various points, even though MIB is clearly defined with respect to some function of the data.
+%     \item They prove properties for methods MIB with respect to ``$f(x)=x$'', which is clearly not a well-defined function of the dataset $\chi$.
+%     \item The model-dependence-bounding section assumes the conclusion...
+% \end{itemize}
 
 \bibliography{refs.bib}
 
