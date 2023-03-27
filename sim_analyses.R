@@ -2,6 +2,64 @@
 # full analysis of simulation results
 
 
+METHODS <- c("diff", "onenn", "csm_scm", "cem_avg", "bal1", "bal2", 
+             "or_lm", "ps_lm",
+             "or_bart", "ps_bart",
+             "aipw1", "tmle1", 
+             "aipw2", "tmle2")
+
+# toy sim -----------------------------------------------------------------
+
+res_toy <- read_csv("sim_toy_results/toy_spaceship7.csv")
+
+
+# check rmse stuff --------------------------------------------------------
+
+res_toy %>% 
+  rename(aipw2=aipw3, tmle2=tmle3) %>% 
+  pivot_longer(diff:aipw2, names_to="method") %>%
+  filter(method %in% METHODS) %>% 
+  filter(method != "onenn", method != "cem_avg") %>% 
+  group_by(method) %>%
+  summarize(
+    RMSE = sqrt(mean((value-true_ATT)^2)),
+    Bias = abs(mean(value-true_ATT)),
+  ) %>% 
+  mutate(method = fct_reorder(method, RMSE, min)) %>% 
+  pivot_longer(c(RMSE, Bias)) %>% 
+  
+  ggplot(aes(x=method)) +
+  geom_point(aes(y=value, pch=name), size=1) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1),
+        # axis.title.x = element_text(vjust=-1),
+        legend.position = c(0.2, 0.8),
+        legend.background = element_rect(linetype="solid", linewidth=0.5, color="black")) +
+  scale_x_discrete(labels = c(
+    "diff" = "diff",
+    "tmle1" = "dr-TMLE1",
+    "tmle2" = "dr-TMLE2",
+    "aipw1" = "dr-AIPW1",
+    "aipw2" = "dr-AIPW2",
+    "bal1" = "bal-SBW1",
+    "bal2" = "bal-SBW2",
+    "or_bart" = "or-BART",
+    "or_lm" = "or-LM",
+    "ps_bart" = "ps-BART",
+    "ps_lm" = "ps-LM",
+    "onenn" = "match-1NN",
+    "cem_avg" = "match-CEM",
+    "csm_scm" = expression(bold(match-CSM)))) +
+  scale_shape_manual(values = c(1,2)) +
+  labs(y = "Value",
+       x = "Method",
+       pch = "Metric")
+
+ggsave("writeup/figures/sim_toy_results.png", width=3.5, height=3.5)
+
+
+# canonical sims ----------------------------------------------------------
+
 res_kang <- read_csv("sim_canonical_results/kang_spaceship.csv") %>% 
   bind_rows(read_csv("sim_canonical_results/kang_spaceship2.csv")) %>% 
   mutate(sim = "kang")
@@ -16,7 +74,6 @@ res <- list(res_kang, res_hain, res_acic) %>%
       select(ninf:sim)
   })
 
-
 # check dropped units -----------------------------------------------------
 
 res %>% 
@@ -28,12 +85,6 @@ res %>%
 
 
 # check rmse stuff --------------------------------------------------------
-
-METHODS <- c("diff", "onenn", "csm_scm", "cem_avg", "bal1", "bal2", 
-             "or_lm", "ps_lm",
-             "or_bart", "ps_bart",
-             "aipw1", "tmle1", 
-             "aipw2", "tmle2")
 
 # do ACIC style plots, for all three datasets?
 acic_plot <- function(simname, title="", ylab="", xlab="", legend.position="none") {
