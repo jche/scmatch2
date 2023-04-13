@@ -23,9 +23,8 @@ boot_bayesian <- function(d, B=100) {
           function(b) {
             d %>% 
               mutate(weights = weights * 
-                       as.numeric(gtools::rdirichlet(1, alpha=rep(1,nrow(d)))) *
-                       # rdirichlet(alpha=rep(1,nrow(d))) * 
-                       nrow(d)) %>% 
+                       as.numeric(gtools::rdirichlet(1, alpha=rep(1,nrow(d))))) %>% 
+                       # rdirichlet(alpha=rep(1,nrow(d)))) %>% 
               get_att_ests()
           })
 }
@@ -50,6 +49,124 @@ boot_bayesian_covs <- function(d, covs, B=100) {
 
 
 
+#' Run a Bayesian bootstrap, corrected (?)
+#'
+#' @param d dataset with tx units and sc units
+#' @param B number of bootstrap samples
+#'
+#' @return vector of bootstrapped ATT estimates
+boot_bayesian2 <- function(d, B=100) {
+  map_dbl(1:B,
+          .progress = "Bootstrapping...",
+          function(b) {
+            set.seed(1)
+            d %>% 
+              mutate(
+                boot_weights = rep(
+                  gtools::rdirichlet(1, alpha=rep(1, nrow(d)/2)) %>% 
+                    as.numeric(),
+                  each=2),
+                weights = weights * boot_weights) %>%
+              get_att_ests()
+            
+            d %>% 
+              mutate(
+                boot_weights = rep(
+                  gtools::rdirichlet(1, alpha=rep(1, nrow(d)/2)) %>% 
+                    as.numeric(),
+                  each=2),
+                tau_i = Z*Y - (1-Z)*Y) %>% 
+              summarize(att = sum(boot_weights * tau_i)) %>% 
+              pull(att)
+          })
+}
+
+
+#' #' @param d dataset with tx units and sc units
+#' #' @param B number of bootstrap samples
+#' #'
+#' #' @return vector of bootstrapped ATT estimates
+#' boot_bayesian2_wild <- function(d, B=100) {
+#'   map_dbl(1:B,
+#'           .progress = "Bootstrapping...",
+#'           function(b) {
+#'             d %>% 
+#'               mutate(
+#'                 boot_weights = rep(
+#'                   sample(c(-(sqrt(5)-1)/2, (sqrt(5)+1)/2), 
+#'                          prob = c((sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5))),
+#'                          size=nrow(d)/2, replace=T),
+#'                   each=2),
+#'                 weights = weights * boot_weights) %>%
+#'               get_att_ests()
+#'           })
+#' }
+
+
+# directly compute T* = 1/sqrt(n1) sum(wt * (tau_i - tau))
+boot_bayesian_redux <- function(d, B=100) {
+  att_hat <- get_att_ests(d)
+  n <- nrow(d)
+  n1 <- sum(d$Z)
+  
+  map_dbl(1:B,
+          .progress = "Bootstrapping...",
+          function(b) {
+            d %>%
+              mutate(weights_boot = as.numeric(gtools::rdirichlet(1, alpha=rep(1,nrow(d)))),
+                     tau_i = Z*Y - (1-Z)*weights*Y) %>%
+              summarize(att = sum(weights_boot * (tau_i - att_hat))) %>%
+              pull(att)
+          })
+}
+
+
+# input: df with weighted tx/co units
+boot_bayesian_redux2 <- function(d, B=100) {
+  map_dbl(1:B,
+          .progress = "Bootstrapping...",
+          function(b) {
+            n <- nrow(d)
+            n1 <- sum(d$Z)
+            d %>% 
+              mutate(weights_boot = as.numeric(gtools::rdirichlet(1, alpha=rep(1,nrow(d)))),
+                     tau_i = Z*Y - (1-Z)*weights*Y) %>% 
+              summarize(att = sum(weights_boot * (tau_i)) * n/n1) %>%
+              pull(att)
+          })
+}
+
+
+# input tx and aggregated co units
+#  - with wild bootstrap weights
+boot_bayesian_finalattempt <- function(d, B=100) {
+  att_hat <- get_att_ests(d)
+  n1 <- sum(d$Z)
+  n <- nrow(d)
+  
+  map_dbl(1:B,
+          .progress = "Bootstrapping...",
+          function(b) {
+            d %>% 
+              mutate(
+                weights_boot = 
+                  as.numeric(gtools::rdirichlet(1, alpha=rep(1,n))),
+                  # sample(
+                  #   c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
+                  #   prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
+                  #   replace = T, size = n),
+                tau_i = Z*Y - (1-Z)*weights*Y) %>% 
+              summarize(att = sum(weights_boot * (tau_i - att_hat)) / n1) %>%
+              pull(att)
+          })
+}
+
+
+# idea: want sd of sampling distribution of sqrt(N) * T
+#  - repeatedly sample T
+
+
+
 # naive bootstrap ---------------------------------------------------------
 
 #' Run naive bootstrap
@@ -58,7 +175,7 @@ boot_bayesian_covs <- function(d, covs, B=100) {
 #' @param B number of bootstrap samples
 #'
 #' @return vector of bootstrapped ATT estimates
-boot_naive <- function(d, 
+boot_naive <- function(d,
                        caliper,
                        metric,
                        cal_method,
