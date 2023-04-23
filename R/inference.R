@@ -162,9 +162,72 @@ boot_bayesian_finalattempt <- function(d, B=100) {
 }
 
 
-# idea: want sd of sampling distribution of sqrt(N) * T
-#  - repeatedly sample T
 
+
+# input tx and aggregated co units
+#  - with wild bootstrap weights
+boot_bayesian_finalattempt <- function(d, B=100) {
+  att_hat <- get_att_ests(d)
+  n1 <- sum(d$Z)
+  n <- nrow(d)
+  
+  map_dbl(1:B,
+          .progress = "Bootstrapping...",
+          function(b) {
+            d %>% 
+              mutate(
+                weights_boot = 
+                  as.numeric(gtools::rdirichlet(1, alpha=rep(1,n))),
+                # sample(
+                #   c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
+                #   prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
+                #   replace = T, size = n),
+                tau_i = Z*Y - (1-Z)*weights*Y) %>% 
+              summarize(att = sum(weights_boot * (tau_i - att_hat)) / n1) %>%
+              pull(att)
+          })
+}
+
+# 
+#' Get bootstrap representation
+#'
+#' @param d 
+#' @param wt_fun function to generate bootstrap weights, inputs n (# weights to gen)
+#' @param B 
+#'
+#' @return
+boot_bayesian <- function(d, 
+                          wt_fun,
+                          B=100) {
+  att_hat <- get_att_ests(d)
+  n1 <- sum(d$Z)
+  n <- nrow(d)
+  
+  map_dbl(1:B,
+          .progress = "Bootstrapping...",
+          function(b) {
+            d %>% 
+              mutate(
+                weights_boot = wt_fun(n),
+                tau_i = Z*Y - (1-Z)*weights*Y) %>% 
+              summarize(att = sum(weights_boot * (tau_i - att_hat)) / n1) %>%
+              pull(att)
+          })
+}
+
+if (F) {
+  wf <- function(n) as.numeric(gtools::rdirichlet(1, alpha=rep(1,n)))
+  wf <- function(n) {
+    sample(
+      c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
+      prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
+      replace = T, size = n)
+  }
+  boot_bayesian(d, wf, B=50) %>% sd()
+  
+  # TODO: what is the "true" sd here?
+  
+}
 
 
 # naive bootstrap ---------------------------------------------------------
