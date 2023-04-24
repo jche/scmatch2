@@ -161,20 +161,19 @@ weighted_boot2 <- function(d, wt_fun, B=100) {
           })
 }
 
-# this is pretty close to what the bootstrap does!
-weighted_boot3 <- function(d, wt_fun, B=100) {
-  map_dbl(1:B,
-          .progress = "Bootstrapping...",
-          function(b) {
-            d %>% 
-              mutate(
-                weights_boot = wt_fun(n()),
-                tau_i = (2*Z-1) * wt * Yobs) %>% 
-              summarize(
-                att = sum(weights_boot * (tau_i)) / sum(weights_boot*Z) ) %>%
-              pull(att)
-          })
-}
+# weighted_boot3 <- function(d, wt_fun, B=100) {
+#   map_dbl(1:B,
+#           .progress = "Bootstrapping...",
+#           function(b) {
+#             d %>% 
+#               mutate(
+#                 weights_boot = wt_fun(n()),
+#                 tau_i = (2*Z-1) * wt * Yobs) %>% 
+#               summarize(
+#                 att = sum(weights_boot * (tau_i)) / sum(weights_boot*Z) ) %>%
+#               pull(att)
+#           })
+# }
 
 if (F) {
   # full bootstrap works great
@@ -190,12 +189,12 @@ if (F) {
   
   wf <- function(n) as.numeric(rmultinom(1, size=n, prob=rep(1/n,n)))
   # wf <- function(n) as.numeric(gtools::rdirichlet(1, alpha=rep(1,n)))
-  # wf <- function(n) {
-  #   sample(
-  #     c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
-  #     prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
-  #     replace = T, size = n)
-  # }
+  wf <- function(n) {
+    sample(
+      c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
+      prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
+      replace = T, size = n)
+  }
   
   wboot_samps <- weighted_boot(df, wf, B=500)
   hist(wboot_samps)

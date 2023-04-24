@@ -138,7 +138,6 @@ boot_bayesian_redux2 <- function(d, B=100) {
 
 
 # input tx and aggregated co units
-#  - with wild bootstrap weights
 boot_bayesian_finalattempt <- function(d, B=100) {
   att_hat <- get_att_ests(d)
   n1 <- sum(d$Z)
@@ -188,45 +187,98 @@ boot_bayesian_finalattempt <- function(d, B=100) {
           })
 }
 
-# 
-#' Get bootstrap representation
-#'
-#' @param d 
-#' @param wt_fun function to generate bootstrap weights, inputs n (# weights to gen)
-#' @param B 
-#'
-#' @return
-boot_bayesian <- function(d, 
-                          wt_fun,
-                          B=100) {
-  att_hat <- get_att_ests(d)
-  n1 <- sum(d$Z)
-  n <- nrow(d)
+
+weighted_boot_naive <- function(d, wt_fun, B=100) {
+  att_hat <- d %>%
+    summarize(att = sum((2*Z-1) * weights * Y) / sum(Z)) %>%
+    pull(att)
   
   map_dbl(1:B,
           .progress = "Bootstrapping...",
           function(b) {
             d %>% 
               mutate(
-                weights_boot = wt_fun(n),
-                tau_i = Z*Y - (1-Z)*weights*Y) %>% 
-              summarize(att = sum(weights_boot * (tau_i - att_hat)) / n1) %>%
+                weights_boot = wt_fun(n()),
+                tau_i = (2*Z-1) * weights * Y) %>% 
+              summarize(
+                att = sum(weights_boot * 
+                            (tau_i - sum(Z)/n()*att_hat)) / sum(Z) ) %>%
+              pull(att)
+          })
+}
+weighted_boot_norm <- function(d, wt_fun, B=100) {
+  att_hat <- d %>%
+    summarize(att = sum((2*Z-1) * weights * Y) / sum(Z)) %>%
+    pull(att)
+  
+  map_dbl(1:B,
+          .progress = "Bootstrapping...",
+          function(b) {
+            d %>% 
+              mutate(
+                weights_boot = wt_fun(n()),
+                tau_i = (2*Z-1) * weights * Y) %>% 
+              summarize(
+                # n1 = sum(weights_boot*Z),
+                # n = sum(weights_boot),
+                att = sum(weights_boot * 
+                            (tau_i - sum(weights_boot*Z)/n()*att_hat)) / 
+                  sum(weights_boot*Z) ) %>%
               pull(att)
           })
 }
 
-if (F) {
-  wf <- function(n) as.numeric(gtools::rdirichlet(1, alpha=rep(1,n)))
-  wf <- function(n) {
-    sample(
-      c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
-      prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
-      replace = T, size = n)
-  }
-  boot_bayesian(d, wf, B=50) %>% sd()
+
+
+# # this inputs tx and weighted co units
+# wild_bootstrap <- function(d, B=100) {
+#   # original ATT estimate
+#   n <- nrow(d)
+#   n1 <- sum(d$Z)
+#   att_hat <- d %>%
+#     summarize(att = sum((2*Z-1) * weights * Y) / n1) %>%
+#     pull(att)
+#   
+#   map_dbl(1:B,
+#           .progress = "Bootstrapping...",
+#           function(b) {
+#             d %>% 
+#               mutate(
+#                 weights_boot = sample(
+#                   c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
+#                   prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
+#                   replace = T, size = n()),
+#                 tau_i = (2*Z-1) * weights * Y) %>% 
+#               summarize(
+#                 att = sum(weights_boot * 
+#                             (tau_i - n1/n*att_hat)) / n1 ) %>%
+#               pull(att)
+#           })
+# }
+
+# this inputs tx and sc units
+wild_bootstrap <- function(d, B=100) {
+  att_hat <- d %>%
+    summarize(att = sum((2*Z-1) * Y) / sum(Z)) %>%
+    pull(att)
   
-  # TODO: what is the "true" sd here?
-  
+  map_dbl(
+    1:B,
+    function(x) {
+      d %>% 
+        group_by(subclass) %>% 
+        summarize(Yhat = sum((2*Z-1) * Y)) %>% 
+        mutate(
+          weights_boot = sample(
+            c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
+            prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
+            replace = T, size = n())) %>% 
+        summarize(
+          att = sum(weights_boot * (Yhat - att_hat)) / n()
+        ) %>% 
+        pull(att)
+    }
+  )
 }
 
 
