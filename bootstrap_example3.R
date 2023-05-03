@@ -18,6 +18,10 @@ source("R/utils.R")
 # true sd: 0.123
 # wild bootstrap estimated sd: 0.161 (slightly conservative, but ok!)
 # regular bootstrap estimated sd: 0.170
+
+# NOTE: when f0_sd is pumped up, estimator becomes anticonservative!
+#  - e.g., f0_sd=5: wild bootstrap gives estimate of 0.60, true of 1.34
+#     - note: other weighted bootstrap gives estimate of 1.1ish!
 dgp <- function() {
   gen_df_adv(
     nc=500,
@@ -74,7 +78,7 @@ dist_scaling_toy <- df_toy %>%
 taus_resamp <- map_dbl(
   1:25,
   function(x) {
-    d <- dgp(x) %>% 
+    d <- dgp() %>% 
       mutate(id = 1:n())
     
     att_hat <- d %>% 

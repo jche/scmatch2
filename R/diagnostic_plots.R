@@ -384,7 +384,69 @@ satt_plot3 <- function(res, B=NA) {
   p
 }
 
-
+# fixed, with wild bootstrap
+satt_plot4 <- function(res, B=NA) {
+  feasible_subclasses <- attr(res, "feasible_subclasses")
+  n_feasible <- length(feasible_subclasses)
+  
+  # ATT estimate vs. # co units added
+  ggd_att <- res %>%
+    left_join(attr(res, "adacalipers"), by="id") %>% 
+    group_by(subclass) %>%
+    summarize(adacal = last(adacal),
+              tx = Y[2] - Y[1]) %>%
+    arrange(adacal) %>%
+    mutate(order = 1:n(),
+           cum_avg = cumsum(tx) / order ) %>% 
+    slice((n_feasible):n())
+  
+  p <- ggd_att %>% 
+    ggplot(aes(x=order, y=cum_avg)) +
+    geom_line(alpha=0.5) +
+    geom_point(aes(color=adacal),
+               size=3) +
+    theme_classic() +
+    labs(y = "Cumulative ATT Estimate",
+         x = "Total number of treated units used",
+         color = "Maximum caliper size used") +
+    scale_color_continuous(low="blue", high="orange") +
+    expand_limits(color=1)
+  
+  if (!is.na(B)) {
+    # bootstrap dists of FSATT and SATT
+    boot_fsatt <- res %>% 
+      filter(subclass %in% feasible_subclasses) %>% 
+      wild_bootstrap(B=B)
+    
+    boot_satt <- attr(res, "scweights") %>% 
+      agg_sc_units() %>% 
+      wild_bootstrap(B=B)
+    
+    # using sd of bootstrap samples
+    boot_df <- ggd_att %>%
+      filter(order == min(order) | order == max(order)) %>%
+      mutate(sd = c(sd(boot_fsatt), sd(boot_satt)))
+    
+    print(paste0("FSATT: (", 
+                 round(boot_df$cum_avg[1]-1.96*boot_df$sd[1],3), 
+                 ", ",
+                 round(boot_df$cum_avg[1]+1.96*boot_df$sd[1], 3), ")"))
+    print(paste0("SATT: (",
+                 round(boot_df$cum_avg[2]-1.96*boot_df$sd[2], 3), 
+                 ", ",
+                 round(boot_df$cum_avg[2]+1.96*boot_df$sd[2], 3), ")"))
+    
+    p <- p +
+      geom_errorbar(data=boot_df,
+                    aes(ymin=cum_avg-1.96*sd, ymax=cum_avg+1.96*sd),
+                    width = 0.5,
+                    linewidth=1) +
+      geom_point(aes(color=adacal),
+                 size=3)
+  }
+  
+  p
+}
 
 
 # love plot ---------------------------------------------------------------

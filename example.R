@@ -159,6 +159,18 @@ tibble(d = as.numeric(attr(calada_scm, "dm_uncapped"))) %>%
 ggsave("writeup/figures/lalonde_calselect.png", height=2.5, width=5)
 
 
+
+# check some units --------------------------------------------------------
+
+calada_scm %>% 
+  left_join(attr(calada_scm, "adacalipers") %>% 
+              rename(subclass = id),
+            by = "subclass") %>% 
+  arrange(desc(adacal)) %>% 
+  filter(adacal > 1, Z==1) %>% 
+  select(id, X5:X8, adacal)
+
+
 # estimate-estimand tradeoff diagnostics ----------------------------------
 
 # maximum caliper vs. # co units added
@@ -168,7 +180,7 @@ set.seed(1)
 #   geom_hline(yintercept=0, lty="dotted")
 # satt_plot2(calada_scm, B=100) +
 #   geom_hline(yintercept=0, lty="dotted")
-foo <- satt_plot3(calada_scm, B=1000)
+foo <- satt_plot4(calada_scm, B=1000)
 foo +
   geom_hline(yintercept=0, lty="dotted") +
   theme(legend.direction="horizontal",
@@ -180,6 +192,8 @@ foo +
        x = "Total number of treated units used",
        color = "Maximum \ncaliper \nsize used    ")
 ggsave("writeup/figures/lalonde_att.png", height=3, width=6)
+# [1] "FSATT: (339.098, 2851.353)"
+# [1] "SATT: (76.115, 2612.28)"
 
 
 # Love plot vs. # co units added
