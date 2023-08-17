@@ -123,7 +123,7 @@ As a result, CSM inherits and improves upon the Monotonic Imbalance Bounding \ci
 
 The rest of the paper proceeds as follows.
 In Section \ref{sec:background}, we provide background and motivate CSM with a toy example.
-In Section \ref{sec:CSM}, we introduce CSM by incrementally augmenting it to address the four maxims proposed above.
+In Section \ref{sec:CSM}, we construct CSM in a stepwise manner to address the four maxims proposed above.
 We then discuss the properties of CSM in Section \ref{sec:properties}.
 In Section \ref{sec:simulation}, we conduct a variety of simulation studies to illustrate how CSM performs compared to other observational causal inference methods.
 Finally, we step through an applied example in Section \ref{sec:lalonde} to demonstrate how CSM may be used on a real dataset.
@@ -553,7 +553,7 @@ Formally, the $q$-Wasserstein distance between probability distributions $P$ and
 where the infimum is over all couplings of $P$ and $Q$, i.e., joint distributions with marginals $P$ and $Q$.
 More intuitively, Wasserstein distance is also known as ``earth-mover's distance'':
 viewing $P$ and $Q$ as piles of soil each with total mass 1, $W_q(P, Q)$ measures the minimum ``cost'' to move soil to make $P$ match $Q$ (or vice-versa), where the ``cost'' of moving $k$ units of soil from $\mathbf{x}$ to $\mathbf{y}$ is $k \cdot d(\mathbf{x}, \mathbf{y})$.
-Wasserstein distance therefore enables distance metrics between points in $\Rp$ to measure distance between full probability distributions.
+Wasserstein distance therefore uses distance metrics between points in $\Rp$ to measure distance between full probability distributions on $\Rp$.
 
 % Now let $X_1, \dots, X_n \overset{i.i.d.}{\sim} P$ and $Y_1, \dots, Y_n \overset{i.i.d.}{\sim} Q$.
 % Then the Wasserstein $p$-distance between the empirical distributions of $P$ and $Q$ may be written as:
@@ -710,7 +710,7 @@ Indeed, as an MIB method, CEM possesses the imbalance-bounding and bias-bounding
 
 To clarify the benefits of radius matching, Figure \ref{fig:vs_cem} visualizes the CEM caliper grid defined by a uniform coarsening of two covariates, $X_1$ and $X_2$,
 along with the equivalently sized $L_\infty$ caliper around treated unit $t_1$.
-\begin{figure}
+\begin{figure}[t]
     \centering
     \includegraphics[width=\textwidth]{writeup/figures/show_cem_calipers.png}
     \caption{Comparison of coarsened exact matching with radius matching using $L_\infty$ calipers.
@@ -778,8 +778,7 @@ Variance estimation for matching procedures requires careful treatment.
 For example, bootstrapping nearest-neighbors matching famously does not lead to consistent variance estimates \citep{abadie2008failure}.
 Intuitively, this is because the naive bootstrap fails to reproduce the distribution of unit-level weights;
 the random dropping and duplication of control observations changes the treated units' matched sets, which affects the total weight assigned to each control unit.\footnote{Interestingly, for synthetic controls, duplicating a control unit does not affect the total weight assigned to it; for each synthetic control, the same weight would simply be divided between the control unit and its duplicates. Dropping units, however, still affects the total weight assigned to control units.}
-To address these challenges, \citet{otsu2017bootstrap} propose a weighted bootstrap procedure.
-The weighted bootstrap resamples units along with their weights, preserving the distribution of unit-level weights and therefore producing consistent variance estimates.
+To address these challenges, \citet{otsu2017bootstrap} propose a weighted bootstrap procedure which resamples units along with their weights, preserving the distribution of unit-level weights and therefore producing consistent variance estimates.
 
 In this paper, we estimate the variance of the point estimate produced by CSM using a weighted bootstrap based on ideas from \citet{otsu2017bootstrap}.\footnote{
     Our procedure differs in two primary ways. 
@@ -799,7 +798,7 @@ The proposed bootstrap procedure is conducted as follows:
     \item (Aggregate results) Estimate the standard error of $\hat{\tau}$ as the standard deviation of the bootstrapped SATT estimates $\{\hat{\tau}^{(b)}\}_{b = 1, \dots, B}$
     % Use the $\frac{\alpha}{2}$ and $1-\frac{\alpha}{2}$ quantiles of $\{\hat{\tau}^{(b)}\}_{b = 1, \dots, B}$ as the $(1-\alpha)$\% confidence interval for the ATT.
 \end{enumerate}
-We leave the precise theoretical treatment of this procedure for future work, though we demonstrate its empirical effectiveness in our simulations.
+We leave the precise theoretical treatment of this procedure for future work, noting that it performs well empirically in our simulations.
 
 We highlight the computational efficiency of this bootstrap procedure.
 Rather than repeatedly resampling and constructing local synthetic controls, the procedure constructs the synthetic controls only once for the initial ATT estimate using the full dataset.
@@ -880,7 +879,7 @@ Baseline                             & diff & Difference-in-means estimator \\ \
 \end{table}
 We use default settings for all of the algorithms to standardize comparisons.
 We implement BART, TMLE, and AIPW in \texttt{R} using defaults from the \texttt{dbarts} \citep{dorie2023dbarts}, \texttt{tmle} \citep{gruber2012tmle}, and \texttt{AIPW} \citep{zhong2021aipw} packages, respectively.
-For SuperLearner, the linear models include a simple mean, linear regression, and generalized linear regression models; the machine-learning models include the linear models as well as combinations of generalized additive models, random forests, BART, and XGBoost \citep{chen2016xgboost}, based on defaults in the \texttt{tmle}, and \texttt{AIPW} packages.
+For SuperLearner, the linear models include a simple mean, linear regression, and generalized linear regression models; the machine-learning models include the linear models as well as generalized additive models, random forests, BART, and XGBoost \citep{chen2016xgboost}, depending on defaults in the \texttt{tmle}, and \texttt{AIPW} packages.
 
 To standardize comparisons for the matching methods, for each dataset we use the distance metric implied by the covariatewise caliper generated by coarsening each numeric covariate into five equally spaced bins.\footnote{I.e., we use $d_V^{(\infty)}$ for diagonal $V$ with entries $V_{kk} = 5 / (max(X_k) - min(X_k))$.}
 We do not tune the covariatewise caliper, assuming zero domain knowledge about variable importance.
@@ -893,12 +892,12 @@ To build intuition for situations in which CSM may perform well, we first show r
 We simulate the covariates for 50 treated units each from multivariate normal distributions centered at $(0.25, 0.25)$ and $(0.75, 0.75)$, and 225 control units each from multivariate normal distributions centered at $(0.25, 0.75)$ and $(0.25, 0.75)$, all with covariance matrices $\begin{bmatrix} 0.1^2 & 0 \\ 0 & 0.1^2 \end{bmatrix}$.
 We then simulate the covariates for 100 control units uniformly on the unit square.
 We finally generate outcomes for each unit $(x_1, x_2)$ as:
-$$Y = \phi(x_1, x_2) + Z*\tau(x_1, x_2) + \epsilon,$$
-where $\phi$ is the density function for a multivariate normal distribution centered at $(0.5, 0.5)$ with covariance matrix $\begin{bmatrix} 1 & 0.8 \\ 0.8 & 1 \end{bmatrix}$, 
+$$Y = f_0(x_1, x_2) + Z*\tau(x_1, x_2) + \epsilon,$$
+where $f_0$ is the density function for a multivariate normal distribution centered at $(0.5, 0.5)$ with covariance matrix $\begin{bmatrix} 1 & 0.8 \\ 0.8 & 1 \end{bmatrix}$, 
 $\tau(x_1, x_2) = 3x_1 + 3x_2$ is the true treatment effect, 
 and $\epsilon \sim N(0, 0.5^2)$ is homoskedastic noise.
 Figure \ref{fig:sim_toy_ex} plots a sample simulated dataset.
-\begin{figure}
+\begin{figure}[t]
     \centering
     \includegraphics[width=0.6\textwidth]{writeup/figures/sim_toy_ex.png}
     \caption{Sample simulated toy dataset.}
@@ -906,7 +905,7 @@ Figure \ref{fig:sim_toy_ex} plots a sample simulated dataset.
 \end{figure}
 
 Figure \ref{fig:sim_toy_results} visualizes the root mean-squared error and absolute bias of the point ATT estimates generated by the various methods.
-\begin{figure}
+\begin{figure}[t]
     \centering
     \includegraphics[width=0.5\textwidth]{writeup/figures/sim_toy_results.png}
     \caption{Method results on simulation based on toy example across 250 simulations.}
@@ -915,7 +914,7 @@ Figure \ref{fig:sim_toy_results} visualizes the root mean-squared error and abso
 We see that CSM performs well, even compared to complex machine-learning methods.
 
 We emphasize that the goal of this simulation is not to demonstrate CSM's performance, but rather to illustrate settings in which we may expect good performance.
-In the toy example, the interaction between the two covariates drives both the control potential outcome function $f_0(X_1, X_2)$ and the (implicit) propensity score.
+In the toy example, the interaction between the two covariates drives both the control potential outcome function $f_0(X_1, X_2)$ and the implicit propensity score.
 Because all of the covariates are interacted with each other, joint covariate balance is very important.
 As a result, methods that do not target joint balance or otherwise do not have access to the interaction term between $X_1$ and $X_2$ perform poorly.
 
@@ -946,8 +945,8 @@ ACIC 2016                 & 10            & $\approx 350$ & $\approx 650$ & Yes 
 \label{tab:simdata}
 \end{table}
 
-Figure \ref{fig:sim_results} summarizes the results of these simulations and illustrates the tradeoffs made by CSM.
-\begin{figure}
+Figure \ref{fig:sim_results} summarizes the results of our simulations using these datasets and illustrates the tradeoffs made by CSM.
+\begin{figure}[t]
     \centering
     \includegraphics[width=\textwidth]{writeup/figures/sim_results.png}
     \caption{Method results on canonical simulated datasets across 250 simulations. 
@@ -965,7 +964,7 @@ This behavior protects them against incorrect extrapolation, but also prevents t
 
 In many simulated (and real) datasets, extrapolating marginal effects can improve counterfactual predictions.
 For example, suppose increasing $X_1$ clearly increases outcomes among controls which have low values of $X_2$, and we would like to predict counterfactual outcomes for treated units with high values of $X_2$.
-A linear model fit to the controls would extrapolate and assume that increasing $X_1$ always increases outcomes, while an exact matching estimator would find a neighbor which may not necessarily have a high value of $X_1$.
+A linear model fit to the controls may extrapolate and assume that increasing $X_1$ always increases outcomes regardless of the value of $X_2$, while an exact matching estimator would not do so.
 Increasing the number of covariates exaggerates this behavior, since models extrapolate more marginal trends.
 Figure \ref{fig:sim_results} shows us that this type of model-based marginal extrapolation improves results for these simulated datasets, since there are few high-dimensional interactions to falsify such extrapolation.
 
@@ -1098,7 +1097,7 @@ We finally construct synthetic control units using the linear program described 
 
 Our chosen distance-metric caliper results in 174 feasible treated units with at least one control within the fixed caliper $c=1$.
 Figure \ref{fig:lalonde_love} shows how marginal mean balance changes as we add treated units and their corresponding matched controls, in order of increasing adaptive caliper size (not shown), until all 185 treated units are included.
-\begin{figure}
+\begin{figure}[t]
     \centering
     \includegraphics[width=\textwidth]{writeup/figures/lalonde_love2.png}
     \caption{Love plot of marginal covariate means}
@@ -1131,7 +1130,7 @@ comparing them to two common estimation strategies which also impute the counter
 \end{enumerate}
 
 % % https://tex.stackexchange.com/questions/6850/table-and-figure-side-by-side-with-independent-captions
-% \begin{figure}
+% \begin{figure}[t]
 % \begin{floatrow}
 %     \ffigbox{%
 %         \includegraphics[width=0.5\textwidth]{writeup/figures/lalonde_dist.png}
@@ -1239,9 +1238,9 @@ CSM builds on the spirit of exact matching by preserving four key principles: in
 Even so, we show that CSM can achieve comparable performance to modern methods on standard benchmark datasets, particularly when many covariates exhibit interaction effects.
 
 CSM provides a framework for transparent causal inference, and each stage may be extended in various ways.
-Future work may reconsider the question of distance-metric and caliper selection, optimizing the distance-metric scaling matrix $V$ using hold-out data or incorporating estimated covariate densities to optimize caliper lengths.
+Future work may reconsider the question of distance-metric and caliper selection, optimizing the distance-metric scaling matrix $V$ using held-out data or incorporating estimated covariate densities to optimize caliper lengths.
 Interpretable estimation methods other than standard synthetic controls may also be used, such as the modified synthetic controls approaches proposed by \citet{abadie2021penalized} and \citet{ben2021augmented}.
-Nonetheless, CSM represents a promising addition to the toolkit for researchers conducting causal inference using matching methods.
+Ultimately, CSM represents a promising addition to the toolkit for researchers conducting causal inference using matching methods.
 
 
 
@@ -1411,6 +1410,32 @@ For any translation-invariant, absolutely homogeneous distance metric $d(\cdot, 
     &= c &\text{[unit vector } v\text{]}
 \end{align*}
 \end{proof}
+
+\subsection{Monotonic Imbalance Bounding}
+\label{app:mib}
+
+\citet{iacus2011multivariate} defines the monotonic imbalance bounding (MIB) class of matching methods as follows:
+\begin{definition}
+\label{def:mib}
+    A matching method is MIB for a function $f(\chi)$ of the dataset $\chi$ with respect to distance metric $d(\cdot, \cdot)$ if there exists some ``monotonically increasing'' $\gamma_{f,d}(\cdot)$  such that:
+    $$d(f(\chi_{m_T(\boldsymbol{\pi})}), f(\chi_{m_C(\boldsymbol{\pi})})) \leq \gamma_{f,d}(\boldsymbol{\pi})$$
+    for given tuning parameter $\boldsymbol{\pi} \in \R^k$ which produces matched sets of treated units $m_T(\boldsymbol{\pi})$ and control units $m_C(\boldsymbol{\pi})$.
+\end{definition}
+The calipering function $\gamma_{f,d}(\cdot)$ is defined to be monotonically increasing if it is increasing in each of its inputs.
+
+As given, Definition \ref{def:mib} is difficult to work with, so in practice \citet{iacus2011multivariate} focuses on methods that are marginally MIB in each covariate.
+In other words, rather than using a $p$-dimensional distance metric, they focus on the one-dimensional distance metric $d(x,y) = |x-y|$ in conjunction with functions that may be marginally written as $f(\chi) = \begin{bmatrix}
+    f_1(\chi_1) & \dots & f_p(\chi_p)
+\end{bmatrix}^T$ for $f_j(\cdot): \mathbb{R}^n \to \mathbb{R}$, e.g., the function that inputs all observations of one covariate and outputs the mean of that covariate, and tuning parameters $\boldsymbol{\pi} \in \R^p$, e.g., covariatewise calipers.
+Notably, changing any element of the tuning parameter $\boldsymbol{\pi}$ now does not affect the MIB condition for any other covariate.
+
+The distance-metric calipers in Proposition \ref{prop:distmetriccal} imply that the matching method  is marginally MIB in each covariate, for each treated unit and its matched controls (i.e., for $d(x,y)=|x-y|$, $f(\chi)$ = observation of interest, $\gamma(\boldsymbol{\pi})=\boldsymbol{\pi}$).
+Using $p$-dimensional distance-metric calipers greatly simplifies notation compared to marginally calipering imbalances in each covariate;
+rather than working with the monotonic function $\gamma(\cdot)$, we directly work with a scalar caliper $c$ using scaled distance metric $d_V(\cdot, \cdot)$.
+
+As a result, Proposition \ref{prop:meanbd} nearly shows that caliper matching is MIB with respect to $f(\chi)=\Bar{X}$, but the caliper is now implicitly defined using the diagonal $V$ matrix in the distance metric.
+Proposition \ref{prop:biasbd_lip} is also very similar to Proposition 1 in \citet{iacus2011multivariate}, though it generalizes Proposition 1 to allow for any $p$-dimensional distance-metric caliper rather than only considering marginal calipers in each covariate.
+
 
 \subsection{Proof of Proposition \ref{prop:wass}}
 \label{app:wass}
@@ -1679,32 +1704,6 @@ For a scaled $L_\infty$ distance, we may transform the SCM optimization into a l
     &\hspace{2mm} 0 \leq w_{jt} \leq 1 \text{ for } j \in \Ct
 \end{align*}
 \end{remark}
-
-
-\section{Monotonic Imbalance Bounding}
-\label{app:mib}
-
-\citet{iacus2011multivariate} defines the monotonic imbalance bounding (MIB) class of matching methods as follows:
-\begin{definition}
-\label{def:mib}
-    A matching method is MIB for a function $f(\chi)$ of the dataset $\chi$ with respect to distance metric $d(\cdot, \cdot)$ if there exists some ``monotonically increasing'' $\gamma_{f,d}(\cdot)$  such that:
-    $$d(f(\chi_{m_T(\boldsymbol{\pi})}), f(\chi_{m_C(\boldsymbol{\pi})})) \leq \gamma_{f,d}(\boldsymbol{\pi})$$
-    for given tuning parameter $\boldsymbol{\pi} \in \R^k$ which produces matched sets of treated units $m_T(\boldsymbol{\pi})$ and control units $m_C(\boldsymbol{\pi})$.
-\end{definition}
-The calipering function $\gamma_{f,d}(\cdot)$ is defined to be monotonically increasing if it is increasing in each of its inputs.
-
-As given, Definition \ref{def:mib} is difficult to work with, so in practice \citet{iacus2011multivariate} focuses on methods that are marginally MIB in each covariate.
-In other words, rather than using a $p$-dimensional distance metric, they focus on the one-dimensional distance metric $d(x,y) = |x-y|$ in conjunction with functions that may be marginally written as $f(\chi) = \begin{bmatrix}
-    f_1(\chi_1) & \dots & f_p(\chi_p)
-\end{bmatrix}^T$ for $f_j(\cdot): \mathbb{R}^n \to \mathbb{R}$, e.g., the function that inputs all observations of one covariate and outputs the mean of that covariate, and tuning parameters $\boldsymbol{\pi} \in \R^p$, e.g., covariatewise calipers.
-Notably, changing any element of the tuning parameter $\boldsymbol{\pi}$ now does not affect the MIB condition for any other covariate.
-
-The distance-metric calipers in Proposition \ref{prop:distmetriccal} imply that the matching method  is marginally MIB in each covariate, for each treated unit and its matched controls (i.e., for $d(x,y)=|x-y|$, $f(\chi)$ = observation of interest, $\gamma(\boldsymbol{\pi})=\boldsymbol{\pi}$).
-Using $p$-dimensional distance-metric calipers greatly simplifies notation compared to marginally calipering imbalances in each covariate;
-rather than working with the monotonic function $\gamma(\cdot)$, we directly work with a scalar caliper $c$ using scaled distance metric $d_V(\cdot, \cdot)$.
-
-As a result, Proposition \ref{prop:meanbd} nearly shows that caliper matching is MIB with respect to $f(\chi)=\Bar{X}$, but the caliper is now implicitly defined using the diagonal $V$ matrix in the distance metric.
-Proposition \ref{prop:biasbd_lip} is also very similar to Proposition 1 in \citet{iacus2011multivariate}, though it generalizes Proposition 1 to allow for any $p$-dimensional distance-metric caliper rather than only considering marginal calipers in each covariate.
 
 % The MIB paper is simply incorrect in various places.
 % I'll use this appendix to try to generously salvage important pieces.
