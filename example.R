@@ -227,4 +227,4 @@ boot_naive_res <- boot_naive(df,
                              dist_scaling = DIST_SCALING,
                              B = 50)
 
-
+write_csv(boot_naive_res, file="sim_canonical_results/boot_naive_res.csv")

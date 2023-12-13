@@ -326,15 +326,24 @@ stopCluster(cl)
 # for "fixed2" intervals, acic/kang coverage still very bad...
 #  - Q: why are kang point estimates sometimes so bad,
 #       even with so many control matches per tx unit?
+setwd("~/Dropbox (Harvard University)/Xiang_Luke/scmatch2")
+library(tidyverse)
+res <- read_csv("bootstrap_results/bootstrap_results_finalattempt.csv")
 
-res <- read_csv("bootstrap_results/bootstrap_results_fixed2.csv")
 
-res %>% 
-  group_by(data) %>% 
-  summarize(coverage = mean(covered),
-            avg_sd = mean(sd),
-            avg_len = mean(length),
-            avg_bias = mean(abs(att-att_hat)))
+# Still did not work because the CI is too narrow.
+res_CI <- res %>% 
+  mutate(lower = att_hat - q975, 
+         upper = att_hat - q025) %>%
+  mutate(covered = lower <= att & att <= upper)
+
+
+# res %>% 
+#   group_by(data) %>% 
+#   summarize(coverage = mean(covered),
+#             avg_sd = mean(sd),
+#             avg_len = mean(length),
+#             avg_bias = mean(abs(att-att_hat)))
 
 # check bias of estimates
 res %>% 
