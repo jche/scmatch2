@@ -458,6 +458,42 @@ gen_df_full <- function(nc, nt, eps_sd = 0.1,
   return(res)
 }
 
+get_df_scaling_from_dgp_name <- function(dgp_name){
+  # input: dgp_name: "toy" or "kang"
+  # output: a list: 
+  #     list(df_dgp=df_dgp,
+  #         dist_scaling=dist_scaling)
+  if (dgp_name == "toy"){
+    df_dgp <- gen_df_adv(
+      nc=500, 
+      nt=100, 
+      f0_sd = 0.5,
+      tx_effect_fun = function(X1, X2) {3*X1+3*X2},
+      f0_fun = function(x,y) {
+        matrix(c(x,y), ncol=2) %>%
+          dmvnorm(mean = c(0.5,0.5),
+                  sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
+      })
+    dist_scaling <- df_dgp %>%
+      summarize(across(starts_with("X"),
+                       function(x) {
+                         if (is.numeric(x)) 6 / (max(x) - min(x))
+                         else 1000
+                       }))
+  }else if(dgp_name=="kang"){
+    df_dgp <- gen_df_kang(n = 1000)
+    dist_scaling <- df_dgp %>%
+      summarize(across(starts_with("X"),
+                       function(x) {
+                         if (is.numeric(x)) 5 / (max(x) - min(x))
+                         else 1000
+                       }))
+  }else{
+    stop("dgp_name must be toy or kang")
+  }
+  return(list(df_dgp=df_dgp,
+              dist_scaling=dist_scaling))
+}
 
 # gen_df_ps <- function(n, eps_sd = 0.1,
 #                       ps = function(x,y) {invlogit(2*x+2*y - 5)},
