@@ -76,18 +76,6 @@ get_matches_and_debiased_residuals <-
                               Y_name = "Y",
                               SL.library = "SL.lm")
       
-      # preds_csm$hat_mu_0 <- 
-      #   SL_pred  <- get_SL_pred(SL_fit=SL_fit_lm, 
-      #                        df_pred=preds_csm, 
-      #                        X_names=X_names)
-      
-      # lm_0 <- lm(Y ~ X1 + X2, 
-      #         data = dplyr::filter(df_dgp, Z == 0))
-      # 
-      # preds_csm$hat_mu_0 <- 
-      #   predict(lm_0, 
-      #           newdata = data.frame(X1 = preds_csm$X1,
-      #                                X2 = preds_csm$X2))
     } else if (dgp_name == "kang") {
       if (mu_model == "kang_correct"){
         X_names<- c("V1","V2","V3","V4")
@@ -96,19 +84,6 @@ get_matches_and_debiased_residuals <-
                                 X_names = X_names,
                                 Y_name = "Y",
                                 SL.library = "SL.lm")
-
-        # preds_csm$hat_mu_0 <-
-        #   SL_pred  <- get_SL_pred(SL_fit=SL_fit_lm,
-        #                           df_pred=preds_csm,
-        #                           X_names=X_names)
-        
-        # lm_0 <- lm(Y ~ V1 + V2 + V3 + V4, data = dplyr::filter(df_dgp, Z == 0))
-        # 
-        # 
-        # preds_csm$hat_mu_0 <- predict(lm_0, newdata = data.frame(V1 = preds_csm$V1,
-        #                                                          V2 = preds_csm$V2,
-        #                                                          V3 = preds_csm$V3,
-        #                                                          V4 = preds_csm$V4))
       }
     } 
     else {
