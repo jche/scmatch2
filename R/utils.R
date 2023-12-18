@@ -11,3 +11,7 @@ invlogit <- function(x) {
 expit <- function(x) {
   1 / (1+exp(-x))
 }
+
+rmse <- function(resid){
+  sqrt(sum(resid^2))
+}

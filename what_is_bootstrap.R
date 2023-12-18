@@ -11,22 +11,14 @@ source("R/wrappers.R")
 source("R/utils.R")
 source("R/bootstrap.R")
 
+res_wild_boot_kang_correct<-
+    boot_wild(dgp_name="kang", 
+              att0=T,
+              I=100,
+              B=250,
+              mu_model="kang_correct")
 
-
-
-# res_bayesian_boot_toy<-boot_bayesian(dgp_name="toy", att0=F,I=100,B=250)
-# res_bayesian_boot_kang<-
-#   boot_bayesian(dgp_name="kang", att0=T,I=100,B=250)
-# res_bayesian_boot_kang_nonlinear<-
-#   boot_bayesian(dgp_name="kang", att0=T,I=100,B=250,mu_model="nonlinear")
-
-res_bayesian_boot_kang_correct<-
-  boot_bayesian(dgp_name="kang", att0=T,I=100,B=250,mu_model="kang_correct")
-res_bayesian_boot_kang_correct$boot_mtd <-
-  "Bayesian_mu_correct"
-print(mean(res_bayesian_boot_kang_correct$covered))
-
-FNAME = "./sim_toy_results/toy_bootstrap_with_boot_sd.csv"
+FNAME = "./sim_toy_results/toy_bootstrap.csv"
 if (file.exists(FNAME)) {
   write_csv(res_bayesian_boot_kang_correct, FNAME, append=T)
 } else {
@@ -34,7 +26,49 @@ if (file.exists(FNAME)) {
 }
 
 
+# Analysis: For Kang correct,
+#   see whether the coverage will be 95% 
+#   if the length of CI is three times larger 
+#   (i.e., when boot_sd recovers sd(att_est_debiased)) 
+FNAME = "./sim_toy_results/toy_bootstrap.csv"
+res_boot_all <- 
+  read_csv(FNAME)
+res_bayesian_boot_kang_correct <- 
+  res_boot_all %>% filter(name=="kang",
+                          boot_mtd == "Bayesian_mu_correct")
+# Obtain CI length
+res_bayesian_boot_kang_correct <- 
+  res_bayesian_boot_kang_correct %>% 
+  mutate(CI_length_1 = (upper-lower)/2,
+         CI_length_2 = (upper-att_est_debiased) ) %>%
+  mutate(CI_length = CI_length_1)
 
+# Enlarge CI length, and calculate the enlarged CI, coverage
+res_bayesian_boot_kang_correct <- 
+  res_bayesian_boot_kang_correct %>%
+  mutate(CI_length_enlarged = CI_length * 3) %>%
+  mutate(upper_enlarged = att_est_debiased + CI_length_enlarged,
+         lower_enlarged = att_est_debiased - CI_length_enlarged) %>%
+  mutate(covered_enlarged = lower_enlarged < att_true & att_true < upper_enlarged)
+
+mean(res_bayesian_boot_kang_correct$covered_enlarged) # 0.96
+
+# An experiment to check no CLT of non-debiased estimator
+sd_att_est<-sd(res_bayesian_boot_kang_correct$att_est)
+
+res_bayesian_boot_kang_correct <- 
+  res_bayesian_boot_kang_correct %>%
+  mutate(CI_att_est = 1.96 * sd_att_est) %>%
+  mutate(upper_att_est = att_est + CI_att_est,
+         lower_att_est = att_est - CI_att_est) %>%
+  mutate(covered_att_est = lower_att_est < att_true & att_true < upper_att_est)
+
+mean(res_bayesian_boot_kang_correct$covered_att_est) # 0.94
+
+# Check the difference between length 1 and length 2
+# Conclusion: seems fine
+# summary(abs(res_bayesian_boot_kang_correct$CI_length_1 -
+#   res_bayesian_boot_kang_correct$CI_length_2)/res_bayesian_boot_kang_correct$CI_length_1)
 
 
 
@@ -43,6 +77,9 @@ if (file.exists(FNAME)) {
 #  - but wild bootstrap requires vec-mean(vec) 
 #    BEFORE multiplying by the weight
 #  - others work with vec-mean(vec), but it's not required
+
+
+
 
 
 

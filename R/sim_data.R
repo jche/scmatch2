@@ -462,7 +462,7 @@ get_df_scaling_from_dgp_name <- function(dgp_name){
   # input: dgp_name: "toy" or "kang"
   # output: a list: 
   #     list(df_dgp=df_dgp,
-  #         dist_scaling=dist_scaling)
+  #           dist_scaling=dist_scaling)
   if (dgp_name == "toy"){
     df_dgp <- gen_df_adv(
       nc=500, 
