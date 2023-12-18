@@ -70,25 +70,22 @@ get_matches_and_debiased_residuals <-
     
     if (dgp_name == "toy") {
       X_names<- c("X1","X2")
-      
-      SL_fit_lm <- get_SL_fit(df_to_fit=df_controls,
-                              X_names = X_names,
-                              Y_name = "Y",
-                              SL.library = "SL.lm")
+      SL_lib <- "SL.lm"
       
     } else if (dgp_name == "kang") {
       if (mu_model == "kang_correct"){
         X_names<- c("V1","V2","V3","V4")
-
-        SL_fit_lm <- get_SL_fit(df_to_fit=df_controls,
-                                X_names = X_names,
-                                Y_name = "Y",
-                                SL.library = "SL.lm")
+        SL_lib <- "SL.lm"
       }
     } 
     else {
       stop("dgp_name must be toy or kang")
     }
+    # Model fitting 
+    SL_fit_lm <- get_SL_fit(df_to_fit=df_controls,
+                            X_names = X_names,
+                            Y_name = "Y",
+                            SL.library = SL_lib)
     
     # get predictions:
     preds_csm$hat_mu_0 <-
