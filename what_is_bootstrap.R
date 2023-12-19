@@ -11,24 +11,28 @@ source("R/wrappers.R")
 source("R/utils.R")
 source("R/bootstrap.R")
 
-# res_wild_boot_kang_correct<-
-#     boot_wild(dgp_name="kang", 
-#               att0=T,
-#               I=100,
-#               B=250,
-#               mu_model="kang_correct")
-res_bayesian_boot_toy <-
-  boot_bayesian(dgp_name="toy", 
-                att0=F,
-                I=100,
-                B=250,
-                n_split=2)
+curr_res<-
+  res_wild_boot_kang_correct<-
+    boot_wild(dgp_name="kang",
+              att0=T,
+              I=100,
+              B=250,
+              mu_model="kang_correct",
+              n_split=2)
+# curr_res<-
+#   res_bayesian_boot_toy <-
+#   boot_bayesian(dgp_name="toy", 
+#                 att0=F,
+#                 I=100,
+#                 B=250,
+#                 n_split=2)
+
 
 FNAME = "./sim_toy_results/toy_bootstrap.csv"
 if (file.exists(FNAME)) {
-  write_csv(res_bayesian_boot_kang_correct, FNAME, append=T)
+  write_csv(curr_res, FNAME, append=T)
 } else {
-  write_csv(res_bayesian_boot_kang_correct, FNAME)
+  write_csv(curr_res, FNAME)
 }
 
 

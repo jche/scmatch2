@@ -270,6 +270,7 @@ boot_CSM <- function(dgp_name,
                                    att_est_debiased = att_debiased,
                                    lower=CI_lower,upper=CI_upper, 
                                    covered=covered,
-                                   sd_boot=sd_boot)
+                                   sd_boot=sd_boot,
+                                   n_split=n_split)
   return(res_save_bayesian_boot)
 }
