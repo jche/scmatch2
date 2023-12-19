@@ -24,12 +24,21 @@ get_SL_pred <-
   }
 
 
-split_data <- function(df_to_split, n_split) {
+assign_group_label <- function(df_to_split, n_split) {
   df_to_split$group_label <- 
     sample(1:n_split, 
            nrow(df_to_split), 
            replace = TRUE)
   return(df_to_split)
+}
+
+get_pred_label_map <- function(n){
+  if (n == 1){
+    return(tibble(group_label=1, pred_label=1))
+  }else{
+    return(tibble(group_label=1:n, 
+                  pred_label=c(2:n, 1) )) # index for cross-fitting
+  }
 }
 
 get_matches_and_debiased_residuals <- 
@@ -38,6 +47,11 @@ get_matches_and_debiased_residuals <-
            dist_scaling, 
            mu_model,
            n_split=1){
+    
+    # Assign group_label to df_dgp
+    # n_split = 2
+    df_dgp_splitted <- assign_group_label(df_dgp,
+                                  n_split = n_split)
     preds_csm <- get_cal_matches(
       df = df_dgp,
       metric = "maximum",
@@ -45,28 +59,24 @@ get_matches_and_debiased_residuals <-
       cal_method = "fixed",
       est_method = "scm",
       return = "all",
-      knn = 25)   
+      knn = 25)  
+    id_to_group_map <- 
+      df_dgp_splitted %>%
+      select(id, group_label)
     
-    # 2. Get the debiased models. 
-    #   Start with n_split == 1. Test on the toy data
-    # 2.1 Split preds_csm into n_split pieces. 
+    # Append the same label to preds_csm through join
+    preds_csm <- 
+      left_join(preds_csm, id_to_group_map, by="id")
     
-    # 2.2 Train both model for each split
-    #  2.2.1 Assign the right training set, 
-    #       Specify the names X variables and 
-    #         Y variable
-    #   Create nested dataset over 
+    # Calculate pred_label 
+    pred_label_map <- 
+      get_pred_label_map(n=n_split)
     
-    #  2.2.2 (done) Given the data, X_names, Y_name, 
-    #       return a trained model
-    #  2.2.3 Attach the trained model correctly 
-    # 2.3 Get the fitted value from the other split
-    #   Create a mapping: two columns: 
-    #     group_label of the data
-    #     group_label of the prediction model to be used
+    preds_csm <- 
+      left_join(preds_csm, pred_label_map, by="group_label")
     
-    
-    df_controls <- df_dgp[df_dgp$Z == 0,]
+    df_controls <- 
+      df_dgp_splitted %>% filter(Z==0)
     
     if (dgp_name == "toy") {
       X_names<- c("X1","X2")
@@ -81,17 +91,38 @@ get_matches_and_debiased_residuals <-
     else {
       stop("dgp_name must be toy or kang")
     }
-    # Model fitting 
-    SL_fit_lm <- get_SL_fit(df_to_fit=df_controls,
-                            X_names = X_names,
-                            Y_name = "Y",
-                            SL.library = SL_lib)
+    # Model fitting using sample splitting
+    # Nest data
+    df_to_fit_nested <- 
+      df_controls %>% 
+      group_by(group_label) %>%
+      nest() %>%
+      arrange(group_label)
     
-    # get predictions:
-    preds_csm$hat_mu_0 <-
-      SL_pred  <- get_SL_pred(SL_fit=SL_fit_lm,
-                           df_pred=preds_csm,
-                           X_names=X_names)
+    models_n_split <- 
+      vector("list", length = n_split)
+    
+    for (i in 1:n_split){
+      # i <- 1
+      df_to_fit_i <- df_to_fit_nested$data[[i]]
+      
+      models_n_split[[i]]<-
+        SL_fit <- get_SL_fit(df_to_fit=df_to_fit_i,
+                              X_names = X_names,
+                              Y_name = "Y",
+                              SL.library = SL_lib)
+      # get predictions:
+      preds_csm[,paste0("hat_mu_0_pred_",i)] <-
+        SL_pred  <- get_SL_pred(SL_fit=SL_fit,
+                                df_pred=preds_csm,
+                                X_names=X_names)
+    }
+    # df_to_fit_nested$mu_fit <- models_n_split
+    # Finally, select the prediction 
+    preds_csm <- preds_csm %>%
+      rowwise() %>%
+      mutate(hat_mu_0 = get(paste0("hat_mu_0_pred_", pred_label)))
+    
     
     ## Construct residuals
     # First, construct each \tilde \tau_i
@@ -129,26 +160,30 @@ boot_bayesian <- function(dgp_name,
                      att0,
                      I=100,
                      B=250,
-                     mu_model="linear"){
+                     mu_model="linear",
+                     n_split=1){
   boot_CSM(dgp_name, 
            att0,
            I,
            B,
            mu_model,
-           boot_mtd="Bayesian")
+           boot_mtd="Bayesian",
+           n_split=n_split)
 }
 
 boot_wild <- function(dgp_name, 
                           att0,
                           I=100,
                           B=250,
-                          mu_model="linear"){
+                          mu_model="linear",
+                      n_split=1){
   boot_CSM(dgp_name, 
            att0,
            I,
            B,
            mu_model,
-           boot_mtd="wild")
+           boot_mtd="wild",
+           n_split=n_split)
 }
 
 boot_CSM <- function(dgp_name, 
@@ -156,7 +191,8 @@ boot_CSM <- function(dgp_name,
                           I=100,
                           B=250,
                           mu_model="linear",
-                          boot_mtd="Bayesian"){
+                          boot_mtd="Bayesian",
+                     n_split=1){
   
   covered <- CI_lower <- CI_upper <- 
     att_true <- att_est <- att_debiased <-
@@ -171,7 +207,7 @@ boot_CSM <- function(dgp_name,
     matches_and_debiased_residuals<-
       get_matches_and_debiased_residuals(
          dgp_name, df_dgp, 
-        dist_scaling, mu_model)
+        dist_scaling, mu_model,n_split)
     list2env(matches_and_debiased_residuals, 
              envir = environment())
     

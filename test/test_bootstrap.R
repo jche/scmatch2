@@ -11,6 +11,58 @@ source("R/wrappers.R")
 source("R/utils.R")
 source("R/bootstrap.R")
 
+
+test_split_data <- function(){
+  dgp_obj <- 
+    get_df_scaling_from_dgp_name(dgp_name="toy")
+  list2env(dgp_obj, envir = environment())
+  
+  
+  # split_data 
+  #   input: df_to_split, n_split
+  #   output: a df, df_to_split with one more column of 
+  #       group label of one of 1,2,...,n_split
+  
+  
+  preds_csm <- get_cal_matches(
+    df = df_dgp,
+    metric = "maximum",
+    dist_scaling = dist_scaling,
+    cal_method = "fixed",
+    est_method = "scm",
+    return = "all",
+    knn = 25)  
+  
+  
+  
+  
+  
+  df_dgp_nested <- df_dgp_splitted %>%
+    group_by(group_label) %>%
+    nest()
+  get_SL_fit_nested <- function(){
+    # input: df_dgp_nested,
+    #         X_names,
+    #         Y_name,
+    #         SL.library
+    # output: 
+    n.df <- length(dat)
+    res <- vector("list", length = n.df)
+    for (i in 1:n.df) {
+      df <- dat[[i]]
+      res[[i]] <- get_SL_fit(df_to_fit,
+                             X_names,
+                             Y_name,
+                             SL.library)
+    }
+  }
+  length(df_dgp_nested)
+  df_dgp_nested$mu_fit <- 
+    pi_fitter(dat_nested$data)
+  
+}
+
+
 test_regression_se <- function(){
   
   # Get true se of the non-debiased estimators
@@ -98,53 +150,8 @@ test_regression_se <- function(){
 }
 
 
-test_split_data <- function(){
-  dgp_obj <- 
-    get_df_scaling_from_dgp_name(dgp_name="toy")
-  list2env(dgp_obj, envir = environment())
-  
-  
-  # split_data 
-  #   input: df_to_split, n_split
-  #   output: a df, df_to_split with one more column of 
-  #       group label of one of 1,2,...,n_split
-  
-  df_dgp_splitted <- split_data(df_dgp,
-                                n_split = 2)
-  preds_csm <- get_cal_matches(
-    df = df_dgp,
-    metric = "maximum",
-    dist_scaling = dist_scaling,
-    cal_method = "fixed",
-    est_method = "scm",
-    return = "all",
-    knn = 25)   
-  df_dgp_nested <- df_dgp_splitted %>%
-    group_by(group_label) %>%
-    nest()
-  get_SL_fit_nested <- function(){
-    # input: df_dgp_nested,
-    #         X_names,
-    #         Y_name,
-    #         SL.library
-    # output: 
-    n.df <- length(dat)
-    res <- vector("list", length = n.df)
-    for (i in 1:n.df) {
-      df <- dat[[i]]
-      res[[i]] <- get_SL_fit(df_to_fit,
-                              X_names,
-                              Y_name,
-                              SL.library)
-    }
-  }
-  length(df_dgp_nested)
-  df_dgp_nested$mu_fit <- 
-    pi_fitter(dat_nested$data)
-  
-}
 
-test_SL_fit()
+
 test_SL_fit <- function(){
   dgp_obj <- 
     get_df_scaling_from_dgp_name(dgp_name="toy")
@@ -198,8 +205,8 @@ test_boot_wild <- function(){
 }
 
 
-source("R/bootstrap.R")
-test_boot_bayesian()
+# source("R/bootstrap.R")
+# test_boot_bayesian()
 
 test_boot_bayesian <- function(){
   bayesian_boot_toy_to_test <-
