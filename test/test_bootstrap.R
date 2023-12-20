@@ -93,7 +93,7 @@ test_regression_se <- function(){
       Y ~ Z + (V1 + V2 + V3 + V4), 
       # Y ~ Z + (X1 + X2 + X3 + X4), 
               df_dgp,
-              se_type = "HC2") # Default variance estimator is HC2 robust standard errors
+              se_type = "HC0") # Default variance estimator is HC2 robust standard errors
   summary(lm_test)
   preds_csm <- get_cal_matches(
     df = df_dgp,
@@ -103,14 +103,14 @@ test_regression_se <- function(){
     est_method = "scm",
     return = "agg_co_units",
     knn = 25) 
-  lm_test<- 
+  lm_test_weighted<- 
     lm_robust(
       Y ~ Z * (V1 + V2 + V3 + V4), 
       # Y ~ Z + (X1 + X2 + X3 + X4), 
               data=preds_csm,
               weights=weights,
-              se_type = "HC0")
-  summary(lm_test)
+              se_type = "HC2")
+  summary(lm_test_weighted)
   sd_att_est_debiased
   sd_att_est
   
@@ -126,7 +126,7 @@ test_regression_se <- function(){
   # plot the debiased amount in toy
   hist(res_bayesian_boot_toy_correct$att_est -
          res_bayesian_boot_toy_correct$att_est_debiased)
-  # Generate a kang df
+  # Generate a toy df
   dgp_obj <- 
     get_df_scaling_from_dgp_name(dgp_name="toy")
   list2env(dgp_obj, envir = environment())
@@ -144,9 +144,14 @@ test_regression_se <- function(){
     lm_robust(Y ~ Z * (X1 + X2 ), 
               data=preds_csm,
               # weights=weights,
-              se_type = "HC0")
+              se_type = "HC2")
   summary(lm_test)
-  sd_att_est
+  lm_test_weighted<- 
+    lm_robust(Y ~ Z * (X1 + X2 ), 
+              data=preds_csm,
+              weights=weights,
+              se_type = "HC2")
+  summary(lm_test_weighted)
 }
 
 
