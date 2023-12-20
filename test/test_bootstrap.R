@@ -157,7 +157,7 @@ test_regression_se <- function(){
 
 
 
-test_SL_fit <- function(){
+test_SL_fit_and_pred_linear <- function(){
   dgp_obj <- 
     get_df_scaling_from_dgp_name(dgp_name="toy")
   list2env(dgp_obj, envir = environment())
@@ -196,6 +196,49 @@ test_SL_fit <- function(){
             newdata = preds_csm[,X_names_toy])
   # Test: the predictions should be the same
   stopifnot(sum(SL_pred[,,drop=T] - test_preds)==0)
+}
+
+test_SL_fit_and_pred_non_linear <- function(){
+  dgp_obj <- 
+    get_df_scaling_from_dgp_name(dgp_name="toy")
+  list2env(dgp_obj, envir = environment())
+  
+  preds_csm <- get_cal_matches(
+    df = df_dgp,
+    metric = "maximum",
+    dist_scaling = dist_scaling,
+    cal_method = "fixed",
+    est_method = "scm",
+    return = "all",
+    knn = 25)   
+  
+  df_controls <- df_dgp[df_dgp$Z == 0,]
+  X_names_toy<- c("X1","X2")
+  # SL_lib <- c("SL.glm", 
+  #             "SL.glmnet",
+  #             "SL.randomForest", 
+  #             "SL.xgboost")  
+  
+  
+  SL_fit <- get_SL_fit(df_to_fit=df_controls,
+                          X_names = X_names_toy,
+                          Y_name = "Y",
+                          SL.library = SL_lib)
+  
+  
+  SL_pred <- get_SL_pred(SL_fit=SL_fit, 
+                         df_pred=preds_csm, 
+                         X_names=X_names_toy)
+  # Test predictions using lm 
+  # # Using controls to train, and predict for both 
+  # #   control and trts
+  # lm_0 <- lm(Y ~ X1 + X2, 
+  #            data = df_controls)
+  # test_preds <- 
+  #   predict(lm_0,
+  #           newdata = preds_csm[,X_names_toy])
+  # # Test: the predictions should be the same
+  # stopifnot(sum(SL_pred[,,drop=T] - test_preds)==0)
 }
 
 

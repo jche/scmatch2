@@ -80,7 +80,20 @@ get_matches_and_debiased_residuals <-
     
     if (dgp_name == "toy") {
       X_names<- c("X1","X2")
-      SL_lib <- "SL.lm"
+      
+      if (mu_model == "linear"){
+        SL_lib <- "SL.lm"
+      }else if (mu_model == "non-linear"){
+        # based on line 37 of sim_kang, the non-par
+        #   libraries used in TMLE estimation
+        # SL_lib <- c("SL.glm", 
+        #                  "SL.glmnet",
+        #                  "SL.randomForest", 
+        #                  "SL.xgboost")  
+        # Start by using SL.randomForest
+        SL_lib <-  "SL.randomForest"
+      }
+      
       
     } else if (dgp_name == "kang") {
       if (mu_model == "kang_correct"){
@@ -251,9 +264,11 @@ boot_CSM <- function(dgp_name,
     
     covered[i] = (CI_lower[i] < att) & (att < CI_upper[i])
     
+    
     print(paste0("ATT is ", signif(att,3),
                  "; LB is ", signif(CI_lower[i],3),
                  "; UB is ", signif(CI_upper[i],3)))
+    print(paste0("Bootstrap s.e. is ", sd_boot[i]))
     print(paste0("Covered is ", covered[i]))
     
     # Get the CSM estimate
@@ -271,6 +286,7 @@ boot_CSM <- function(dgp_name,
                                    lower=CI_lower,upper=CI_upper, 
                                    covered=covered,
                                    sd_boot=sd_boot,
-                                   n_split=n_split)
+                                   n_split=n_split,
+                                   mu_model=mu_model)
   return(res_save_bayesian_boot)
 }

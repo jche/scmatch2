@@ -13,6 +13,30 @@ source("R/bootstrap.R")
 
 curr_res<-
   res_wild_boot_kang_correct<-
+  boot_bayesian(dgp_name="toy",
+                att0=F,
+                I=100,
+                B=250,
+                mu_model="non-linear",
+                n_split=2)
+sd(curr_res$att_est_debiased)
+mean(curr_res$sd_boot)
+hist((curr_res$att_est_debiased - curr_res$att_est) /
+       curr_res$att_est)
+curr_res$mu_model="non-linear"
+
+
+curr_res<-
+  res_wild_boot_kang_correct<-
+  boot_wild(dgp_name="kang",
+            att0=T,
+            I=100,
+            B=250,
+            mu_model="kang_correct",
+            n_split=2)
+
+curr_res<-
+  res_wild_boot_kang_correct<-
     boot_wild(dgp_name="kang",
               att0=T,
               I=100,
