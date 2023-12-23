@@ -458,11 +458,9 @@ gen_df_full <- function(nc, nt, eps_sd = 0.1,
   return(res)
 }
 
-get_df_scaling_from_dgp_name <- function(dgp_name){
-  # input: dgp_name: "toy" or "kang"
-  # output: a list: 
-  #     list(df_dgp=df_dgp,
-  #           dist_scaling=dist_scaling)
+get_df_scaling_from_dgp_name <- 
+  function(dgp_name,
+           kang_true = F){
   if (dgp_name == "toy"){
     df_dgp <- gen_df_adv(
       nc=500, 
@@ -482,6 +480,10 @@ get_df_scaling_from_dgp_name <- function(dgp_name){
                        }))
   }else if(dgp_name=="kang"){
     df_dgp <- gen_df_kang(n = 1000)
+    if (kang_true){ # Replace X1 to X4 by V1 to V4
+      df_dgp[, paste0("X",1:4)] <-
+        df_dgp %>% select(starts_with("V"))
+    }
     dist_scaling <- df_dgp %>%
       summarize(across(starts_with("X"),
                        function(x) {

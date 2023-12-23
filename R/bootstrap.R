@@ -205,7 +205,8 @@ boot_CSM <- function(dgp_name,
                           B=250,
                           mu_model="linear",
                           boot_mtd="Bayesian",
-                     n_split=1){
+                     n_split=1,
+                     kang_true=F){
   
   covered <- CI_lower <- CI_upper <- 
     att_true <- att_est <- att_debiased <-
@@ -214,7 +215,9 @@ boot_CSM <- function(dgp_name,
   set.seed(123)
   for (i in 1:I){
     print(i)
-    dgp_obj <- get_df_scaling_from_dgp_name(dgp_name=dgp_name)
+    dgp_obj <- 
+      get_df_scaling_from_dgp_name(dgp_name=dgp_name,
+                                   kang_true=kang_true)
     list2env(dgp_obj,envir = environment())
     
     matches_and_debiased_residuals<-

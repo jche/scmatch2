@@ -12,44 +12,39 @@ source("R/utils.R")
 source("R/bootstrap.R")
 
 curr_res<-
-  res_wild_boot_kang_correct<-
-  boot_bayesian(dgp_name="toy",
-                att0=F,
-                I=100,
-                B=250,
-                mu_model="non-linear",
-                n_split=2)
-sd(curr_res$att_est_debiased)
+  boot_CSM(dgp_name="kang",
+           att0=T,
+           I=100,
+           B=250,
+           mu_model="kang_correct",
+           n_split=2,
+           kang_true = T)
+mean(curr_res$covered)
 mean(curr_res$sd_boot)
-hist((curr_res$att_est_debiased - curr_res$att_est) /
-       curr_res$att_est)
-curr_res$mu_model="non-linear"
+sd(curr_res$att_est_debiased)
+sd(curr_res$att_est)
+hist((curr_res$att_est_debiased - curr_res$att_est))
+hist((curr_res$att_est_debiased - curr_res$att_est)/ 
+       sd(curr_res$att_est))
 
 
-curr_res<-
-  res_wild_boot_kang_correct<-
-  boot_wild(dgp_name="kang",
-            att0=T,
-            I=100,
-            B=250,
-            mu_model="kang_correct",
-            n_split=2)
-
-curr_res<-
-  res_wild_boot_kang_correct<-
-    boot_wild(dgp_name="kang",
-              att0=T,
-              I=100,
-              B=250,
-              mu_model="kang_correct",
-              n_split=2)
 # curr_res<-
-#   res_bayesian_boot_toy <-
-#   boot_bayesian(dgp_name="toy", 
-#                 att0=F,
-#                 I=100,
-#                 B=250,
-#                 n_split=2)
+#   res_wild_boot_kang_correct<-
+#   boot_wild(dgp_name="kang",
+#             att0=T,
+#             I=100,
+#             B=250,
+#             mu_model="kang_correct",
+#             n_split=2)
+
+# curr_res<-
+#   res_wild_boot_kang_correct<-
+#     boot_wild(dgp_name="kang",
+#               att0=T,
+#               I=100,
+#               B=250,
+#               mu_model="kang_correct",
+#               n_split=2)
 
 
 FNAME = "./sim_toy_results/toy_bootstrap.csv"
