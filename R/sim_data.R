@@ -458,20 +458,69 @@ gen_df_full <- function(nc, nt, eps_sd = 0.1,
   return(res)
 }
 
+
+### Generate Otsu and Rai DGP to debug the bootstrap
+gen_df_otsu <- function(N = 1000,K = 2){
+  # output: "id" "X1" "X2" "Z"  "Y0" "Y1" "Y" 
+  # Function m(z) as defined
+  m <- function(z) {
+    0.4 + 0.25 * sin(8 * z - 5) + 0.4 * exp(-16 * (4 * z - 2.5)^2)
+  }
+  
+  # Generate data
+  xi <- runif(N, 0, 1)
+  zeta <- matrix(rnorm(N * K), ncol = K)
+  X <- xi * apply(abs(zeta), 1, function(x) x / sqrt(sum(x^2)))
+  norm_X <- sqrt(colSums(X^2))
+  
+  # Parameters for P(X)
+  gamma1 <- 0.15
+  gamma2 <- 0.7
+  P_X <- gamma1 + gamma2 * norm_X
+  
+  # Treatment assignment
+  vi <- runif(N)
+  Z <- as.numeric(P_X >= vi)
+  
+  # Potential outcomes
+  epsilon <- rnorm(N, 0, 0.2)
+  Y0 <- m(norm_X) + epsilon
+  Y1 <- Y0 + 0  # tau is set to 0
+  Y <- (1 - Z) * Y0 + Z * Y1
+  
+  # Create dataframe
+  df <- data.frame(id = 1:N, 
+                   X1 = X[, 1], 
+                   X2 = X[, 2], 
+                   Z = Z, 
+                   Y0 = Y0, 
+                   Y1 = Y1, 
+                   Y = Y)
+  return(df)
+}
+
+generate_one_otsu <- function(){
+  gen_df_otsu(N = 1000,K = 2)
+}
+
+generate_one_toy <- function(){
+  gen_df_adv(
+    nc=500, 
+    nt=100, 
+    f0_sd = 0.5,
+    tx_effect_fun = function(X1, X2) {3*X1+3*X2},
+    f0_fun = function(x,y) {
+      matrix(c(x,y), ncol=2) %>%
+        dmvnorm(mean = c(0.5,0.5),
+                sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
+    })
+}
+
 get_df_scaling_from_dgp_name <- 
   function(dgp_name,
            kang_true = F){
   if (dgp_name == "toy"){
-    df_dgp <- gen_df_adv(
-      nc=500, 
-      nt=100, 
-      f0_sd = 0.5,
-      tx_effect_fun = function(X1, X2) {3*X1+3*X2},
-      f0_fun = function(x,y) {
-        matrix(c(x,y), ncol=2) %>%
-          dmvnorm(mean = c(0.5,0.5),
-                  sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
-      })
+    df_dgp <- generate_one_toy()
     dist_scaling <- df_dgp %>%
       summarize(across(starts_with("X"),
                        function(x) {
