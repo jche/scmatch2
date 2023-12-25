@@ -463,6 +463,7 @@ gen_df_full <- function(nc, nt, eps_sd = 0.1,
 gen_df_otsu <- function(N = 1000,K = 2){
   # output: "id" "X1" "X2" "Z"  "Y0" "Y1" "Y" 
   # Function m(z) as defined
+  # K=2; N = 1000
   m <- function(z) {
     0.4 + 0.25 * sin(8 * z - 5) + 0.4 * exp(-16 * (4 * z - 2.5)^2)
   }
@@ -490,8 +491,8 @@ gen_df_otsu <- function(N = 1000,K = 2){
   
   # Create dataframe
   df <- data.frame(id = 1:N, 
-                   X1 = X[, 1], 
-                   X2 = X[, 2], 
+                   X1 = X[1, ], 
+                   X2 = X[2, ], 
                    Z = Z, 
                    Y0 = Y0, 
                    Y1 = Y1, 
@@ -539,8 +540,16 @@ get_df_scaling_from_dgp_name <-
                          if (is.numeric(x)) 5 / (max(x) - min(x))
                          else 1000
                        }))
-  }else{
-    stop("dgp_name must be toy or kang")
+  }else if (dgp_name == "otsu"){
+    df_dgp <- generate_one_otsu()
+    dist_scaling <- df_dgp %>%
+      summarize(across(starts_with("X"),
+                       function(x) {
+                         if (is.numeric(x)) 6 / (max(x) - min(x))
+                         else 1000
+                       }))
+  } else {
+    stop("dgp_name must be toy or kang or otsu")
   }
   return(list(df_dgp=df_dgp,
               dist_scaling=dist_scaling))
