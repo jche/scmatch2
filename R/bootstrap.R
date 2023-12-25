@@ -41,6 +41,67 @@ get_pred_label_map <- function(n){
   }
 }
 
+get_matches <- function(dgp_name, df_dgp,dist_scaling){
+  if (dgp_name == "toy" || dgp_name == "kang") {
+    df_dgp_with_matches <- get_cal_matches(
+      df = df_dgp,
+      metric = "maximum",
+      dist_scaling = dist_scaling,
+      cal_method = "fixed",
+      est_method = "scm",
+      return = "all",
+      knn = 25
+    )
+  } else if (dgp_name == "otsu") {
+    df_dgp_with_matches <- get_NN_matches(df_dgp)
+    
+  } else {
+    stop("dgp_name must be toy, kang, or otsu")
+  }
+  return(df_dgp_with_matches)
+}
+
+get_NN_matches <- function(df_dgp){
+  library(MatchIt)
+  m.out <- matchit(Z ~ X1 + X2, 
+                   data = df_dgp, 
+                   method = "nearest", 
+                   replace = TRUE,
+                   mahvars = ~ X1 + X2,
+                   ratio = 8)
+  
+  # Obtain matched dataset
+  df_matched <- match.data(m.out)
+  
+  df_matched_ids <- data.frame(m.out$match.matrix)
+  
+  id <- subclass <- weights <- c()
+  
+  for(i in 1:nrow(df_matched_ids)) {
+    # Concatenate row name (treated id) with matched control ids
+    # i <- 1
+    row_ids <- c(as.integer(rownames(df_matched_ids)[i]), 
+                 as.integer(unlist(df_matched_ids[i, ])))
+    id <- c(id, row_ids)
+    # Add subclass
+    M <- length(row_ids) - 1
+    subclass <- c(subclass, rep(i, M + 1))
+    weights <- c(weights, c(1, rep(1/M, M )) )
+  }
+  
+  # Create the new dataframe
+  new_df <- data.frame(id = id, 
+                       subclass = subclass,
+                       weights)
+  
+  # Display the first few rows of the new dataframe
+  head(new_df)
+  
+  preds_matching <- 
+    left_join(new_df, df_dgp, by = "id")
+  return(preds_matching)
+}
+
 get_matches_and_debiased_residuals <- 
   function(dgp_name,
            df_dgp, 
@@ -49,17 +110,13 @@ get_matches_and_debiased_residuals <-
            n_split=1){
     
     # Assign group_label to df_dgp
-    # n_split = 2
     df_dgp_splitted <- assign_group_label(df_dgp,
                                   n_split = n_split)
-    preds_csm <- get_cal_matches(
-      df = df_dgp,
-      metric = "maximum",
-      dist_scaling = dist_scaling,
-      cal_method = "fixed",
-      est_method = "scm",
-      return = "all",
-      knn = 25)  
+    
+    preds_csm <- get_matches(dgp_name=dgp_name,
+                             df_dgp=df_dgp,
+                             dist_scaling=dist_scaling)
+    
     id_to_group_map <- 
       df_dgp_splitted %>%
       select(id, group_label)
@@ -78,7 +135,7 @@ get_matches_and_debiased_residuals <-
     df_controls <- 
       df_dgp_splitted %>% filter(Z==0)
     
-    if (dgp_name == "toy") {
+    if (dgp_name == "toy" || dgp_name == "otsu") {
       X_names<- c("X1","X2")
       
       if (mu_model == "linear"){
@@ -199,6 +256,26 @@ boot_wild <- function(dgp_name,
            n_split=n_split)
 }
 
+boot_by_resids <- function(resids, B,boot_mtd, seed_addition){
+  T_star <- numeric(B)
+  for (b in 1:B){
+    set.seed(123 + seed_addition + b*13)
+    n1 <- length(resids)
+    # The implemented W is W(in the paper) / sqrt(n)
+    if (boot_mtd=="Bayesian"){
+      W = gtools::rdirichlet(1, alpha=rep(1,n1))
+    }else if (boot_mtd=="wild"){
+      W = sample(
+        c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
+        prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
+        replace = T, size = n1) / n1
+    }
+    T_star[b] = sum(resids * W)
+  }
+  return(T_star)
+}
+
+
 boot_CSM <- function(dgp_name, 
                           att0,
                           I=100,
@@ -229,25 +306,13 @@ boot_CSM <- function(dgp_name,
     
     att_debiased[i] <- mean_tilde_tau
     
-    # Perform Bayesian bootstrap
-    for (b in 1:B){
-      set.seed(123 + i * 11 + b*13)
-      n1 <- length(tilde_tau_resids)
-      # The implemented W is W(in the paper) / sqrt(n)
-      if (boot_mtd=="Bayesian"){
-        W = gtools::rdirichlet(1, alpha=rep(1,n1))
-      }else if (boot_mtd=="wild"){
-        W = sample(
-          c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
-          prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
-          replace = T, size = n1) / n1 
-      }
-      T_star[b] = sum(tilde_tau_resids * W)
-      if (length(W) != length(tilde_tau_resids)){
-        print(paste0("Length of W is ", length(W),". Length of resid is ",length(tilde_tau_resids)))
-      }
-      
-    }
+    # Perform bootstrap
+    
+    T_star <- 
+      boot_by_resids(resids=tilde_tau_resids, 
+                     B=B,
+                     boot_mtd=boot_mtd, 
+                     seed_addition=i * 11)
     
     CI_lower[i] = mean_tilde_tau - quantile(T_star, 0.975)
     CI_upper[i] = mean_tilde_tau - quantile(T_star, 0.025)

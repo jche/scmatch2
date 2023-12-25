@@ -18,6 +18,11 @@ test_get_df_scaling_from_otsu <- function(){
   list2env(dgp_obj,envir = environment())
 }
 
+test_matches_from_otsu <- function(){
+  df_otsu <- generate_one_otsu()
+  otsu_matched<- get_NN_matches(df_otsu)
+}
+
 test_matches_and_debiased_residuals_from_otsu <-
   function(){
     # First get one from toy. See the return format
@@ -31,28 +36,44 @@ test_matches_and_debiased_residuals_from_otsu <-
       dist_scaling, "linear",n_split=2)
     list2env(match_obj_toy, 
              envir = environment())
-    preds_csm
-    
-    tilde_tau
-    tilde_tau_resids
-    # Then get from
     
   }
 
-df_otsu <- generate_one_otsu()
-head(df_otsu)
-library(MatchIt)
-m.out <- matchit(Z ~ X1 + X2, 
-                 data = df_otsu, 
-                 method = "nearest", 
-                 replace = TRUE,
-                 mahvars = ~ X1 + X2,
-                 ratio = 8)
 
-# Obtain matched dataset
-df_matched <- match.data(m.out)
-
-df_matched_ids <- data.frame(m.out$match.matrix)
-
-
-
+# library(MatchIt)
+# m.out <- matchit(Z ~ X1 + X2, 
+#                  data = df_otsu, 
+#                  method = "nearest", 
+#                  replace = TRUE,
+#                  mahvars = ~ X1 + X2,
+#                  ratio = 8)
+# 
+# # Obtain matched dataset
+# df_matched <- match.data(m.out)
+# 
+# df_matched_ids <- data.frame(m.out$match.matrix)
+# 
+# id <- subclass <- weights <- c()
+# 
+# for(i in 1:nrow(df_matched_ids)) {
+#   # Concatenate row name (treated id) with matched control ids
+#   # i <- 1
+#   row_ids <- c(as.integer(rownames(df_matched_ids)[i]), 
+#                as.integer(unlist(df_matched_ids[i, ])))
+#   id <- c(id, row_ids)
+#   # Add subclass
+#   M <- length(row_ids) - 1
+#   subclass <- c(subclass, rep(i, M + 1))
+#   weights <- c(weights, c(1, rep(1/M, M )) )
+# }
+# 
+# # Create the new dataframe
+# new_df <- data.frame(id = id, 
+#                      subclass = subclass,
+#                      weights)
+# 
+# # Display the first few rows of the new dataframe
+# head(new_df)
+# 
+# preds_matching_otsu <- 
+#   left_join(new_df, df_otsu, by = "id")

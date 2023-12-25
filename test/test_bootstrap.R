@@ -291,5 +291,28 @@ test_boot_bayesian <- function(){
               bayesian_boot_kang_expected$upper[1])
 }
 
-
+test_boot_by_resids<-function(){
+  # Test 1: Gaussian 
+  sd = 2; n = 500
+  I <- 50
+  se_boot <- numeric(I)
+  for (i in 1:I){
+    X = rnorm(n, mean = 0, sd= sd)
+    T_star <- boot_by_resids(resids=X-mean(X), 
+                             B=250,
+                             boot_mtd="Bayesian", 
+                             # boot_mtd="wild", 
+                             seed_addition=100)
+    se_boot[i] = sd(T_star)
+  }
+  
+  se_gaussian_expected <- sd / sqrt(n)
+  # Test: se should be around sd / sqrt(n)
+  tol <- 0.01
+  stopifnot(
+    abs(mean(se_boot) - se_gaussian_expected) 
+            < 
+              tol)
+  print("Test boot by resids passed")
+}
 
