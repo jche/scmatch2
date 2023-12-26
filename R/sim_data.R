@@ -501,7 +501,12 @@ gen_df_otsu <- function(N = 1000,K = 2){
 }
 
 generate_one_otsu <- function(){
-  gen_df_otsu(N = 1000,K = 2)
+  # gen_df_otsu(N = 1000,K = 2)
+  # Edit 26 Dec 2023: Realized sample size 
+  #   might affect the success of the s.e. 
+  # The paper has sample size 100. Thus change
+  #     to it
+  gen_df_otsu(N = 100,K = 2)
 }
 
 generate_one_toy <- function(){

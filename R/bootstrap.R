@@ -63,6 +63,7 @@ get_matches <- function(dgp_name, df_dgp,dist_scaling){
 
 get_NN_matches <- function(df_dgp){
   library(MatchIt)
+  
   m.out <- matchit(Z ~ X1 + X2, 
                    data = df_dgp, 
                    method = "nearest", 
@@ -70,10 +71,24 @@ get_NN_matches <- function(df_dgp){
                    mahvars = ~ X1 + X2,
                    ratio = 8)
   
-  # Obtain matched dataset
-  df_matched <- match.data(m.out)
+  # # Obtain matched dataset
+  # df_matched <- match.data(m.out)
   
   df_matched_ids <- data.frame(m.out$match.matrix)
+  
+  # # Inverting the treatment indicator
+  # df_dgp$Z_inv <- ifelse(df_dgp$Z == 1, 0, 1)
+  # 
+  # m.out2 <- matchit(Z_inv ~ X1 + X2, 
+  #                   data = df_dgp, 
+  #                   method = "nearest", 
+  #                   replace = TRUE, 
+  #                   mahvars = ~ X1 + X2, 
+  #                   ratio = 8)
+  # df_matched_ids.2 <- data.frame(m.out2$match.matrix)
+  # 
+  # df_matched_ids <- rbind(df_matched_ids,
+  #                         df_matched_ids.2)
   
   id <- subclass <- weights <- c()
   
@@ -98,7 +113,7 @@ get_NN_matches <- function(df_dgp){
   head(new_df)
   
   preds_matching <- 
-    left_join(new_df, df_dgp, by = "id")
+    left_join(new_df, df_dgp%>%distinct(id, .keep_all=T), by = "id")
   return(preds_matching)
 }
 
@@ -108,7 +123,11 @@ get_matches_and_debiased_residuals <-
            dist_scaling, 
            mu_model,
            n_split=1){
-    
+    # df_dgp <- generate_one_toy(); n_split=2; 
+    # dgp_name = "otsu"
+    # df_obj <- get_df_scaling_from_dgp_name(dgp_name = dgp_name,
+                                 # kang_true = F)
+    # list2env(df_obj,envir=environment())
     # Assign group_label to df_dgp
     df_dgp_splitted <- assign_group_label(df_dgp,
                                   n_split = n_split)
@@ -123,7 +142,9 @@ get_matches_and_debiased_residuals <-
     
     # Append the same label to preds_csm through join
     preds_csm <- 
-      left_join(preds_csm, id_to_group_map, by="id")
+      left_join(preds_csm, 
+                id_to_group_map %>% distinct(id, .keep_all=T), 
+                by="id")
     
     # Calculate pred_label 
     pred_label_map <- 
@@ -143,10 +164,6 @@ get_matches_and_debiased_residuals <-
       }else if (mu_model == "non-linear"){
         # based on line 37 of sim_kang, the non-par
         #   libraries used in TMLE estimation
-        # SL_lib <- c("SL.glm", 
-        #                  "SL.glmnet",
-        #                  "SL.randomForest", 
-        #                  "SL.xgboost")  
         # Start by using SL.randomForest
         SL_lib <-  "SL.randomForest"
       }
@@ -187,7 +204,7 @@ get_matches_and_debiased_residuals <-
                                 df_pred=preds_csm,
                                 X_names=X_names)
     }
-    # df_to_fit_nested$mu_fit <- models_n_split
+    
     # Finally, select the prediction 
     preds_csm <- preds_csm %>%
       rowwise() %>%
@@ -275,6 +292,36 @@ boot_by_resids <- function(resids, B,boot_mtd, seed_addition){
   return(T_star)
 }
 
+boot_naive <- function(df_dgp, 
+                       B,
+                       seed_addition){
+  # B <- 100; seed_addition <- 1
+  bootstrap_estimates <- numeric(B)
+  
+  # Perform bootstrap
+  for (b in 1:B) {
+    print(b)
+    set.seed(123 + seed_addition + b*13)
+    resampled_data <- 
+      df_dgp[sample(nrow(df_dgp), replace = TRUE), ]
+    
+    estimator <- function(df){
+      obj <- get_matches_and_debiased_residuals(
+        dgp_name="otsu",
+        df_dgp=df,
+        # df_dgp=resampled_data,
+        dist_scaling=0, 
+        mu_model="linear",
+        n_split=1)
+      return(obj$mean_tilde_tau)
+    }
+    bootstrap_estimates[b] <- 
+      estimator(resampled_data)
+  }
+  
+  return(bootstrap_estimates)
+}
+
 
 boot_CSM <- function(dgp_name, 
                           att0,
@@ -307,7 +354,6 @@ boot_CSM <- function(dgp_name,
     att_debiased[i] <- mean_tilde_tau
     
     # Perform bootstrap
-    
     T_star <- 
       boot_by_resids(resids=tilde_tau_resids, 
                      B=B,
