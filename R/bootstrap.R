@@ -323,6 +323,60 @@ boot_naive <- function(df_dgp,
 }
 
 
+boot_cluster <- function(df_dgp, 
+                       B,
+                       seed_addition){
+  # B <- 100; seed_addition <- 1
+  # df_dgp <- generate_one_otsu()
+  obj <- get_matches_and_debiased_residuals(
+    dgp_name="otsu",
+    df_dgp=df_dgp,
+    dist_scaling=0, 
+    mu_model="linear",
+    n_split=1)
+  md <- obj$preds_csm
+  pair_ids <- unique(md$subclass)
+  
+  #Unit IDs, split by pair membership
+  split_inds <- 
+    split(seq_len(nrow(md)), md$subclass)
+  
+  
+  bootstrap_estimates <- numeric(B)
+  # Perform bootstrap
+  for (b in 1:B) {
+    # b<-1
+    # print(b)
+    set.seed(123 + seed_addition + b*13)
+    
+    n_ids <- length(pair_ids)
+    
+    i <- sample(1:n_ids,replace=T)
+    
+    ids <- unlist(split_inds[pair_ids[i]])
+    
+    resampled_data <- md[ids,]
+    
+    estimator <- function(df){
+      # Calculate mean_tilde_tau
+      tmp0 <- df %>% 
+        mutate(Y_bias_corrected = Y - hat_mu_0) %>%
+        group_by(subclass, Z) %>%
+        summarize(mn = sum(Y_bias_corrected*weights)) 
+      tmp <- tmp0 %>%
+        group_by(subclass) %>%
+        summarise(tilde_tau = last(mn)-first(mn)) 
+      tilde_tau = tmp$tilde_tau
+      mean_tilde_tau <- mean(tilde_tau)
+      return(mean_tilde_tau)
+    }
+    bootstrap_estimates[b] <- 
+      estimator(resampled_data)
+  }
+  
+  return(bootstrap_estimates)
+}
+
 boot_CSM <- function(dgp_name, 
                           att0,
                           I=100,
@@ -334,7 +388,9 @@ boot_CSM <- function(dgp_name,
   
   covered <- CI_lower <- CI_upper <- 
     att_true <- att_est <- att_debiased <-
-    sd_boot <-numeric(I)
+    sd_boot <- 
+    time_on_matching <- 
+    time_on_bootstrap <- numeric(I)
   T_star <- numeric(B)
   set.seed(123)
   for (i in 1:I){
@@ -344,25 +400,52 @@ boot_CSM <- function(dgp_name,
                                    kang_true=kang_true)
     list2env(dgp_obj,envir = environment())
     
+    time_before_matching <- proc.time()
     matches_and_debiased_residuals<-
       get_matches_and_debiased_residuals(
          dgp_name, df_dgp, 
         dist_scaling, mu_model,n_split)
     list2env(matches_and_debiased_residuals, 
              envir = environment())
+    time_after_matching <- proc.time()
+    time_on_matching[i] <- 
+      (time_after_matching - time_before_matching)[3]
     
     att_debiased[i] <- mean_tilde_tau
     
     # Perform bootstrap
-    T_star <- 
-      boot_by_resids(resids=tilde_tau_resids, 
-                     B=B,
-                     boot_mtd=boot_mtd, 
-                     seed_addition=i * 11)
+    seed_addition = i * 11
+    if (boot_mtd == "Bayesian" || boot_mtd == "wild"){
+      T_star <- 
+        boot_by_resids(resids=tilde_tau_resids, 
+                       B=B,
+                       boot_mtd=boot_mtd, 
+                       seed_addition=seed_addition)
+      
+      CI_lower[i] = mean_tilde_tau - quantile(T_star, 0.975)
+      CI_upper[i] = mean_tilde_tau - quantile(T_star, 0.025)
+      sd_boot[i] = sd(T_star)
+    }else if (boot_mtd == "naive"){
+      T_star <- boot_naive(df_dgp = df_dgp,
+                 B = B,
+                 seed_addition = seed_addition)
+      
+      sd_boot[i] = sd(T_star)
+      CI_lower[i] = mean_tilde_tau -1.96 *  sd_boot[i]
+      CI_upper[i] = mean_tilde_tau + 1.96 * sd_boot[i]
+    }else if (boot_mtd == "cluster"){
+      T_star <- boot_cluster(df_dgp = df_dgp,
+                           B = B,
+                           seed_addition = seed_addition)
+      
+      sd_boot[i] = sd(T_star)
+      CI_lower[i] = mean_tilde_tau -1.96 *  sd_boot[i]
+      CI_upper[i] = mean_tilde_tau + 1.96 * sd_boot[i]
+    }
+    time_after_bootstrap <- proc.time()
+    time_on_bootstrap[i] <-
+      (time_after_bootstrap - time_after_matching)[3]
     
-    CI_lower[i] = mean_tilde_tau - quantile(T_star, 0.975)
-    CI_upper[i] = mean_tilde_tau - quantile(T_star, 0.025)
-    sd_boot[i] = sd(T_star)
     
     # Get true ATT for coverage
     if (att0){
@@ -401,6 +484,8 @@ boot_CSM <- function(dgp_name,
                                    covered=covered,
                                    sd_boot=sd_boot,
                                    n_split=n_split,
-                                   mu_model=mu_model)
+                                   mu_model=mu_model,
+                                   time_on_matching=time_on_matching,
+                                   time_on_bootstrap=time_on_bootstrap)
   return(res_save_bayesian_boot)
 }

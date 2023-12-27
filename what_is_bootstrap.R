@@ -11,48 +11,56 @@ source("R/wrappers.R")
 source("R/utils.R")
 source("R/bootstrap.R")
 
-curr_res<-
-  boot_CSM(dgp_name="kang",
+# boot_otsu_to_test <-
+#   boot_CSM(dgp_name="otsu", 
+#            att0=T,
+#            I=10,
+#            B=100,
+#            mu_model="linear",
+#            boot_mtd="naive",
+#            n_split=2)
+boot_otsu_to_test <-
+  boot_CSM(dgp_name="otsu",
            att0=T,
-           I=100,
-           B=250,
-           mu_model="kang_correct",
-           n_split=2,
-           kang_true = T)
-mean(curr_res$covered)
-mean(curr_res$sd_boot)
-sd(curr_res$att_est_debiased)
-sd(curr_res$att_est)
-hist((curr_res$att_est_debiased - curr_res$att_est))
-hist((curr_res$att_est_debiased - curr_res$att_est)/ 
-       sd(curr_res$att_est))
+           I=10,
+           B=100,
+           mu_model="linear",
+           boot_mtd="wild",
+           n_split=2)
+sd(boot_otsu_to_test$att_est_debiased)
+mean(boot_otsu_to_test$sd_boot)
+mean(boot_otsu_to_test$covered)
 
-
-# curr_res<-
-#   res_wild_boot_kang_correct<-
-#   boot_wild(dgp_name="kang",
-#             att0=T,
-#             I=100,
-#             B=250,
-#             mu_model="kang_correct",
-#             n_split=2)
-
-# curr_res<-
-#   res_wild_boot_kang_correct<-
-#     boot_wild(dgp_name="kang",
-#               att0=T,
-#               I=100,
-#               B=250,
-#               mu_model="kang_correct",
-#               n_split=2)
-
-
-FNAME = "./sim_toy_results/toy_bootstrap.csv"
+curr_res<- boot_otsu_to_test
+FNAME = "./sim_toy_results/naive_bootstrap_on_otsu.csv"
 if (file.exists(FNAME)) {
   write_csv(curr_res, FNAME, append=T)
 } else {
   write_csv(curr_res, FNAME)
 }
+
+# curr_res<-
+#   boot_CSM(dgp_name="kang",
+#            att0=T,
+#            I=100,
+#            B=250,
+#            mu_model="kang_correct",
+#            n_split=2,
+#            kang_true = T)
+# mean(curr_res$covered)
+# mean(curr_res$sd_boot)
+# sd(curr_res$att_est_debiased)
+# sd(curr_res$att_est)
+# hist((curr_res$att_est_debiased - curr_res$att_est))
+# hist((curr_res$att_est_debiased - curr_res$att_est)/ 
+#        sd(curr_res$att_est))
+
+# FNAME = "./sim_toy_results/toy_bootstrap.csv"
+# if (file.exists(FNAME)) {
+#   write_csv(curr_res, FNAME, append=T)
+# } else {
+#   write_csv(curr_res, FNAME)
+# }
 
 
 # Analysis: For Kang correct,
