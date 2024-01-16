@@ -11,33 +11,72 @@ source("R/wrappers.R")
 source("R/utils.R")
 source("R/bootstrap.R")
 
-# boot_otsu_to_test <-
-#   boot_CSM(dgp_name="otsu", 
-#            att0=T,
-#            I=10,
-#            B=100,
-#            mu_model="linear",
-#            boot_mtd="naive",
-#            n_split=2)
+save_res_to_csv<-
+  function(curr_res,
+           FNAME = "./sim_toy_results/naive_bootstrap_on_otsu.csv"){
+  if (file.exists(FNAME)) {
+    write_csv(curr_res, FNAME, append=T)
+  } else {
+    write_csv(curr_res, FNAME)
+  }
+} # save_res_to_csv
+
+source("R/bootstrap.R")
+toy_naive<-
+  boot_CSM(dgp_name="toy",
+           att0=F,
+           I=1,
+           B=100,
+           mu_model="linear",
+           boot_mtd="naive",
+           n_split=1,
+           kang_true = F)
+save_res_to_csv(toy_naive,
+  FNAME = "./sim_toy_results/kang_toy_naive.csv")
+
+
+source("R/bootstrap.R")
+kang_naive<-
+  boot_CSM(dgp_name="kang",
+           att0=T,
+           I=1,
+           B=100,
+           mu_model="kang_correct",
+           boot_mtd="naive",
+           n_split=1,
+           kang_true = T)
+save_res_to_csv(
+  kang_naive,
+  FNAME = "./sim_toy_results/kang_toy_naive.csv")
+
 boot_otsu_to_test <-
   boot_CSM(dgp_name="otsu",
            att0=T,
-           I=10,
+           I=100,
            B=100,
            mu_model="linear",
-           boot_mtd="wild",
+           boot_mtd="Bayesian",
            n_split=2)
 sd(boot_otsu_to_test$att_est_debiased)
 mean(boot_otsu_to_test$sd_boot)
 mean(boot_otsu_to_test$covered)
+save_res_to_csv(boot_otsu_to_test)
 
-curr_res<- boot_otsu_to_test
-FNAME = "./sim_toy_results/naive_bootstrap_on_otsu.csv"
-if (file.exists(FNAME)) {
-  write_csv(curr_res, FNAME, append=T)
-} else {
-  write_csv(curr_res, FNAME)
-}
+
+
+
+
+kang_cluster<-
+  boot_CSM(dgp_name="kang",
+           att0=T,
+           I=10,
+           B=200,
+           mu_model="kang_correct",
+           boot_mtd="cluster",
+           n_split=2,
+           kang_true = T)
+save_res_to_csv(kang_cluster)
+
 
 # curr_res<-
 #   boot_CSM(dgp_name="kang",
@@ -52,7 +91,7 @@ if (file.exists(FNAME)) {
 # sd(curr_res$att_est_debiased)
 # sd(curr_res$att_est)
 # hist((curr_res$att_est_debiased - curr_res$att_est))
-# hist((curr_res$att_est_debiased - curr_res$att_est)/ 
+# hist((curr_res$att_est_debiased - curr_res$att_est)/
 #        sd(curr_res$att_est))
 
 # FNAME = "./sim_toy_results/toy_bootstrap.csv"
@@ -64,24 +103,24 @@ if (file.exists(FNAME)) {
 
 
 # Analysis: For Kang correct,
-#   see whether the coverage will be 95% 
-#   if the length of CI is three times larger 
-#   (i.e., when boot_sd recovers sd(att_est_debiased)) 
+#   see whether the coverage will be 95%
+#   if the length of CI is three times larger
+#   (i.e., when boot_sd recovers sd(att_est_debiased))
 FNAME = "./sim_toy_results/toy_bootstrap.csv"
-res_boot_all <- 
+res_boot_all <-
   read_csv(FNAME)
-res_bayesian_boot_kang_correct <- 
+res_bayesian_boot_kang_correct <-
   res_boot_all %>% filter(name=="kang",
                           boot_mtd == "Bayesian_mu_correct")
 # Obtain CI length
-res_bayesian_boot_kang_correct <- 
-  res_bayesian_boot_kang_correct %>% 
+res_bayesian_boot_kang_correct <-
+  res_bayesian_boot_kang_correct %>%
   mutate(CI_length_1 = (upper-lower)/2,
          CI_length_2 = (upper-att_est_debiased) ) %>%
   mutate(CI_length = CI_length_1)
 
 # Enlarge CI length, and calculate the enlarged CI, coverage
-res_bayesian_boot_kang_correct <- 
+res_bayesian_boot_kang_correct <-
   res_bayesian_boot_kang_correct %>%
   mutate(CI_length_enlarged = CI_length * 3) %>%
   mutate(upper_enlarged = att_est_debiased + CI_length_enlarged,
@@ -93,7 +132,7 @@ mean(res_bayesian_boot_kang_correct$covered_enlarged) # 0.96
 # An experiment to check no CLT of non-debiased estimator
 sd_att_est<-sd(res_bayesian_boot_kang_correct$att_est)
 
-res_bayesian_boot_kang_correct <- 
+res_bayesian_boot_kang_correct <-
   res_bayesian_boot_kang_correct %>%
   mutate(CI_att_est = 1.96 * sd_att_est) %>%
   mutate(upper_att_est = att_est + CI_att_est,
@@ -111,7 +150,7 @@ mean(res_bayesian_boot_kang_correct$covered_att_est) # 0.94
 
 
 # note: standard, bayesian, and wild bootstraps all capture true sd
-#  - but wild bootstrap requires vec-mean(vec) 
+#  - but wild bootstrap requires vec-mean(vec)
 #    BEFORE multiplying by the weight
 #  - others work with vec-mean(vec), but it's not required
 
@@ -123,7 +162,7 @@ mean(res_bayesian_boot_kang_correct$covered_att_est) # 0.94
 ## Next: make the naive boostrap fail for toy example
 I <- 10 # do 100 times
 B <- 100
-covered <- CI_lower <- CI_upper <- 
+covered <- CI_lower <- CI_upper <-
   att_true <- att_est <- att_debiased<-numeric(I)
 T_boots <- numeric(B)
 set.seed(123)
@@ -133,8 +172,8 @@ for (i in 1:I){
   print(i)
   # Generate data of size 100 according to the DGP N(mu,1)
   df_toy <- gen_df_adv(
-    nc=500, 
-    nt=100, 
+    nc=500,
+    nt=100,
     f0_sd = 0.5,
     tx_effect_fun = function(X1, X2) {3*X1+3*X2},
     f0_fun = function(x,y) {
@@ -148,9 +187,9 @@ for (i in 1:I){
                        if (is.numeric(x)) 6 / (max(x) - min(x))
                        else 1000
                      }))
-  
-  
-  # Get the matches 
+
+
+  # Get the matches
   preds_csm <- get_cal_matches(
     df = df_toy,
     metric = "maximum",
@@ -160,10 +199,10 @@ for (i in 1:I){
     # return = "agg_co_units",
     return = "all",
     knn = 25)   # NOTE: knn does nothing when cal_method = "fixed"...
-  
+
   att_est[i] <- get_att_ests(preds_csm)
-  
-  
+
+
   # Perform naive bootstrap
   ## Naive bootstrap: Draw 600 from all vs draw 100 trt, 500 control
   for (b in 1:B){
@@ -173,14 +212,14 @@ for (i in 1:I){
     # Splitting the dataframe into two subsets
     df_toy_T <- df_toy[df_toy$Z == T, ]
     df_toy_F <- df_toy[df_toy$Z == F, ]
-    
+
     # Sampling with replacement
     sampled_T <- df_toy_T[sample(nrow(df_toy_T), 100, replace = TRUE), ]
     sampled_F <- df_toy_F[sample(nrow(df_toy_F), 500, replace = TRUE), ]
-    
+
     # Combining the samples to create the bootstrapped dataset
     df_boot <- rbind(sampled_T, sampled_F)
-    
+
     # Re-match, and compute the att
     dist_scaling_toy_boot <- df_boot %>%
       summarize(across(starts_with("X"),
@@ -188,7 +227,7 @@ for (i in 1:I){
                          if (is.numeric(x)) 6 / (max(x) - min(x))
                          else 1000
                        }))
-    
+
     preds_csm <- get_cal_matches(
       df = df_boot,
       metric = "maximum",
@@ -197,29 +236,29 @@ for (i in 1:I){
       est_method = "scm",
       # return = "agg_co_units",
       return = "all",
-      knn = 25)   
-    
+      knn = 25)
+
     T_boots[b] <- get_att_ests(preds_csm)
-    
+
   }
-  
+
   CI_lower[i] = quantile(T_boots, 0.025)
   CI_upper[i] = quantile(T_boots, 0.975)
-  
+
   # Get true ATT for coverage
   att_true[i] <- att <- df_toy %>%
     # filter((!Z) | id %in% attr(preds_csm, "feasible_units")) %>%
     filter(Z & !(id %in% attr(preds_csm, "unmatched_units"))) %>%
     summarize(att = mean(Y1-Y0)) %>%
     pull(att)
-  
+
   print(paste0("ATT is ", signif(att,3),
                "; LB is ", signif(CI_lower[i],3),
                "; UB is ", signif(CI_upper[i],3)))
   covered[i] = (CI_lower[i] < att) & (att < CI_upper[i])
-  
+
   print(paste0("Covered is ", covered[i]))
-  
+
 }
 t1 <- proc.time()
 
@@ -229,7 +268,7 @@ res_save_naive_boot <- tibble(id=1:I,
                                  att_true = att_true,
                                  att_est= att_est,
                                  att_est_debiased = att_debiased,
-                                 lower=CI_lower,upper=CI_upper, 
+                                 lower=CI_lower,upper=CI_upper,
                                  covered=covered)
 
 
@@ -246,10 +285,10 @@ if (file.exists(FNAME)) {
 
 # DGP simple data
 # input: N, mu
-# output: 
+# output:
 
-# boot simple data 
-# input: 
+# boot simple data
+# input:
 # output: a vector of bootstrapped residuals
 
 N <- 100; B <- 1000; mu <- 1
@@ -262,15 +301,15 @@ colnames_res <- c("id","data","true_param",
 p <- length(colnames_res)
 res_local <- array(dim = c(I, p))
 set.seed(123)
-# input: 
+# input:
 for (i in 1:I){
   print(i)
   # Generate data of size 100 according to the DGP N(mu,1)
-  X <- rnorm(N, mean=mu) 
-  
-  # Get the estimate 
+  X <- rnorm(N, mean=mu)
+
+  # Get the estimate
   X_bar = mean(X)
-  
+
   # Get the residuals
   X_resid = X - X_bar
   # Perform Bayesian bootstrap
@@ -278,7 +317,7 @@ for (i in 1:I){
     W = gtools::rdirichlet(1, alpha=rep(1,N))
     T_star[b] = sum(X_resid * W)
   }
-  
+
   CI_lower[i] = X_bar - quantile(T_star, 0.975)
   CI_upper[i] = X_bar - quantile(T_star, 0.025)
   covered[i] = (CI_lower[i] < mu) & (mu < CI_upper[i])
@@ -303,7 +342,7 @@ map_dbl(
   function(x) {
     rnorm(N) %>% mean(mean=mu)
   }
-) %>% 
+) %>%
   sd()
 
 # naive bootstrap
@@ -311,7 +350,7 @@ map_dbl(
   1:B,
   function(x) {
     sample(vec, N, replace=T) %>% mean()
-  }) %>% 
+  }) %>%
   sd()
 
 # non-par bootstrap, which is equivalent to naive bootstrap
@@ -319,7 +358,7 @@ map_dbl(
   1:B,
   function(x) {
     (vec * as.numeric(rmultinom(1, size=N, prob=rep(1/N,N))) / N) %>% sum()
-  }) %>% 
+  }) %>%
   sd()
 
 # bayesian bootstrap (Rubin, 1981)
@@ -327,7 +366,7 @@ map_dbl(
   1:B,
   function(x) {
     (vec * as.numeric(gtools::rdirichlet(1, alpha=rep(1,N)))) %>% sum()
-  }) %>% 
+  }) %>%
   sd()
 
 # wild bootstrap
@@ -339,6 +378,6 @@ map_dbl(
       c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
       prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
       replace = T, size = N)) %>% mean()
-  }) %>% 
+  }) %>%
   sd()
 
