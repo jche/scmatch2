@@ -29,21 +29,21 @@ source("R/diagnostic_plots.R")
 
 # load data ---------------------------------------------------------------
 
-lalonde <- read_csv("lalonde.csv") %>% 
+lalonde <- read_csv("lalonde.csv") %>%
   rename(Z = treat, Y = re78) %>%
   mutate(id = 1:n(),
          dataset = c(rep("NSWD", 185+260),
                      rep("CPS", 15992)),
-         across(c(black, hispanic, married, nodegree), as.logical)) %>% 
+         across(c(black, hispanic, married, nodegree), as.logical)) %>%
   select(id, Z, Y,
-         black, hispanic, married, nodegree, 
+         black, hispanic, married, nodegree,
          age, education, re74, re75,
          dataset)
 
 # rename variables for my matching methods
 df <- lalonde %>%
-  rename(X1=black, X2=hispanic, 
-         X3=married, X4=nodegree, 
+  rename(X1=black, X2=hispanic,
+         X3=married, X4=nodegree,
          X5=age, X6=education,
          X7=re74, X8=re75)
 
@@ -61,7 +61,7 @@ df <- df %>%
 
 # EDA ---------------------------------------------------------------------
 
-df %>% 
+df %>%
   group_by(dataset, Z) %>%
   summarize(across(starts_with("X"),
                    mean))
@@ -72,20 +72,20 @@ if (F) {
   #  - less educated, fewer degrees
   #  - much more black
   #  - much lower earnings
-  df %>% 
-    group_by(dataset) %>% 
+  df %>%
+    group_by(dataset) %>%
     summarize(across(X1:X8, mean))
-  
+
   # NSWD has...
   #  - less variance in age/educ/income
-  df %>% 
-    group_by(dataset) %>% 
+  df %>%
+    group_by(dataset) %>%
     summarize(across(X1:X8, sd))
-  
+
   # visualize covariate distributions
-  df %>% 
-    group_by(dataset) %>% 
-    pivot_longer(X1:X8) %>% 
+  df %>%
+    group_by(dataset) %>%
+    pivot_longer(X1:X8) %>%
     ggplot(aes(x=value, color=dataset)) +
     geom_density() +
     facet_wrap(~name, scales="free")
@@ -128,8 +128,8 @@ get_att_ests(calada_scm)
 
 # FSATT results -----------------------------------------------------------
 
-feasible <- attr(calada_scm, "scweights") %>% 
-  bind_rows() %>% 
+feasible <- attr(calada_scm, "scweights") %>%
+  bind_rows() %>%
   filter(subclass %in% attr(calada_scm, "feasible_subclasses"))
 get_att_ests(feasible)
 
@@ -149,25 +149,39 @@ ggsave("writeup/figures/lalonde_ess.png", height=3, width=4)
 # (optional) visualize density --------------------------------------------
 
 require(latex2exp)
-tibble(d = as.numeric(attr(calada_scm, "dm_uncapped"))) %>% 
-  filter(d < 1000) %>% 
+dm <- data.frame(t(as.matrix(attr(calada_scm, "dm_uncapped"))))
+# rank each column
+dm_col_sorted <- apply(dist_matrix, 2, sort)
+dist_to_plot <- dm_col_sorted[1:3,] # choose top 3
+tibble(d = as.numeric(as.matrix(dist_to_plot))) %>%
+  filter(d < 1000) %>%
   ggplot(aes(d)) +
-  geom_histogram(color="black", binwidth=0.5) +
+  geom_histogram(color="black", binwidth=0.3) +
   theme_classic() +
   labs(y = "Count",
        x = TeX("$d(X_t, X_j)$"))
-ggsave("writeup/figures/lalonde_calselect.png", height=2.5, width=5)
+ggsave("writeup/figures/lalonde_calselect_top_3.png", height=2.5, width=5)
+
+
+# tibble(d = as.numeric(attr(calada_scm, "dm_uncapped"))) %>%
+#   filter(d < 1000) %>%
+#   ggplot(aes(d)) +
+#   geom_histogram(color="black", binwidth=0.5) +
+#   theme_classic() +
+#   labs(y = "Count",
+#        x = TeX("$d(X_t, X_j)$"))
+# ggsave("writeup/figures/lalonde_calselect.png", height=2.5, width=5)
 
 
 
 # check some units --------------------------------------------------------
 
-calada_scm %>% 
-  left_join(attr(calada_scm, "adacalipers") %>% 
+calada_scm %>%
+  left_join(attr(calada_scm, "adacalipers") %>%
               rename(subclass = id),
-            by = "subclass") %>% 
-  arrange(desc(adacal)) %>% 
-  filter(adacal > 1, Z==1) %>% 
+            by = "subclass") %>%
+  arrange(desc(adacal)) %>%
+  filter(adacal > 1, Z==1) %>%
   select(id, X5:X8, adacal)
 
 
@@ -180,17 +194,18 @@ set.seed(1)
 #   geom_hline(yintercept=0, lty="dotted")
 # satt_plot2(calada_scm, B=100) +
 #   geom_hline(yintercept=0, lty="dotted")
-foo <- satt_plot4(calada_scm, B=1000)
+# foo <- satt_plot4(calada_scm, B=1000)
+foo <- satt_plot4(calada_scm, B=NA)
 foo +
   geom_hline(yintercept=0, lty="dotted") +
   theme(legend.direction="horizontal",
         legend.position = c(0.5, 0.85),
-        # legend.position = "bottom",
         legend.background = element_blank(),
         legend.box.background = element_rect(colour = "black")) +
   labs(y = "Cumulative ATT Estimate",
        x = "Total number of treated units used",
-       color = "Maximum \ncaliper \nsize used    ")
+       color = "Maximum \ncaliper \nsize used    ")+
+  ylim(c(0,2500))
 ggsave("writeup/figures/lalonde_att.png", height=3, width=6)
 # [1] "FSATT: (339.098, 2851.353)"
 # [1] "SATT: (76.115, 2612.28)"
@@ -207,11 +222,12 @@ ggsave("writeup/figures/lalonde_love.png", height=3, width=4)
 
 love_labs <- c("Age", "Years of Education", "Earnings (1974)", "Earnings (1975)")
 names(love_labs) <- paste0("X", 5:8)
+tmp <- attr(calada_scm,  "adacalipers")
 love_plot2(calada_scm, covs = paste0("X", 5:8)) +
   theme(legend.background = element_blank(),
         legend.box.background = element_rect(colour = "black")) +
   scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(1,5)]) +
-  facet_wrap(~name, 
+  facet_wrap(~name,
              scales="free",
              labeller = labeller(name = love_labs))
 ggsave("writeup/figures/lalonde_love2.png", height=3, width=6)
@@ -220,7 +236,7 @@ ggsave("writeup/figures/lalonde_love2.png", height=3, width=6)
 
 ### naive bootstrap
 
-boot_naive_res <- boot_naive(df, 
+boot_naive_res <- boot_naive(df,
                              caliper = CALIPER,
                              metric = METRIC,
                              cal_method = CAL_METHOD,
