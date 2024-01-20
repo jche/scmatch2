@@ -49,6 +49,27 @@ save_res_to_csv(
   kang_naive,
   FNAME = "./sim_toy_results/kang_toy_naive.csv")
 
+
+source("R/bootstrap.R")
+kang_false_naive<-
+  boot_CSM(dgp_name="kang",
+           att0=T,
+           I=1,
+           B=100,
+           mu_model="linear",
+           boot_mtd="naive",
+           n_split=1,
+           kang_true = F)
+save_res_to_csv(
+  kang_false_naive,
+  FNAME = "./sim_toy_results/kang_toy_naive.csv")
+print(kang_false_naive$time_on_bootstrap)
+
+
+
+
+
+
 boot_otsu_to_test <-
   boot_CSM(dgp_name="otsu",
            att0=T,

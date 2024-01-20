@@ -165,6 +165,9 @@ get_matches_and_debiased_residuals <-
       if (mu_model == "kang_correct"){
         X_names<- c("V1","V2","V3","V4")
         SL_lib <- "SL.lm"
+      }else if (mu_model == "linear"){
+        X_names<- c("X1","X2","X3","X4")
+        SL_lib <- "SL.lm"
       }
     }
     else {
@@ -288,10 +291,26 @@ boot_naive <- function(df_dgp,
                        dgp_name="otsu",
                        mu_model="linear"){
   # B <- 100; seed_addition <- 1
+  # dgp_name <- "toy"; mu_model = "linear"
+  # df_dgp <- generate_one_toy()
   bootstrap_estimates <- numeric(B)
+
+  # X_names<- c("X1","X2")
+  # if (mu_model == "linear"){
+  #   SL_lib <- "SL.lm"
+  # }else if (mu_model == "non-linear"){
+  #   SL_lib <-  "SL.randomForest"
+  # }
+  # # Get the debiased model of the original data
+  # SL_fit <- get_SL_fit(df_to_fit=df_dgp,
+  #                      X_names = X_names,
+  #                      Y_name = "Y",
+  #                      SL.library = SL_lib)
+
 
   # Perform bootstrap
   for (b in 1:B) {
+    # b <- 2
     print(paste0("Naive boot: ", b))
     set.seed(123 + seed_addition + b*13)
 
@@ -314,13 +333,45 @@ boot_naive <- function(df_dgp,
 
     resampled_data$id <- df_dgp$id
 
-    dist_scaling_resampled_data <- resampled_data %>%
-      summarize(across(starts_with("X"),
-                       function(x) {
-                         if (is.numeric(x)) 6 / (max(x) - min(x))
-                         else 1000
-                       }))
+    if (dgp_name == "toy"){
+      dist_scaling_resampled_data <- resampled_data %>%
+        summarize(across(starts_with("X"),
+                         function(x) {
+                           if (is.numeric(x)) 6 / (max(x) - min(x))
+                           else 1000
+                         }))
+    }else if (dgp_name == "kang"){
+      dist_scaling_resampled_data <- resampled_data %>%
+        summarize(across(starts_with("X"),
+                         function(x) {
+                           if (is.numeric(x)) 5 / (max(x) - min(x))
+                           else 1000
+                         }))
+    }
 
+    # Fix the debiasing model
+    # estimator <- function(df){
+    #   preds_csm <- get_matches(dgp_name=dgp_name,
+    #                            df_dgp=df,
+    #                            dist_scaling=dist_scaling)
+    #   preds_csm[,paste0("hat_mu_0")] <-
+    #     SL_pred  <- get_SL_pred(SL_fit=SL_fit,
+    #                             df_pred=preds_csm,
+    #                             X_names=X_names)
+    #   ## Construct residuals
+    #   # First, construct each \tilde \tau_i
+    #   tmp0 <- preds_csm %>%
+    #     mutate(Y_bias_corrected = Y - hat_mu_0) %>%
+    #     group_by(subclass, Z) %>%
+    #     summarize(mn = sum(Y_bias_corrected*weights))
+    #   tmp <- tmp0 %>%
+    #     group_by(subclass) %>%
+    #     summarise(tilde_tau = last(mn)-first(mn))
+    #   tilde_tau = tmp$tilde_tau
+    #   return(tilde_tau)
+    # }
+
+    # Estimate debiasing model independently
     estimator <- function(df){
       obj <- get_matches_and_debiased_residuals(
         dgp_name=dgp_name,
@@ -332,6 +383,7 @@ boot_naive <- function(df_dgp,
     }
     bootstrap_estimates[b] <-
       estimator(resampled_data)
+    print(bootstrap_estimates[b])
   }
 
   return(bootstrap_estimates)
@@ -339,6 +391,89 @@ boot_naive <- function(df_dgp,
 
 
 boot_cluster <- function(df_dgp,
+                                  B,
+                                  seed_addition){
+  # B <- 100; seed_addition <- 1
+  # dgp_name <- "toy"; mu_model = "linear"
+  # df_dgp <- generate_one_toy()
+  dist_scaling <- df_dgp %>%
+    summarize(across(starts_with("X"),
+                     function(x) {
+                       if (is.numeric(x)) 6 / (max(x) - min(x))
+                       else 1000
+                     }))
+  obj <- get_matches_and_debiased_residuals(
+    dgp_name=dgp_name,
+    df_dgp=df_dgp,
+    dist_scaling=dist_scaling,
+    mu_model="linear",
+    n_split=1)
+  md <- obj$preds_csm
+  pair_ids <- unique(md$subclass)
+
+  #Unit IDs, split by pair membership
+  split_inds <-
+    split(seq_len(nrow(md)), md$subclass)
+  #
+  debiased_units <- md %>%
+    mutate(Y_bias_corrected = Y - hat_mu_0) %>%
+    group_by(subclass, Z) %>%
+    summarize(mn = sum(Y_bias_corrected*weights))%>%
+    group_by(subclass) %>%
+    summarise(tilde_tau = last(mn)-first(mn))
+  tilde_tau <- debiased_units$tilde_tau
+  hist(tilde_tau)
+  # Bootstrap process
+  for(i in 1:200) {
+    sample_data <- sample(tilde_tau,
+                          replace = TRUE,
+                          size = length(tilde_tau))
+    bootstrap_estimates[i] <- mean(sample_data)
+  }
+  hist(bootstrap_estimates)
+  sd(bootstrap_estimates)
+
+  # Compute bootstrap standard error
+  bootstrap_se <- sd(bootstrap_estimates)
+
+
+
+  bootstrap_estimates <- numeric(B)
+  # Perform bootstrap
+  for (b in 1:B) {
+    # b<-1
+    # print(b)
+    set.seed(123 + seed_addition + b*13)
+
+    n_ids <- length(pair_ids)
+
+    i <- sample(1:n_ids,replace=T)
+
+    ids <- unlist(split_inds[pair_ids[i]])
+
+    resampled_data <- md[ids,]
+
+    estimator <- function(df){
+      # Calculate mean_tilde_tau
+      tmp0 <- df %>%
+        mutate(Y_bias_corrected = Y - hat_mu_0) %>%
+        group_by(subclass, Z) %>%
+        summarize(mn = sum(Y_bias_corrected*weights))
+      tmp <- tmp0 %>%
+        group_by(subclass) %>%
+        summarise(tilde_tau = last(mn)-first(mn))
+      tilde_tau = tmp$tilde_tau
+      mean_tilde_tau <- mean(tilde_tau)
+      return(mean_tilde_tau)
+    }
+    bootstrap_estimates[b] <-
+      estimator(resampled_data)
+  }
+
+  return(bootstrap_estimates)
+}
+
+boot_cluster_for_otsu <- function(df_dgp,
                        B,
                        seed_addition){
   # B <- 100; seed_addition <- 1

@@ -1,0 +1,2 @@
+id,name,boot_mtd,att_true,att_est,att_est_debiased,lower,upper,covered,sd_boot
+1,kang,Bayesian,0,-0.19513939702585503,0.2156467012631977,0.10322581528762335,0.31500034014636746,0,0.057201765835460536

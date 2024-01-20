@@ -1,3 +1,9 @@
+# Write up
+/writeup/
+
+# Results
+/sim_toy_results/
+
 # History files
 .Rhistory
 .Rapp.history
