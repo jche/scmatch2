@@ -1,27 +1,3 @@
-# Function: Obtain the debiased residuals
-# input:
-#   df_dgp, dist_scaling, mu_model
-# Output:
-#   preds_csm: matched df
-#   tilde_tau,
-#   mean_tilde_tau,
-#   tilde_tau_resids
-
-get_SL_fit <- function(df_to_fit,
-                       X_names,
-                       Y_name,
-                       SL.library){
-  SuperLearner(Y = df_to_fit[,Y_name,drop=T],
-               X = df_to_fit[,X_names],
-               SL.library = SL.library)
-}
-
-get_SL_pred <-
-  function(SL_fit, df_pred, X_names){
-    SL_pred_obj <- predict(SL_fit,
-            newdata = df_pred[,X_names])
-    return(SL_pred_obj$library.predict)
-  }
 
 
 assign_group_label <- function(df_to_split, n_split) {
@@ -194,7 +170,7 @@ get_matches_and_debiased_residuals <-
       # get predictions:
       preds_csm[,paste0("hat_mu_0_pred_",i)] <-
         SL_pred  <- get_SL_pred(SL_fit=SL_fit,
-                                df_pred=preds_csm,
+                                df_test=preds_csm,
                                 X_names=X_names)
     }
 
@@ -356,7 +332,7 @@ boot_naive <- function(df_dgp,
     #                            dist_scaling=dist_scaling)
     #   preds_csm[,paste0("hat_mu_0")] <-
     #     SL_pred  <- get_SL_pred(SL_fit=SL_fit,
-    #                             df_pred=preds_csm,
+    #                             df_test=preds_csm,
     #                             X_names=X_names)
     #   ## Construct residuals
     #   # First, construct each \tilde \tau_i

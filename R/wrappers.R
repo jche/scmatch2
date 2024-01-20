@@ -1,80 +1,141 @@
 
-# wrapper functions: input data/settings, output ATT estimate
+# wrapper functions:
+#  an adaptive implementation of wide-use basic
+#  functions for convenience
 
 require(optweight)
 require(dbarts)
 require(tmle)
 require(AIPW)
+require(mvtnorm)
+
+
+#' SuperLearner fitting
+#'
+#' @param df_to_fit The data frame for whom we fit the SuperLearner.
+#' Should contain both X and Y
+#' @param X_names A vector of strings, specifying column names of covariates
+#' @param Y_name A string variable specifying
+#' @param SL.library A string to tell SuperLearner which learner to use
+#'
+#' @return A SuperLearner object
+#' @export
+#'
+#' @examples get_SL_fit <- function(df_to_fit=df_to_fit_i,X_names=c("X1","X2"),Y_name="Y", SL.library="SL.lm")
+get_SL_fit <- function(df_to_fit,
+                       X_names,
+                       Y_name,
+                       SL.library){
+  SuperLearner(Y = df_to_fit[,Y_name,drop=T],
+               X = df_to_fit[,X_names],
+               SL.library = SL.library)
+}
+
+#' Get prediction from the fitted SuperLearner object
+#'
+#' @param SL_fit A fitted SuperLearner object
+#' @param df_pred The testing dataset
+#' @param X_names A vector of strings, specifying column names of covariates
+#'
+#' @return A matrix of predictions. Column is the SL.lib. Rows are N_data
+#' @export
+#'
+#' @examples mock_SL_fit <- create_mock_SL_fit()
+#' mock_df_test <- create_mock_df_test()
+#' X_names <- c("X1","X2")
+#' result <- get_SL_pred(mock_SL_fit,
+#'                       mock_df_test,
+#'                       X_names)
+get_SL_pred <-
+  function(SL_fit, df_test, X_names){
+    SL_pred_obj <- predict(SL_fit,
+                           newdata = df_test[,X_names])
+    return(SL_pred_obj$library.predict)
+  }
+
+
+generate_one_toy <- function(){
+  gen_df_adv(
+    nc=500,
+    nt=100,
+    f0_sd = 0.5,
+    tx_effect_fun = function(X1, X2) {3*X1+3*X2},
+    f0_fun = function(x,y) {
+      matrix(c(x,y), ncol=2) %>%
+        dmvnorm(mean = c(0.5,0.5),
+                sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
+    })
+}
 
 
 get_att_diff <- function(d) {
-  d %>% 
-    group_by(Z) %>% 
-    summarize(mn = mean(Y)) %>% 
-    pivot_wider(names_from=Z, names_prefix="Y", values_from=mn) %>% 
-    mutate(ATT = YTRUE - YFALSE) %>% 
+  d %>%
+    group_by(Z) %>%
+    summarize(mn = mean(Y)) %>%
+    pivot_wider(names_from=Z, names_prefix="Y", values_from=mn) %>%
+    mutate(ATT = YTRUE - YFALSE) %>%
     pull(ATT)
 }
 
-get_att_bal <- function(d, 
+get_att_bal <- function(d,
                         form,
                         tols) {
   m_bal <- optweight(form,
                      data = d,
                      tols = tols,
                      estimand = "ATT")
-  
+
   # output ATT estimate
-  d %>% 
-    mutate(wt = m_bal$weights) %>% 
-    group_by(Z) %>% 
+  d %>%
+    mutate(wt = m_bal$weights) %>%
+    group_by(Z) %>%
     summarize(Y = mean(Y*wt)) %>%    # co weights sum to nc, tx weights = 1
-    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
-    mutate(ATT = YTRUE - YFALSE) %>% 
+    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>%
+    mutate(ATT = YTRUE - YFALSE) %>%
     pull(ATT)
 }
 
 get_att_or_lm <- function(d,
                           form) {
   m_lm <- lm(form, data = d %>% filter(!Z))
-  
-  d %>% 
-    filter(Z) %>% 
-    mutate(mhat0 = predict(m_lm, newdata=.)) %>% 
-    summarize(ATThat = mean(Y - mhat0)) %>% 
+
+  d %>%
+    filter(Z) %>%
+    mutate(mhat0 = predict(m_lm, newdata=.)) %>%
+    summarize(ATThat = mean(Y - mhat0)) %>%
     pull(ATThat)
 }
 
 get_att_or_bart <- function(d,
                             covs) {
-  
-  m_bart <- bart(x.train = d %>% 
-                   filter(Z==0) %>% 
-                   select({{covs}}), 
-                 y.train = d %>% 
-                   filter(Z==0) %>% 
+
+  m_bart <- bart(x.train = d %>%
+                   filter(Z==0) %>%
+                   select({{covs}}),
+                 y.train = d %>%
+                   filter(Z==0) %>%
                    pull(Y),
-                 x.test = d %>% 
-                   filter(Z==1) %>% 
+                 x.test = d %>%
+                   filter(Z==1) %>%
                    select({{covs}}),
                  verbose=F)
-  
+
   # output ATT estimate
-  d %>% 
-    filter(Z==1) %>% 
-    mutate(mhat0 = colMeans(m_bart$yhat.test)) %>% 
-    summarize(ATThat = mean(Y-mhat0)) %>% 
+  d %>%
+    filter(Z==1) %>%
+    mutate(mhat0 = colMeans(m_bart$yhat.test)) %>%
+    summarize(ATThat = mean(Y-mhat0)) %>%
     pull(ATThat)
 }
 
 get_att_ps_lm <- function(d,
                           form) {
   m_lm_ps <- glm(form, data = d, family="binomial")
-  
-  d %>% 
+
+  d %>%
     mutate(e = invlogit(predict(m_lm_ps, newdata=.)),
            wt = ifelse(Z, 1, e/(1-e))) %>%   # for ATT
-    summarize(ATThat = 
+    summarize(ATThat =
                 sum(Z*wt*Y) / sum(Z*wt) -              # tx weighted mean
                 sum((1-Z)*wt*Y) / sum((1-Z)*wt)) %>%   # co weighted mean
     pull(ATThat)
@@ -82,31 +143,31 @@ get_att_ps_lm <- function(d,
 
 get_att_ps_bart <- function(d,
                             covs) {
-  
-  m_bart <- bart(x.train = d %>% 
-                   select({{covs}}), 
+
+  m_bart <- bart(x.train = d %>%
+                   select({{covs}}),
                  y.train = d$Z %>% as.numeric(),
-                 x.test = d %>% 
+                 x.test = d %>%
                    select({{covs}}),
                  verbose=F)
-  
+
   # output ATT estimate
-  d %>% 
+  d %>%
     mutate(e = pnorm(colMeans(m_bart$yhat.test)),
-           wt = Z - e*(1-Z)/(1-e)) %>% 
-    summarize(ATThat = 
+           wt = Z - e*(1-Z)/(1-e)) %>%
+    summarize(ATThat =
                 sum(Z*wt*Y) / sum(Z*wt) -              # tx weighted mean
                 sum((1-Z)*wt*Y) / sum((1-Z)*wt)) %>%   # co weighted mean
     pull(ATThat)
 }
 
-get_att_tmle <- function(d, 
+get_att_tmle <- function(d,
                          covs,
                          Q.SL.library,
                          g.SL.library) {
-  tmle <- tmle(Y = d$Y, 
+  tmle <- tmle(Y = d$Y,
                A = as.numeric(d$Z),
-               W = d %>% 
+               W = d %>%
                  select({{covs}}),
                Q.SL.library = Q.SL.library,
                g.SL.library = g.SL.library,
@@ -121,7 +182,7 @@ get_att_aipw <- function(d,
   aipw <- AIPW$
     new(Y = d$Y,
         A = d$Z,
-        W = d %>% 
+        W = d %>%
           select({{covs}}),
         Q.SL.library = Q.SL.library,
         g.SL.library = g.SL.library,
@@ -129,8 +190,8 @@ get_att_aipw <- function(d,
         verbose = F)$
     stratified_fit()$
     summary()
-  
-  aipw$ATT_estimates$RD['Estimate'] %>% 
+
+  aipw$ATT_estimates$RD['Estimate'] %>%
     as.numeric()
 }
 
@@ -147,35 +208,35 @@ get_att_csm <- function(d,
     est_method = est_method,
     return = "sc_units",
     knn = 25)
-  
+
   if (F) {
     # when return = "all":
     #  - in hain simulation, see that you get some
     #    very extreme estimates from units with 1 or 2 matched controls...
-    preds_csm %>% 
-      group_by(subclass) %>% 
+    preds_csm %>%
+      group_by(subclass) %>%
       summarize(n = n(),
-                est = sum(weights*Y*Z) - sum(weights*Y*(1-Z))) %>% 
+                est = sum(weights*Y*Z) - sum(weights*Y*(1-Z))) %>%
       ggplot(aes(x=n-1, y=est)) +
       geom_point()
   }
-  
+
   # output average number of matches per unit
   if (F) {
-    n_matches <- attr(preds_csm, "scweights") %>% 
+    n_matches <- attr(preds_csm, "scweights") %>%
       map_dbl(~nrow(.)-1)
     print(paste("Average number of co units per tx unit:", mean(n_matches)))
     p <- ggplot(tibble(x=n_matches)) +
       geom_histogram(aes(x), color="black")
     print(p)
   }
-  
+
   # get ATT estimate:
-  preds_csm %>% 
-    group_by(Z) %>% 
+  preds_csm %>%
+    group_by(Z) %>%
     summarize(Y = mean(Y)) %>%   # return = "sc_units" so this is okay
-    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
-    mutate(ATT = YTRUE - YFALSE) %>% 
+    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>%
+    mutate(ATT = YTRUE - YFALSE) %>%
     pull(ATT)
 }
 
@@ -185,28 +246,28 @@ get_att_cem <- function(d,
                         estimand = c("ATT", "CEM-ATT"),
                         est_method = "average") {
   estimand <- match.arg(estimand)
-  
+
   preds_feasible <- get_cem_matches(
     df = d,
     num_bins = num_bins,
     est_method = est_method,
     return = "sc_units")
-  
+
   # get ATT estimate:
-  att_feasible <- preds_feasible %>% 
-    group_by(Z) %>% 
+  att_feasible <- preds_feasible %>%
+    group_by(Z) %>%
     summarize(Y = mean(Y)) %>%   # return = "sc_units" so this is okay
-    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
-    mutate(ATT = YTRUE - YFALSE) %>% 
+    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>%
+    mutate(ATT = YTRUE - YFALSE) %>%
     pull(ATT)
-  
+
   if (estimand == "CEM-ATT") {
     return(att_feasible)
   }
-  
+
   if (length(attr(preds_feasible, "feasible_units")) < sum(d$Z)) {
-    preds_infeasible <- d %>% 
-      filter(!Z | !(id %in% attr(preds_feasible, "feasible_units"))) %>% 
+    preds_infeasible <- d %>%
+      filter(!Z | !(id %in% attr(preds_feasible, "feasible_units"))) %>%
       get_cal_matches(.,
                       metric = "maximum",
                       cal_method = "1nn",
@@ -218,14 +279,14 @@ get_att_cem <- function(d,
                                            else 1000
                                          })),
                       return = "sc_units")
-    att_infeasible <- preds_infeasible %>% 
-      group_by(Z) %>% 
-      summarize(Y = mean(Y*weights)) %>% 
-      pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
-      mutate(ATT = YTRUE - YFALSE) %>% 
+    att_infeasible <- preds_infeasible %>%
+      group_by(Z) %>%
+      summarize(Y = mean(Y*weights)) %>%
+      pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>%
+      mutate(ATT = YTRUE - YFALSE) %>%
       pull(ATT)
-    
-    return((att_feasible * sum(preds_feasible$Z) + 
+
+    return((att_feasible * sum(preds_feasible$Z) +
               att_infeasible * sum(preds_infeasible$Z)) / sum(d$Z))
   }
   return(att_feasible)
@@ -240,17 +301,17 @@ get_att_1nn <- function(d, dist_scaling) {
     est_method = "average",
     dist_scaling = dist_scaling,
     return = "sc_units",
-    cem_tx_units = d %>% 
-      filter(Z==1) %>% 
+    cem_tx_units = d %>%
+      filter(Z==1) %>%
       pull(id)
   )
-  
+
   # get ATT estimate:
-  preds_1nn %>% 
-    group_by(Z) %>% 
+  preds_1nn %>%
+    group_by(Z) %>%
     summarize(Y = mean(Y)) %>%   # return = "sc_units" so this is okay
-    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>% 
-    mutate(ATT = YTRUE - YFALSE) %>% 
+    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>%
+    mutate(ATT = YTRUE - YFALSE) %>%
     pull(ATT)
 }
 
@@ -261,34 +322,34 @@ get_att_1nn <- function(d, dist_scaling) {
 if (F) {
   require(tidyverse)
   require(mvtnorm)
-  
+
   require(optweight)
   require(dbarts)
   require(tmle)
   require(AIPW)
-  
+
   require(tictoc)
-  
+
   source("R/distance.R")
   source("R/sc.R")
   source("R/matching.R")
   source("R/estimate.R")
   source("R/sim_data.R")
-  
-  df <- gen_df_adv2d(nc=1000, nt=50, 
+
+  df <- gen_df_adv2d(nc=1000, nt=50,
                      tx_effect=0.2,
                      sd=0.03,
                      effect_fun = function(x,y) {
-                       matrix(c(x,y), ncol=2) %>% 
+                       matrix(c(x,y), ncol=2) %>%
                          dmvnorm(mean = c(0.5,0.5),
                                  sigma = matrix(c(1,0.8,0.8,1), nrow=2))
                      })
-  
+
   df <- gen_df_full(nc=1000, nt=50, eps_sd=0,
                     tx_effect = function(x,y) {(0.5*(x+y))},
                     effect_fun = function(x,y) {x+y})
-  
-  df %>% 
+
+  df %>%
     ggplot(aes(X1,X2)) +
     geom_point(aes(pch=as.factor(Z), color=Y)) +
     scale_color_continuous(low="orange", high="blue") +
@@ -298,34 +359,34 @@ if (F) {
          x = latex2exp::TeX("$X_1$"),
          y = latex2exp::TeX("$X_2$")) +
     facet_wrap(~Z)
-  df %>% 
-    filter(Z) %>% 
+  df %>%
+    filter(Z) %>%
     summarize(eff = mean(Y1-Y0))
-  
-  
+
+
   get_att_bal(df,
               form=as.formula('Z ~ X1+X2'),
               tols=c(0.01, 0.01))
   get_att_bal(df,
               form=as.formula('Z ~ X1*X2'),
               tols=c(0.01, 0.01, 0.1))
-  
+
   get_att_or_lm(df, form=as.formula('Y ~ X1*X2'))
   get_att_or_bart(df, covs=c(X1, X2))
   get_att_ps_lm(df, form=as.formula('Z ~ X1*X2'))
   get_att_ps_bart(df, covs=c(X1, X2))
-  
-  get_att_tmle(df %>% 
-                 mutate(X3 = X1*X2), 
+
+  get_att_tmle(df %>%
+                 mutate(X3 = X1*X2),
                covs=c(X1,X2,X3),
                Q.SL.library = SL.library1,
                g.SL.library = SL.library1)
-  get_att_aipw(df %>% 
-                 mutate(X3 = X1*X2), 
+  get_att_aipw(df %>%
+                 mutate(X3 = X1*X2),
                covs=c(X1,X2,X3),
                Q.SL.library = SL.library1,
                g.SL.library = SL.library1)
-  
+
   get_att_csm(df, num_bins=5, est_method="scm")
   get_att_cem(df, num_bins=5, est_method="scm")
 }

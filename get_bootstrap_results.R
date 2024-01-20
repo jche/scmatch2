@@ -1,6 +1,5 @@
 setwd("~/Dropbox (Harvard University)/Xiang_Luke/scmatch2")
 library(tidyverse)
-require(mvtnorm)
 source("R/distance.R")
 source("R/sc.R")
 source("R/matching.R")
