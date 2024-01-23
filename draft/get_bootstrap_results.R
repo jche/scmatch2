@@ -66,6 +66,18 @@ print(kang_false_naive$time_on_bootstrap)
 
 
 
+source("R/bootstrap.R")
+kang_residual<-
+  boot_CSM(dgp_name="kang",
+           att0=F,
+           I=100,
+           B=20,
+           mu_model="linear",
+           boot_mtd="naive",
+           n_split=1,
+           kang_true = F)
+save_res_to_csv(toy_naive,
+                FNAME = "./sim_toy_results/kang_toy_naive.csv")
 
 
 

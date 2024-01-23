@@ -22,7 +22,7 @@ save_res_to_csv<-
   } # save_res_to_csv
 
 I = 40; B=40
-FNAME = 
+FNAME =
   paste0("./sim_toy_results/kang_toy_naive_I_",I,"_B_",B,".csv")
 source("R/bootstrap.R")
 toy_naive<-
@@ -65,5 +65,23 @@ kang_false_naive<-
            kang_true = F)
 save_res_to_csv(
   kang_false_naive,
+  FNAME = FNAME)
+
+
+# Get results using
+I <- 100; B=20
+FNAME <- paste0("./sim_toy_results/toy_bootstrap.csv")
+source("R/bootstrap.R")
+kang_false_resid<-
+  boot_CSM(dgp_name="kang",
+           att0=T,
+           I=I,
+           B=B,
+           mu_model="linear",
+           boot_mtd="wild",
+           n_split=1,
+           kang_true = F)
+save_res_to_csv(
+  kang_false_resid,
   FNAME = FNAME)
 

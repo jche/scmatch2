@@ -607,7 +607,7 @@ boot_CSM <- function(dgp_name,
     covered[i] = (CI_lower[i] < att) & (att < CI_upper[i])
 
 
-    print(paste0("ATT is ", signif(att,3),
+    print(paste0("att_est is ", signif(att_est[i],3),
                  "; LB is ", signif(CI_lower[i],3),
                  "; UB is ", signif(CI_upper[i],3)))
     print(paste0("Bootstrap s.e. is ", sd_boot[i]))
