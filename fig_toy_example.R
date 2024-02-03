@@ -69,6 +69,29 @@ toy_example_six_points_plot <-
 ggsave("writeup/figures/toyexample2.png", width=3, height=3)
 
 
+# plot dataset ------------------------------------------------------------
+
+nc <- 500
+nt <- 100
+f0_sd <- 1
+set.seed(4)
+source("R/sim_data.R")
+source("R/diagnostic_plots.R")
+df <- gen_df_adv(
+  nc=nc,
+  nt=nt,
+  f0_sd = f0_sd,
+  tx_effect_fun = function(X1, X2) {3*X1+3*X2},
+  # f0_fun = function(x,y) {abs(x-y)})
+  f0_fun = function(x,y) {
+    matrix(c(x,y), ncol=2) %>%
+      dmvnorm(mean = c(0.5,0.5),
+              sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
+  })
+
+create_toy_df_plot(df)
+
+ggsave("writeup/figures/sim_toy_ex.png", width=4, height=3)
 
 
 # conditional expectation function ----------------------------------------

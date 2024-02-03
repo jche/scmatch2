@@ -21,6 +21,52 @@ save_res_to_csv<-
     }
   } # save_res_to_csv
 
+I = 100; B=40
+FNAME =
+  paste0("./sim_toy_results/naive_toy_low_mid_high.csv")
+source("R/bootstrap.R")
+source("R/sim_data.R")
+toy_naive_low<-
+  boot_CSM(dgp_name="toy",
+           att0=F,
+           I=I,
+           B=B,
+           mu_model="linear",
+           boot_mtd="naive",
+           n_split=1,
+           kang_true = F,
+           toy_ctr_dist = 0.5)
+save_res_to_csv(toy_naive_low,
+                FNAME = FNAME)
+
+toy_naive_mid<-
+  boot_CSM(dgp_name="toy",
+           att0=F,
+           I=I,
+           B=B,
+           mu_model="linear",
+           boot_mtd="naive",
+           n_split=1,
+           kang_true = F,
+           toy_ctr_dist = 0.3)
+save_res_to_csv(toy_naive_mid,
+                FNAME = FNAME)
+
+toy_naive_high<-
+  boot_CSM(dgp_name="toy",
+           att0=F,
+           I=I,
+           B=B,
+           mu_model="linear",
+           boot_mtd="naive",
+           n_split=1,
+           kang_true = F,
+           toy_ctr_dist = 0.1)
+save_res_to_csv(toy_naive_high,
+                FNAME = FNAME)
+
+
+
 I = 40; B=40
 FNAME =
   paste0("./sim_toy_results/kang_toy_naive_I_",I,"_B_",B,".csv")

@@ -2,47 +2,71 @@
 # functions for simulating data
 
 require(aciccomp2016)
-
+library(mvtnorm)
 
 # toy example -------------------------------------------------------------
+#' Generate covariates X1, X2 for the toy example
+#'
+#' @param n Number of samples
+#' @param X1_ctrs A vector of two elements, representing the two different
+#'  X1 locations
+#' @param X2_ctrs Same as X1_ctrs, but
+#' @param SD Std. deviation of the
+#'
+#' @return A tibble object with two columns X1, X2
+#' @export
+#'
+#' @examples n = 100
+#' X1_ctrs <- c(0.25, 0.75)
+#' X2_ctrs <- c(0.25, 0.75)
+#' SD <- 0.1
+#' res <- gen_toy_covar(n, X1_ctrs, X2_ctrs, SD)
+gen_toy_covar <- function(n, X1_ctrs, X2_ctrs, SD){
+  tibble::tibble(
+    X1 = c(rnorm(n/2, mean=X1_ctrs[1], sd=SD),
+           rnorm(n/2, mean=X1_ctrs[2], sd=SD)),
+    X2 = c(rnorm(n/2, mean=X2_ctrs[1], sd=SD),
+           rnorm(n/2, mean=X2_ctrs[2], sd=SD))
+  )
+}
 
 # generate data mostly in grid (0,1) x (0,1)
 gen_df_adv <- function(nc, nt,
                        f0_sd = 0.1,   # homoskedastic noise
                        f0_fun = function(X1, X2) {1},
-                       tx_effect_fun = function(X1, X2) {1}
-                       # f0_fun = function(X1, X2) { abs(X1-X2) },
-                       # tx_effect = function(X1, X2) {(X1-0.5)^2+(X2-0.5)^2},
+                       tx_effect_fun = function(X1, X2) {1},
+                       ctr_dist = 0.5 # from 0 to 1;
+                       #            lower means better overlap
                        ) {
 
   SD <- 0.1
 
-  # tx units clustered at (0.25,0.25) and (0.75,0.75)
-  dat_txblobs <- tibble(
-    X1 = c(rnorm(nt/2, mean=0.25, sd=SD),
-           rnorm(nt/2, mean=0.75, sd=SD)),
-    X2 = c(rnorm(nt/2, mean=0.25, sd=SD),
-           rnorm(nt/2, mean=0.75, sd=SD)),
-    Z  = T
-  )
+  c1 <- 0.5 - ctr_dist/2
+  c2 <- 0.5 + ctr_dist/2
 
-  # co units clustered at (0.75,0.25) and (0.25,0.75)
-  dat_coblobs <- tibble(
-    X1 = c(rnorm((nc-nt)/2, mean=0.25, sd=SD),
-           rnorm((nc-nt)/2, mean=0.75, sd=SD)),
-    X2 = c(rnorm((nc-nt)/2, mean=0.75, sd=SD),
-           rnorm((nc-nt)/2, mean=0.25, sd=SD)),
-    Z  = F
-  )
+  # nt tx units clustered at (0.25,0.25) and (0.75,0.75)
+  #     which translates to X1_ctrs=(0.25,0.75) and X2_ctrs=(0.25,0.75)
+  dat_txblobs <-
+    gen_toy_covar(nt, X1_ctrs=c(c1,c2), X2_ctrs=c(c1,c2), SD)
+  dat_txblobs$Z <- T
 
-  # some co units uniformly scattered on (0,1) box
+  # (nc-nt) co units clustered at (0.75,0.25) and (0.25,0.75)
+  #     which translates to X1_ctrs=(0.75,0.25) and X2_ctrs=(0.25,0.75)
+  dat_coblobs <-
+    gen_toy_covar(nc-nt, X1_ctrs=c(c2,c1), X2_ctrs=c(c1,c2), SD)
+  dat_coblobs$Z <- F
+
+  # nt co units uniformly scattered on (0,1) box to give some
+  #   randomly good controls
   dat_conear <- tibble(
     X1 = runif(nt),
     X2 = runif(nt),
     Z  = F
   )
 
-  dat <- bind_rows(dat_txblobs, dat_coblobs, dat_conear)
+  dat <- bind_rows(dat_txblobs,
+                   dat_coblobs,
+                   dat_conear)
 
   res <- dat %>%
     mutate(Y0 = f0_fun(X1,X2) +
@@ -228,7 +252,7 @@ gen_df_acic <- function(model.trt="step",
 gen_df_kang <- function(n=1000) {
   as_tibble(rmvnorm(n, mean=rep(0,4), sigma=diag(4))) %>%
     mutate(Y = 210 + 27.4*V1 + 13.7*(V2+V3+V4) + rnorm(n),
-           e = expit(-V1 + 0.5*V2 - 0.25*V3 - 0.1*V4)) %>%
+           e = rje::expit(-V1 + 0.5*V2 - 0.25*V3 - 0.1*V4)) %>%
     mutate(X1 = exp(V1/2),
            X2 = V2/(1+exp(V1)) + 10,
            X3 = (V1*V3/25 + 0.6)^3,
@@ -513,9 +537,10 @@ generate_one_otsu <- function(){
 
 get_df_scaling_from_dgp_name <-
   function(dgp_name,
-           kang_true = F){
+           kang_true = F,
+           toy_ctr_dist=0.5){
   if (dgp_name == "toy"){
-    df_dgp <- generate_one_toy()
+    df_dgp <- gen_one_toy(ctr_dist=toy_ctr_dist)
     dist_scaling <- df_dgp %>%
       summarize(across(starts_with("X"),
                        function(x) {

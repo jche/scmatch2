@@ -1,5 +1,6 @@
 setwd("~/Dropbox (Harvard University)/Xiang_Luke/scmatch2")
 library(tidyverse)
+source("analysis/MCSE_functions.R")
 
 # load data
 I = 40; B=40
@@ -7,26 +8,6 @@ FNAME =
   paste0("./sim_toy_results/kang_toy_naive_I_",I,"_B_",B,".csv")
 res <- read.csv(file =  FNAME)
 
-
-kurtosis <- function(x){
-  S_T = sd(x)
-  kurt = mean( (x - mean(x))^4 ) / S_T^4
-  return(kurt)
-}
-
-MCvar_SEtrue <- function(x){
-  S_T = sd(x); R <- length(x); k_T <- kurtosis(x)
-  return(S_T^2 * sqrt( (k_T-1)/R ))
-}
-
-MCSE_SEtrue <- function(x){
-  return(sqrt(MCvar_SEtrue(x)))
-}
-
-MCSE_bias <- function(x){
-  S_T = sd(x); R <- length(x)
-  return( sqrt(S_T^2 /R ))
-}
 
 table_3_naive <- res %>%
   mutate(bias_before = (att_est - att_true),
@@ -46,25 +27,9 @@ kangs <- res_res_boot %>%
            boot_mtd == "wild") %>%
   filter(mu_model=="kang_correct"|
            mu_model=="linear")
-# kang_correct <- kangs %>% filter(mu_model=="kang_correct")
-# hist(kang_correct$att_est_debiased)
-# kang_wrong <- kangs %>% filter(mu_model=="linear")
-# hist(kang_wrong$att_est_debiased)
 
 toys <- res_res_boot %>%
   filter(name=="toy", n_split==1, boot_mtd=="wild")
-
-# # Assess variation of true means of toys
-# hist(toys$att_true)
-# mean(toys$att_true)
-# sd(toys$att_true)
-# hist(toys$att_est)
-# sd(toys$att_est)
-#
-# mean(toys$att_est - 3)
-# sd((toys$att_est - 3))
-# mean(toys$att_est - toys$att_true)
-# sd((toys$att_est - toys$att_true))
 
 
 table_3_residual <- rbind(kangs,toys) %>%

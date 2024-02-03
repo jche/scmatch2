@@ -268,7 +268,7 @@ boot_naive <- function(df_dgp,
                        mu_model="linear"){
   # B <- 100; seed_addition <- 1
   # dgp_name <- "toy"; mu_model = "linear"
-  # df_dgp <- generate_one_toy()
+  # df_dgp <- gen_one_toy()
   bootstrap_estimates <- numeric(B)
 
   # X_names<- c("X1","X2")
@@ -371,7 +371,7 @@ boot_cluster <- function(df_dgp,
                                   seed_addition){
   # B <- 100; seed_addition <- 1
   # dgp_name <- "toy"; mu_model = "linear"
-  # df_dgp <- generate_one_toy()
+  # df_dgp <- gen_one_toy()
   dist_scaling <- df_dgp %>%
     summarize(across(starts_with("X"),
                      function(x) {
@@ -527,7 +527,8 @@ boot_CSM <- function(dgp_name,
                           mu_model="linear",
                           boot_mtd="Bayesian",
                      n_split=1,
-                     kang_true=F){
+                     kang_true=F,
+                     toy_ctr_dist=0.5){
 
   covered <- CI_lower <- CI_upper <-
     att_true <- att_est <- att_debiased <-
@@ -540,7 +541,8 @@ boot_CSM <- function(dgp_name,
     print(i)
     dgp_obj <-
       get_df_scaling_from_dgp_name(dgp_name=dgp_name,
-                                   kang_true=kang_true)
+                                   kang_true=kang_true,
+                                   toy_ctr_dist=toy_ctr_dist)
     list2env(dgp_obj,envir = environment())
 
     time_before_matching <- proc.time()

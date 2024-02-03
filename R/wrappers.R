@@ -54,7 +54,7 @@ get_SL_pred <-
   }
 
 
-generate_one_toy <- function(){
+gen_one_toy <- function(ctr_dist = 0.5){
   gen_df_adv(
     nc=500,
     nt=100,
@@ -64,7 +64,8 @@ generate_one_toy <- function(){
       matrix(c(x,y), ncol=2) %>%
         dmvnorm(mean = c(0.5,0.5),
                 sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
-    })
+    },
+    ctr_dist = ctr_dist)
 }
 
 
