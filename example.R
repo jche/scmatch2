@@ -149,7 +149,7 @@ ggsave("writeup/figures/lalonde_ess.png", height=3, width=4)
 # (optional) visualize density --------------------------------------------
 
 require(latex2exp)
-dm <- data.frame(t(as.matrix(attr(calada_scm, "dm_uncapped"))))
+dist_matrix <- data.frame(t(as.matrix(attr(calada_scm, "dm_uncapped"))))
 # rank each column
 dm_col_sorted <- apply(dist_matrix, 2, sort)
 dist_to_plot <- dm_col_sorted[1:3,] # choose top 3
@@ -157,20 +157,14 @@ tibble(d = as.numeric(as.matrix(dist_to_plot))) %>%
   filter(d < 1000) %>%
   ggplot(aes(d)) +
   geom_histogram(color="black", binwidth=0.3) +
+  geom_vline(xintercept = 1, col="red") +
   theme_classic() +
   labs(y = "Count",
        x = TeX("$d(X_t, X_j)$"))
 ggsave("writeup/figures/lalonde_calselect_top_3.png", height=2.5, width=5)
 
 
-# tibble(d = as.numeric(attr(calada_scm, "dm_uncapped"))) %>%
-#   filter(d < 1000) %>%
-#   ggplot(aes(d)) +
-#   geom_histogram(color="black", binwidth=0.5) +
-#   theme_classic() +
-#   labs(y = "Count",
-#        x = TeX("$d(X_t, X_j)$"))
-# ggsave("writeup/figures/lalonde_calselect.png", height=2.5, width=5)
+
 
 
 

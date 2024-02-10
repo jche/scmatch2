@@ -37,6 +37,52 @@ get_matches <- function(dgp_name, df_dgp,dist_scaling){
   return(df_dgp_with_matches)
 }
 
+get_se_AE <- function(preds_csm){
+  # 1. Get debiased units; Get the subclasses
+  preds_csm <- preds_csm %>%
+    mutate(Y_bias_corrected = Y - hat_mu_0)
+  # 2. Filter the controls
+  #     and the subclasses with n_controls >= 2
+  preds_csm_filtered <-
+    preds_csm %>%
+    filter(Z==F) %>%
+    group_by(subclass) %>%
+    filter(n() >= 2) %>%
+    ungroup()
+  # 3. For each filtered subclass,
+  #   calculate the cluster residual s_j^2 = se(debiased_units)
+  weighted_var <- function(x, wt) {
+    n <- length(x)
+    wm <- weighted.mean(x, wt)
+    sum(wt * (x - wm)^2) * n / (n-1)
+  }
+
+  weighted_se <- function(x, wt) {
+    sqrt(weighted_var(x, wt) / length(x))
+  }
+  cluster_var_df <-
+    preds_csm_filtered %>%
+    group_by(subclass) %>%
+    summarise(nj = n(),
+              var_cluster = var(Y_bias_corrected))
+  # var_cluster = weighted_var(Y_bias_corrected, weights))
+  # 4. Get the weighted average of s_j^2, weighted by n_j, number of units in the subclass
+  weighted_var_df <- cluster_var_df %>%
+    summarise(weighted_var = weighted.mean(var_cluster, w = nj))
+  sigma_hat <- sqrt(weighted_var_df$weighted_var)
+
+  # 5. calculate N_T and N_C
+  N_T <- nrow(preds_csm %>% filter(Z==T))
+  tmp <- preds_csm %>%
+    filter(Z==F) %>%
+    group_by(id) %>%
+    summarise(w_i_sq = sum(weights^2))
+  N_C_tilde <- N_T^2 / sum(tmp$w_i_sq)
+  # 6. Calculate the variance of the estimator
+  res <- sqrt((1/N_T + 1/N_C_tilde)) * sigma_hat
+  return(res)
+}
+
 get_NN_matches <- function(df_dgp){
   library(MatchIt)
 
@@ -103,8 +149,6 @@ get_matches_and_debiased_residuals <-
     # Assign group_label to df_dgp
     df_dgp_splitted <- assign_group_label(df_dgp,
                                   n_split = n_split)
-    # print("Bootstrap dataset id: ")
-    # print(head(sort(df_dgp$id)))
     preds_csm <- get_matches(dgp_name=dgp_name,
                              df_dgp=df_dgp,
                              dist_scaling=dist_scaling)
@@ -366,9 +410,18 @@ boot_naive <- function(df_dgp,
 }
 
 
-boot_cluster <- function(df_dgp,
-                                  B,
-                                  seed_addition){
+
+
+
+boot_cluster <-function(df_dgp,
+  B,
+  seed_addition,
+  dgp_name="otsu",
+  mu_model="linear"){
+
+  # function(df_dgp,
+  #                                 B,
+  #                                 seed_addition){
   # B <- 100; seed_addition <- 1
   # dgp_name <- "toy"; mu_model = "linear"
   # df_dgp <- gen_one_toy()
@@ -390,27 +443,26 @@ boot_cluster <- function(df_dgp,
   #Unit IDs, split by pair membership
   split_inds <-
     split(seq_len(nrow(md)), md$subclass)
+  # debiased_units <- md %>%
+  #   mutate(Y_bias_corrected = Y - hat_mu_0) %>%
+  #   group_by(subclass, Z) %>%
+  #   summarize(mn = sum(Y_bias_corrected*weights))%>%
+  #   group_by(subclass) %>%
+  #   summarise(tilde_tau = last(mn)-first(mn))
+  # tilde_tau <- debiased_units$tilde_tau
+  # hist(tilde_tau)
+  # # Bootstrap process
+  # for(i in 1:200) {
+  #   sample_data <- sample(tilde_tau,
+  #                         replace = TRUE,
+  #                         size = length(tilde_tau))
+  #   bootstrap_estimates[i] <- mean(sample_data)
+  # }
+  # hist(bootstrap_estimates)
+  # sd(bootstrap_estimates)
   #
-  debiased_units <- md %>%
-    mutate(Y_bias_corrected = Y - hat_mu_0) %>%
-    group_by(subclass, Z) %>%
-    summarize(mn = sum(Y_bias_corrected*weights))%>%
-    group_by(subclass) %>%
-    summarise(tilde_tau = last(mn)-first(mn))
-  tilde_tau <- debiased_units$tilde_tau
-  hist(tilde_tau)
-  # Bootstrap process
-  for(i in 1:200) {
-    sample_data <- sample(tilde_tau,
-                          replace = TRUE,
-                          size = length(tilde_tau))
-    bootstrap_estimates[i] <- mean(sample_data)
-  }
-  hist(bootstrap_estimates)
-  sd(bootstrap_estimates)
-
-  # Compute bootstrap standard error
-  bootstrap_se <- sd(bootstrap_estimates)
+  # # Compute bootstrap standard error
+  # bootstrap_se <- sd(bootstrap_estimates)
 
 
 
@@ -583,12 +635,41 @@ boot_CSM <- function(dgp_name,
     }else if (boot_mtd == "cluster"){
       T_star <- boot_cluster(df_dgp = df_dgp,
                            B = B,
-                           seed_addition = seed_addition)
+                           seed_addition = seed_addition,
+                           dgp_name=dgp_name,
+                           mu_model=mu_model)
 
       sd_boot[i] = sd(T_star)
       CI_lower[i] = mean_tilde_tau -1.96 *  sd_boot[i]
       CI_upper[i] = mean_tilde_tau + 1.96 * sd_boot[i]
+    }else if(boot_mtd == "regression"){
+      library(estimatr)
+      lm_test_weighted<-
+        lm_robust(Y ~ Z,
+                  data=preds_csm,
+                  weights=weights)
+      tmp<-summary(lm_test_weighted)$coefficients
+      sd_boot[i] = tmp[2,2]
+      CI_lower[i] = tmp[2,5]
+      CI_upper[i] = tmp[2,6]
+    }else if(boot_mtd == "regression_debiased"){
+      library(estimatr)
+      preds_csm <- preds_csm %>%
+        mutate(Y_bias_corrected = Y - hat_mu_0)
+      lm_test_weighted<-
+        lm_robust(Y_bias_corrected ~ Z,
+                  data=preds_csm,
+                  weights=weights)
+      tmp<-summary(lm_test_weighted)$coefficients
+      sd_boot[i] = tmp[2,2]
+      CI_lower[i] = tmp[2,5]
+      CI_upper[i] = tmp[2,6]
+    }else if (boot_mtd == "A-E"){
+      sd_boot[i] = get_se_AE(preds_csm)
+      CI_lower[i] = mean_tilde_tau -1.96 *  sd_boot[i]
+      CI_upper[i] = mean_tilde_tau + 1.96 * sd_boot[i]
     }
+
     time_after_bootstrap <- proc.time()
     time_on_bootstrap[i] <-
       (time_after_bootstrap - time_after_matching)[3]

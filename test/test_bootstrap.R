@@ -147,14 +147,32 @@ test_regression_se <- function(){
               se_type = "HC2")
   summary(lm_test)
   lm_test_weighted<-
-    lm_robust(Y ~ Z * (X1 + X2 ),
+    lm_robust(Y ~ Z,
               data=preds_csm,
               weights=weights,
               se_type = "HC2")
-  summary(lm_test_weighted)
+  tmp<-summary(lm_test_weighted)$coefficients
+  tmp[2,2]
+  tmp[2,5]
+  tmp[2,6]
 }
 
+test_eli <- function(){
+  dgp_obj <-
+    get_df_scaling_from_dgp_name(dgp_name="toy")
+  list2env(dgp_obj, envir = environment())
 
+  matches_and_debiased_residuals<-
+    get_matches_and_debiased_residuals(
+      dgp_name="toy", df_dgp,
+      dist_scaling, mu_model="linear",n_split=1)
+  list2env(matches_and_debiased_residuals,
+           envir = environment())
+  View(preds_csm)
+  tmp<-preds_csm %>%
+    group_by(subclass) %>%
+    summarise(n())
+}
 
 
 test_SL_fit_and_pred_linear <- function(){

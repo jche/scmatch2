@@ -21,9 +21,14 @@ save_res_to_csv<-
     }
   } # save_res_to_csv
 
-I = 100; B=40
+I = 100; B=40;
+BOOT_MTD = "A-E"
+# BOOT_MTD = "regression_debiased"
+# BOOT_MTD = "regression"
+# BOOT_MTD = "cluster"
+# BOOT_MTD = "naive"
 FNAME =
-  paste0("./sim_toy_results/naive_toy_low_mid_high.csv")
+  paste0("./sim_toy_results/",BOOT_MTD,"_toy_low_mid_high.csv")
 source("R/bootstrap.R")
 source("R/sim_data.R")
 toy_naive_low<-
@@ -32,7 +37,7 @@ toy_naive_low<-
            I=I,
            B=B,
            mu_model="linear",
-           boot_mtd="naive",
+           boot_mtd=BOOT_MTD,
            n_split=1,
            kang_true = F,
            toy_ctr_dist = 0.5)
@@ -45,7 +50,7 @@ toy_naive_mid<-
            I=I,
            B=B,
            mu_model="linear",
-           boot_mtd="naive",
+           boot_mtd=BOOT_MTD,
            n_split=1,
            kang_true = F,
            toy_ctr_dist = 0.3)
@@ -58,7 +63,7 @@ toy_naive_high<-
            I=I,
            B=B,
            mu_model="linear",
-           boot_mtd="naive",
+           boot_mtd=BOOT_MTD,
            n_split=1,
            kang_true = F,
            toy_ctr_dist = 0.1)
@@ -74,10 +79,10 @@ source("R/bootstrap.R")
 toy_naive<-
   boot_CSM(dgp_name="toy",
            att0=F,
-           I=I,
-           B=B,
+           I=1,
+           B=2,
            mu_model="linear",
-           boot_mtd="naive",
+           boot_mtd="cluster",
            n_split=1,
            kang_true = F)
 save_res_to_csv(toy_naive,
