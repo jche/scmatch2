@@ -8,17 +8,16 @@
 #   Internal Scripts: analysis/plot_toy.R
 
 require(ggplot2)
-# require(mvtnorm)
 
-source("analysis/plot_toy.R")
+source("scripts/analysis/plot_toy.R")
 
 # Load background ----------
-toy_background_df_path <- "data/toy_background_df.rds"
+toy_background_df_path <- "data/inputs/toy_background_df.rds"
 background_df <- tryCatch({
   readRDS(toy_background_df_path)
 }, error = function(err){
   message("The data file for background_df is not found. Generating one...")
-  source("analysis/generate_toy_background_df.R")
+  source("scripts/analysis/generate_toy_background_df.R")
   readRDS(toy_background_df_path)
 }
 )
