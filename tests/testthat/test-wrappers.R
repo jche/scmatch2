@@ -1,4 +1,4 @@
-library(CSM)
+library(tidyverse)
 
 test_that("get_SL_pred returns correct output structure", {
   mock_SL_fit <- create_mock_SL_fit()
@@ -11,3 +11,7 @@ test_that("get_SL_pred returns correct output structure", {
   expect_true(is.matrix(result) == T)
 })
 
+test_that("get_SL_fit returns a correct output data type", {
+  result = create_mock_SL_fit()
+  expect_true("SuperLearner" %in% class(result))
+})

@@ -3,12 +3,10 @@
 
 require(tidyverse)
 require(mvtnorm)
-
 require(optweight)
 require(dbarts)
 require(tmle)
 require(AIPW)
-
 require(tictoc)
 
 source("R/distance.R")
@@ -19,8 +17,8 @@ source("R/sim_data.R")
 source("R/wrappers.R")
 source("R/utils.R")
 
-# parallelize
-if (T) {
+USE_PARALLEL = F
+if (USE_PARALLEL) {
   library(foreach)
   library(doParallel)
   cores=detectCores()
@@ -36,8 +34,7 @@ SL.library1 <- c("SL.mean", "SL.lm", "SL.glm")
 #   and SuperLearner documentation,
 #   adjusted to reduce the computational burden"
 SL.library2 <- c("SL.glm", "SL.gam", "SL.glmnet",
-                 # "SL.gbm", "SL.bartMachine",   # too slow
-                 "SL.randomForest", "SL.xgboost")             # based on aipw recommendations
+                 "SL.randomForest", "SL.xgboost")
 
 # tmle defaults
 SL.library3Q <- c("SL.glm", "tmle.SL.dbarts2", "SL.glmnet")   # default tmle Q.SL.library
@@ -54,8 +51,8 @@ form2 <- as.formula("Y ~ X1*X2")
 
 # repeatedly run for all combinations of pars
 res <- foreach(
-  i=1:40, 
-  .packages = c("tidyverse", 
+  i=1:40,
+  .packages = c("tidyverse",
                 "mvtnorm", "optweight", "dbarts", "tmle", "AIPW", "tictoc",
                 "aciccomp2016"),
   .combine=rbind) %dopar% {
@@ -66,17 +63,17 @@ res <- foreach(
     source("R/sim_data.R")
     source("R/wrappers.R")
     source("R/utils.R")
-    
+
 # for (i in 1:250) {
-    
+
   tic()
-  
+
   nc <- 500
   nt <- 100
   f0_sd <- 0.5
   df <- gen_df_adv(
-    nc=nc, 
-    nt=nt, 
+    nc=nc,
+    nt=nt,
     f0_sd = f0_sd,
     tx_effect_fun = function(X1, X2) {3*X1+3*X2},
     # f0_fun = function(x,y) {abs(x-y)})
@@ -85,17 +82,17 @@ res <- foreach(
         dmvnorm(mean = c(0.5,0.5),
                 sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
       })
-  
+
   num_bins <- 6
-  
+
   dist_scaling <- df %>%
     summarize(across(starts_with("X"),
                      function(x) {
                        if (is.numeric(x)) num_bins / (max(x) - min(x))
                        else 1000
                      }))
-  
-  
+
+
   # for acic simulation: drop units that don't get a within-caliper matches
   preds_csm <- get_cal_matches(
     df = df,
@@ -110,15 +107,15 @@ res <- foreach(
     num_bins = num_bins,
     est_method = "average",
     return = "all")
-  
+
   # record number of infeasible units
   ninf <- length(attr(preds_csm, "unmatched_units"))
   ninf_cem <- sum(df$Z) - length(attr(preds_cem, "feasible_units"))
-  
+
   # for all methods: filter out unmatched csm units
-  df <- df %>% 
+  df <- df %>%
     filter(!id %in% attr(preds_csm, "unmatched_units"))
-  
+
 
   res <- tibble(
     runid = i,
@@ -133,7 +130,7 @@ res <- foreach(
       filter(Z) %>%
       summarize(att = mean(Y1-Y0)) %>%
       pull(att),
-    
+
     diff = get_att_diff(df),
 
     bal1 = get_att_bal(df, zform1, c(0.01, 0.01)),
@@ -143,7 +140,7 @@ res <- foreach(
     or_bart = get_att_or_bart(df, covs=c(X1,X2)),
     ps_lm = get_att_ps_lm(df, zform2),
     ps_bart = get_att_ps_bart(df, covs=c(X1,X2)),
-    
+
     csm_scm = get_att_csm(df, dist_scaling=dist_scaling, est_method="scm",
                           cal_method = "fixed"),
     csm_avg = get_att_csm(df, dist_scaling=dist_scaling, est_method="average",
@@ -153,16 +150,16 @@ res <- foreach(
     cem_avg = get_att_cem(df, num_bins=num_bins, est_method="average",
                           estimand = "CEM-ATT"),
     onenn = get_att_1nn(df, dist_scaling=dist_scaling),
-    
-    tmle1 = get_att_tmle(df, 
+
+    tmle1 = get_att_tmle(df,
                          covs=c(X1,X2),
                          Q.SL.library = SL.library1,
                          g.SL.library = SL.library1),
-    aipw1 = get_att_aipw(df, 
+    aipw1 = get_att_aipw(df,
                          covs=c(X1,X2),
                          Q.SL.library = SL.library1,
                          g.SL.library = SL.library1),
-    
+
     tmle3 = get_att_tmle(df, covs=c(X1,X2),
                          Q.SL.library = SL.library3Q,
                          g.SL.library = SL.library3g),
@@ -170,19 +167,19 @@ res <- foreach(
                          Q.SL.library = SL.library2,
                          g.SL.library = SL.library2)
   )
-  
+
   toc()
-  
-  # res %>% 
+
+  # res %>%
   #   pivot_longer(-c(runid:true_ATT))
-  
+
   FNAME <- "sim_toy_results/toy_spaceship7.csv"
   if (file.exists(FNAME)) {
     write_csv(res, FNAME, append=T)
   } else {
     write_csv(res, FNAME)
   }
-  
+
   res
 }
 
@@ -213,8 +210,8 @@ stopCluster(cl)
 # plot sample data
 set.seed(1)
 df <- gen_df_adv(
-  nc=500, 
-  nt=100, 
+  nc=500,
+  nt=100,
   f0_sd = 0.1,
   tx_effect_fun = function(X1, X2) {0.2},
   # f0_fun = function(x,y) {abs(x-y)})
@@ -225,7 +222,7 @@ df <- gen_df_adv(
   })
 vlines <- seq(min(df$X1),max(df$X1),length.out=9)
 hlines <- seq(min(df$X2),max(df$X2),length.out=9)
-df %>% 
+df %>%
   ggplot(aes(x=X1, y=X2, color=Y)) +
   geom_point(aes(pch=Z)) +
   scale_color_continuous(low="blue", high="orange") +
@@ -235,7 +232,7 @@ df %>%
 
 d1 <- (vlines[2]-vlines[1])/2
 d2 <- (hlines[2]-hlines[1])/2
-df %>% 
+df %>%
   ggplot(aes(x=X1, y=X2, color=Y)) +
   geom_rect(data=. %>% filter(Z) %>% slice(1:5),
             aes(xmin=X1-d1, xmax=X1+d1, ymin=X2-d2, ymax=X2+d2),
@@ -247,8 +244,8 @@ df %>%
 
 if (F) {
   # for seed(1): cem does better! it drops a bunch though.
-  df %>% 
-    filter(Z) %>% 
+  df %>%
+    filter(Z) %>%
     summarize(ATT = mean(Y1-Y0))
   csm_scm <- get_cal_matches(
     df = df,
@@ -263,15 +260,15 @@ if (F) {
                        })),
     return = "all",
     knn = 25)
-  csm_scm %>% 
-    count(subclass) %>% 
+  csm_scm %>%
+    count(subclass) %>%
     ggplot(aes(x=n)) +
     geom_histogram(binwidth=2, color="black")
-  
+
   csm_avg = get_att_csm(df, num_bins=8, est_method="average")
   cem_scm = get_att_cem(df, num_bins=8, est_method="scm")
   cem_avg = get_att_cem(df, num_bins=8, est_method="average")
-  
+
   csm_scm
   csm_avg
   cem_scm
@@ -283,13 +280,13 @@ if (F) {
 
 total_res <- read_csv("sim_toy_results/toy_spaceship7.csv")
 
-total_res %>% 
+total_res %>%
   pivot_longer(-(runid:true_ATT)) %>%
   group_by(nc,nt,f0_sd,name) %>%
   summarize(rmse = sqrt(mean((value-true_ATT)^2)),
             bias = mean(value-true_ATT),
-            sd   = sd(value)) %>% 
-  rename(method = name) %>% 
+            sd   = sd(value)) %>%
+  rename(method = name) %>%
   pivot_longer(c(rmse, bias, sd)) %>%
   ggplot(aes(x=method)) +
   geom_col(aes(y=value)) +
@@ -297,25 +294,25 @@ total_res %>%
   coord_flip()
 
 # prove identity
-total_res %>% 
+total_res %>%
   pivot_longer(-(runid:true_ATT)) %>%
   group_by(nc,nt,f0_sd,name) %>%
   summarize(rmse = sqrt(mean((value-true_ATT)^2)),
             bias = mean(value-true_ATT),
             var_est = mean((value-mean(value))^2),
             var_true = mean((true_ATT-mean(true_ATT))^2),
-            cov = mean((value-mean(value))*(true_ATT-mean(true_ATT)))) %>% 
+            cov = mean((value-mean(value))*(true_ATT-mean(true_ATT)))) %>%
   # mutate(rmse2 = sqrt(var_est + var_true + bias^2 - 2*cov),
-  #        correct = all.equal(rmse,rmse2)) %>% 
-  rename(method = name) %>% 
-  pivot_longer(c(rmse, bias, var_est, var_true, cov)) %>% 
+  #        correct = all.equal(rmse,rmse2)) %>%
+  rename(method = name) %>%
+  pivot_longer(c(rmse, bias, var_est, var_true, cov)) %>%
   ggplot(aes(x=method)) +
   geom_col(aes(y=value)) +
   facet_wrap(~name, scales="free") +
   coord_flip()
 
 # results:
-#  - toy_constant-tx-effect: 
+#  - toy_constant-tx-effect:
 #     - aipw1/bal2/csm_avg best...?
 #     - 1nn lowest bias but very variable
 #     - in general, does seem like lowering variance matters quite a bit...
@@ -330,11 +327,11 @@ total_res %>%
 
 # Q: HOW in the world does CEM outperform CSM in terms of bias?
 
-#  - toy_constant-tx-effects5: same as 4, but fixed bug where 
+#  - toy_constant-tx-effects5: same as 4, but fixed bug where
 #    csm is calipering on X3 as well (annoying that this changes things),
 #    also added X3 to tmle estimator
 #     - results: csm better now in terms of rmse, tmle1 not horrible anymore.
-#     - challenges: avg is better than scm in terms of bias?? 
+#     - challenges: avg is better than scm in terms of bias??
 #                   cem is better than csm in terms of bias??
 #  - toy_constant-tx-effects6: reduce noise again?
 #     - doesn't seem to change results

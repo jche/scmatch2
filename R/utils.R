@@ -15,3 +15,13 @@ expit <- function(x) {
 rmse <- function(resid){
   sqrt(sum(resid^2))
 }
+
+weighted_var <- function(x, wt) {
+  n <- length(x)
+  wm <- weighted.mean(x, wt)
+  sum(wt * (x - wm)^2) * n / (n-1)
+}
+
+weighted_se <- function(x, wt) {
+  sqrt(weighted_var(x, wt) / length(x))
+}

@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(scmatch2)
+library(CSM)
 
-test_check("scmatch2")
+test_check("CSM")

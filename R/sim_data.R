@@ -75,7 +75,7 @@ gen_df_adv <- function(nc, nt,
              rnorm(n(), mean=0, sd=f0_sd),
            Y  = ifelse(Z, Y1, Y0)) %>%
     mutate(id = 1:n(), .before=X1)
-  print(paste0("SD of control outcomes: ", round(sd(res$Y0),4)))
+  # print(paste0("SD of control outcomes: ", round(sd(res$Y0),4)))
 
   return(res)
 }
