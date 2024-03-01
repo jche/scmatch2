@@ -62,18 +62,24 @@ create_toy_example_four_points_plot <-
 }
 
 create_toy_example_six_points_plot <-
-  function(background_plot, six_points_df){
+  function(background_plot, six_points_df, draw_circle=T){
     toy_example_four_points_plot <-
       create_toy_example_four_points_plot(background_plot, six_points_df)
     with_point_text_plot <-
       toy_example_four_points_plot +
       annotate("text", x=X1-2.9*NUDGE, y=Y1-0.5*NUDGE, label="c[3]", parse=T) +
       annotate("text", x=X2-2.3*NUDGE, y=Y2+0.7*NUDGE, label="c[4]", parse=T)
-    with_caliper_plot <-
-      with_point_text_plot +
-      ggforce::geom_circle(aes(x0=X1, y0=Y1, r=NUDGE*4),
-                           lty = "dotted") +
-      ggforce::geom_circle(aes(x0=X2, y0=Y2, r=NUDGE*4),
-                           lty = "dotted")
+    if (draw_circle){
+      with_caliper_plot <-
+        with_point_text_plot +
+        ggforce::geom_circle(aes(x0=X1, y0=Y1, r=NUDGE*4),
+                             lty = "dotted") +
+        ggforce::geom_circle(aes(x0=X2, y0=Y2, r=NUDGE*4),
+                             lty = "dotted")
+    }else{
+      with_caliper_plot <-
+        with_point_text_plot
+    }
+
     return(with_caliper_plot)
 }

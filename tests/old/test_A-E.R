@@ -52,7 +52,6 @@ get_se_AE <- function(preds_csm){
 }
 
 # Run
-{
   deg_overlap = "low"
   if (deg_overlap == "low"){
     ctr_dist <- 0.5
@@ -62,6 +61,8 @@ get_se_AE <- function(preds_csm){
     ctr_dist <- 0.1
   }
 
+
+{
   df_dgp <- gen_one_toy(ctr_dist=ctr_dist)
 
   # The V matrix
@@ -84,3 +85,45 @@ get_se_AE <- function(preds_csm){
                signif(se_AE,3) ))
 }
 
+
+set.seed(123)
+R <- 100
+N_Ts <- N_Cs <- numeric(R * 3)
+ctr_dists <- c(0.5, 0.3, 0.1)
+full_ctr_dists <- rep(c(0.5, 0.3, 0.1),each=R)
+deg_overlaps <- rep(c("low","mid","high"),each=R)
+for (ctr_dist in ctr_dists){
+  for (i in 1:R) {
+    print(i)
+    df_dgp <- gen_one_toy(ctr_dist=ctr_dist)
+
+    # The V matrix
+    dist_scaling <- df_dgp %>%
+      summarize(across(starts_with("X"),
+                       function(x) {
+                         if (is.numeric(x)) 6 / (max(x) - min(x))
+                         else 1000
+                       }))
+
+    matches_and_debiased_residuals<-
+      get_matches_and_debiased_residuals(
+        dgp_name="toy", df_dgp,
+        dist_scaling, mu_model="linear",n_split=1)
+    list2env(matches_and_debiased_residuals,
+             envir = environment())
+
+    list2env(calc_N_T_N_C(preds_csm),
+             envir = environment())
+    N_Ts[i] <- N_T
+    N_Cs[i] <- N_C_tilde
+    se_AE <- get_se_AE(preds_csm)
+    # print(paste0("Avi-Eli standard error is: ",
+    #              signif(se_AE,3) ))
+  }
+}
+
+df_N_T_N_C <-
+  data.frame(N_Ts=N_Ts,N_Cs=N_Cs,deg_overlaps=deg_overlaps)
+
+FNAME <-paste0("data/outputs/sim_toy_results/","A_E_N_C_N_T.csv")
+write_csv(df_N_T_N_C, FNAME, append=T)

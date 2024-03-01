@@ -23,7 +23,7 @@ get_matches <- function(dgp_name, df_dgp,dist_scaling){
       df = df_dgp,
       metric = "maximum",
       dist_scaling = dist_scaling,
-      cal_method = "fixed",
+      rad_method = "fixed",
       est_method = "scm",
       return = "all",
       knn = 25
@@ -36,6 +36,18 @@ get_matches <- function(dgp_name, df_dgp,dist_scaling){
   }
   return(df_dgp_with_matches)
 }
+
+calc_N_T_N_C <- function(preds_csm){
+  N_T <- nrow(preds_csm %>% filter(Z==T))
+  tmp <- preds_csm %>%
+    filter(Z==F) %>%
+    group_by(id) %>%
+    summarise(w_i_sq = sum(weights^2))
+  N_C_tilde <- N_T^2 / sum(tmp$w_i_sq)
+  return(list(N_T = N_T,
+              N_C_tilde = N_C_tilde ))
+}
+
 
 get_se_AE <- function(preds_csm){
   # 1. Get debiased units; Get the subclasses
@@ -72,12 +84,9 @@ get_se_AE <- function(preds_csm){
   sigma_hat <- sqrt(weighted_var_df$weighted_var)
 
   # 5. calculate N_T and N_C
-  N_T <- nrow(preds_csm %>% filter(Z==T))
-  tmp <- preds_csm %>%
-    filter(Z==F) %>%
-    group_by(id) %>%
-    summarise(w_i_sq = sum(weights^2))
-  N_C_tilde <- N_T^2 / sum(tmp$w_i_sq)
+  list2env(calc_N_T_N_C(preds_csm),
+           envir = environment())
+
   # 6. Calculate the variance of the estimator
   res <- sqrt((1/N_T + 1/N_C_tilde)) * sigma_hat
   return(res)

@@ -33,14 +33,15 @@ scale_covs <- function(covs, scaling){
   len_scaling <- length(scaling)
 
   if ((len_scaling != 1) & (len_scaling != p)){
-    stop("Length of scaling must be 1 or ncol(covs)")
+    stop(paste0("Length of scaling must be 1 or ncol(covs). Your len_scaling is ",
+                len_scaling, ", ncol(covs) is ", ncol(covs)))
   }
 
   if (len_scaling == 1) {
     scaling <- rep(scaling, p)
   }
 
-  covs_scaled <- covs_coerced %>%
+  covs_scaled <- covs %>%
     as.matrix() %*%
     diag(scaling)
 
@@ -64,20 +65,21 @@ gen_dm <- function(df,
                    treatment = "Z",
                    scaling = 1,
                    metric = c("maximum", "euclidean", "manhattan")) {
-  if (!all(covs %in% names(df))){
-    missing_covs <- covs[!covs %in% names(df)]
-    stop("covariates specified are not in the dataframe: ", paste(missing_covs,collapse=", "),call.=F )
-  }
 
-  if (!(treatment %in% names(df))){
-    stop("Input treatment variable is wrong. You inputted: ", treatment )
-  }
+  # if (!all(covs %in% names(df))){
+  #   missing_covs <- covs[!covs %in% names(df)]
+  #   stop("covariates specified are not in the dataframe: ", paste(missing_covs,collapse=", "),call.=F )
+  # }
+
+  # if (!(treatment %in% names(df))){
+  #   stop("Input treatment variable is wrong. You inputted: ", treatment )
+  # }
 
   metric <- match.arg(metric)
 
   # pull out df with only covariates
   covs <- df %>%
-    select({{covs}})
+    select(all_of({{covs}}))
 
   covs_coerced <-  coerce_covs(covs)
 

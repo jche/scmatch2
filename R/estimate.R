@@ -1,5 +1,18 @@
 
 # functions for estimating effects
+# The following two functions should be combined
+#   once we get to know the input of get_att_ests
+get_est_att_from_wt <-
+  function(df,
+           input_wt){
+    df_est_att <- df %>%
+      cbind(wt=input_wt) %>%
+      group_by(Z) %>%
+      summarise(Y_wtd = weighted.mean(Y,wt))
+
+    est_att <- diff(df_est_att$Y_wtd)
+    return(est_att)
+  }
 
 get_att_ests <- function(matched_df) {
   matched_df %>%
@@ -9,6 +22,8 @@ get_att_ests <- function(matched_df) {
     pull(est)
 }
 
+# get_att_ests_from_wt<-
+#   function(df, input_wt)
 
 # aggregation functions ---------------------------------------------------
 
@@ -20,19 +35,19 @@ get_att_ests <- function(matched_df) {
 #' @return df with tx and corresponding sc units
 agg_sc_units <- function(scweights) {
   if (!is.data.frame(scweights)) {
-    scweights <- scweights %>% 
+    scweights <- scweights %>%
       map_dfr(~mutate(., subclass=id[1]))
   }
-  
-  scweights %>% 
-    group_by(subclass, Z) %>% 
+
+  scweights %>%
+    group_by(subclass, Z) %>%
     summarize(across(starts_with("X"),
                      ~sum(.x * weights)),
               across(starts_with("Y"),
                      ~sum(.x * weights)),
               .groups="drop_last") %>%
-    mutate(id = c(NA, subclass[1]), .before="subclass") %>% 
-    mutate(weights = 1) %>% 
+    mutate(id = c(NA, subclass[1]), .before="subclass") %>%
+    mutate(weights = 1) %>%
     ungroup()
 }
 
@@ -44,10 +59,10 @@ agg_sc_units <- function(scweights) {
 #' @return df with original tx and sc units, with weights
 agg_co_units <- function(scweights) {
   if (!is.data.frame(scweights)) {
-    scweights <- scweights %>% 
+    scweights <- scweights %>%
       bind_rows()
   }
-  
+
   scweights %>%
     group_by(id) %>%
     summarize(across(-contains("weights"), ~first(.)),
@@ -59,18 +74,18 @@ agg_co_units <- function(scweights) {
 
 agg_avg_units <- function(scweights) {
   if (!is.data.frame(scweights)) {
-    scweights <- scweights %>% 
+    scweights <- scweights %>%
       map_dfr(~mutate(., subclass=id[1]))
   }
-  
-  scweights %>% 
-    group_by(subclass, Z) %>% 
+
+  scweights %>%
+    group_by(subclass, Z) %>%
     summarize(across(starts_with("X"),
                      ~sum(.x * 1/n())),
               across(starts_with("Y"),
                      ~sum(.x * 1/n()))) %>%
-    mutate(id = c(NA, subclass[1]), .before="subclass") %>% 
-    mutate(weights = 1) %>% 
+    mutate(id = c(NA, subclass[1]), .before="subclass") %>%
+    mutate(weights = 1) %>%
     ungroup()
 }
 

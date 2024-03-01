@@ -81,19 +81,28 @@ get_att_diff <- function(d) {
 get_att_bal <- function(d,
                         form,
                         tols) {
+  trt_var_name <- all.vars(form)[1]
+  trt_var <- d[[trt_var_name]]
+
+  if (!all(trt_var %in% c(F,T) ) ){
+    stop("Treatment variable must be either 0, 1 or FALSE, TRUE")
+  }
+
+  ## Fit model
   m_bal <- optweight(form,
                      data = d,
                      tols = tols,
                      estimand = "ATT")
 
-  # output ATT estimate
-  d %>%
+  ### output ATT estimate
+  d <- d %>%
+    ungroup() %>%
     mutate(wt = m_bal$weights) %>%
-    group_by(Z) %>%
-    summarize(Y = mean(Y*wt)) %>%    # co weights sum to nc, tx weights = 1
-    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>%
-    mutate(ATT = YTRUE - YFALSE) %>%
-    pull(ATT)
+    group_by(Z) %>% # Change this step
+    summarize(Y_wtd = weighted.mean(Y,wt))
+
+  att <- diff(d$Y_wtd)
+  return(att)
 }
 
 get_att_or_lm <- function(d,
@@ -199,13 +208,13 @@ get_att_aipw <- function(d,
 get_att_csm <- function(d,
                         metric = "maximum",
                         dist_scaling,
-                        cal_method = "adaptive",
+                        rad_method = "adaptive",
                         est_method = "scm") {
   preds_csm <- get_cal_matches(
     df = d,
     metric = metric,
     dist_scaling = dist_scaling,
-    cal_method = cal_method,
+    rad_method = rad_method,
     est_method = est_method,
     return = "sc_units",
     knn = 25)
@@ -271,7 +280,7 @@ get_att_cem <- function(d,
       filter(!Z | !(id %in% attr(preds_feasible, "feasible_units"))) %>%
       get_cal_matches(.,
                       metric = "maximum",
-                      cal_method = "1nn",
+                      rad_method = "1nn",
                       est_method = est_method,
                       dist_scaling = d %>%
                         summarize(across(starts_with("X"),
@@ -298,7 +307,7 @@ get_att_1nn <- function(d, dist_scaling) {
   preds_1nn <- get_cal_matches(
     df = d,
     metric = "maximum",
-    cal_method = "1nn",
+    rad_method = "1nn",
     est_method = "average",
     dist_scaling = dist_scaling,
     return = "sc_units",

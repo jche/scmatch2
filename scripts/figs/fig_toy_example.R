@@ -44,7 +44,7 @@ co_dat <- tibble(
 )
 four_points_df <- rbind(tx_dat, co_dat)
 
-source("analysis/plot_toy.R")
+source("scripts/analysis/plot_toy.R")
 toy_example_four_points_plot <-
   create_toy_example_four_points_plot(
     background_plot, four_points_df)
@@ -63,9 +63,15 @@ six_points_df <-
 
 toy_example_six_points_plot <-
   create_toy_example_six_points_plot(
-    background_plot, six_points_df)
+    background_plot, six_points_df,draw_circle=T)
 
 ggsave("writeup/figures/toyexample2.png", width=3, height=3)
+
+toy_example_six_points_plot <-
+  create_toy_example_six_points_plot(
+    background_plot, six_points_df,draw_circle=F)
+
+ggsave("writeup/figures/toyexample2_no_circle.png", width=3, height=3)
 
 
 # plot dataset ------------------------------------------------------------

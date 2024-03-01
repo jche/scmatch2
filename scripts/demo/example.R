@@ -28,75 +28,29 @@ source("R/diagnostic_plots.R")
 
 
 # load data ---------------------------------------------------------------
+LOAD_OPTION <- "lalonde_w_cps"
+# option 1: "lalonde_only": use only experimental data
+# option 2: "lalonde_w_cps": use experimental treateds and all controls
+# option 3: use experimental treateds and nonexperimental controls
+load(file = paste0("data/inputs/", LOAD_OPTION,".RData"))
 
-lalonde <- read_csv("lalonde.csv") %>%
-  rename(Z = treat, Y = re78) %>%
-  mutate(id = 1:n(),
-         dataset = c(rep("NSWD", 185+260),
-                     rep("CPS", 15992)),
-         across(c(black, hispanic, married, nodegree), as.logical)) %>%
-  select(id, Z, Y,
-         black, hispanic, married, nodegree,
-         age, education, re74, re75,
-         dataset)
-
-# rename variables for my matching methods
-df <- lalonde %>%
-  rename(X1=black, X2=hispanic,
-         X3=married, X4=nodegree,
-         X5=age, X6=education,
-         X7=re74, X8=re75)
-
-# # for now, use only experimental data
-# df <- df %>%
-#   filter(dataset == "NSWD")
-
-# # use experimental treateds and all controls
-# df <- df
-
-# use experimental treateds and nonexperimental controls
-df <- df %>%
-  filter((dataset == "NSWD" & Z==T) | (dataset=="CPS" & Z==F))
-
-
-# EDA ---------------------------------------------------------------------
-
-df %>%
-  group_by(dataset, Z) %>%
-  summarize(across(starts_with("X"),
-                   mean))
-
-if (F) {
-  # NSWD is...
-  #  - younger, less married
-  #  - less educated, fewer degrees
-  #  - much more black
-  #  - much lower earnings
-  df %>%
-    group_by(dataset) %>%
-    summarize(across(X1:X8, mean))
-
-  # NSWD has...
-  #  - less variance in age/educ/income
-  df %>%
-    group_by(dataset) %>%
-    summarize(across(X1:X8, sd))
-
-  # visualize covariate distributions
-  df %>%
-    group_by(dataset) %>%
-    pivot_longer(X1:X8) %>%
-    ggplot(aes(x=value, color=dataset)) +
-    geom_density() +
-    facet_wrap(~name, scales="free")
-}
-
+ggplot(lalonde_df,
+       aes(x = married, y=re74 ))+
+  geom_boxplot()+
+  facet_wrap(.~Z)
 
 # set matching settings ---------------------------------------------------
 
 CALIPER <- 1
 METRIC <- "maximum"   # "maximum", "euclidean", "manhattan"
 CAL_METHOD <- "ada"   # "ada", "cem"
+
+lalonde_df_renamed <- lalonde_df %>%
+  rename(X1=black, X2=hispanic,
+         X3=married, X4=nodegree,
+         X5=age, X6=education,
+         X7=re74, X8=re75)
+
 DIST_SCALING <- tibble(
   X1 = 1000,
   X2 = 1000,
@@ -108,9 +62,21 @@ DIST_SCALING <- tibble(
   X8 = 1/5000
 )
 
+# DIST_SCALING <- tibble(
+#   black = 1000,
+#   hispanic = 1000,
+#   married = 1000,
+#   nodegree = 1000,
+#   age = 1/3,
+#   education = 1,
+#   re74 = 1/5000,
+#   re75 = 1/5000
+# )
+
+
 # run matching ------------------------------------------------------------
 
-calada_scm <- df %>%
+calada_scm <- lalonde_df_renamed %>%
   get_cal_matches(caliper = CALIPER,
                   metric = METRIC,
                   cal_method = CAL_METHOD,
@@ -121,6 +87,7 @@ calada_scm <- df %>%
                   num_bins = 5,     # for cem
                   wider = F)        # for cem
 get_att_ests(calada_scm)
+
 
 # get_cem_matches(df, num_bins=5, method="average", return="sc_units")
 

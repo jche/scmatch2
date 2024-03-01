@@ -1,9 +1,17 @@
+test_that("Making the {{ }} call work", {
+  df <- data.frame(X1=1:4,
+                   X2=4:1,
+                   Z = c(0, 1, 0, 1))
+  dm <- gen_dm(df,
+               covs=starts_with("X"),
+               treatment=Z)
+  expect_true(is.matrix(dm))
+})
+
 test_that("Error when covariates or treatment variable specified in covs or treatment are not in the dataframe",{
   df <- data.frame(X1 = 1:5, Z=rep(0:1, length.out=5))
-  expect_error(gen_dm(df, covs=c("X1","X2") , treatment = "Z"),
-               "covariates specified are not in the dataframe")
-  expect_error(gen_dm(df, covs=c("X1") , treatment = "A"),
-               "Input treatment variable is wrong.")
+  expect_error(gen_dm(df, covs=c("X1","X2") , treatment = "Z"))
+  expect_error(gen_dm(df, covs=c("X1") , treatment = "A"))
 })
 
 test_that("coerce_covs coerces T/F into 1/2, and turn factor types into numerics",{
