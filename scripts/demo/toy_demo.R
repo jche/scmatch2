@@ -33,6 +33,12 @@ good_wt <- c(1,1,0,0,1,1)
     get_est_att_from_wt(df=df_six_points,
                         input_wt=good_wt))
 
+diff_wt <- c(1,1,rep(1/2,4))
+(diff_est <-
+    get_est_att_from_wt(df=df_six_points,
+                        input_wt=diff_wt))
+
+
 # estimated ATT if you match to all controls
 # i.e. what
 # weighted sum of
@@ -44,19 +50,33 @@ bad_wt <- c(1,1,2/3,2/3,1/3,1/3)
 (bad_est_att <- get_est_att_from_wt(df=df_six_points,
                     input_wt=bad_wt))
 
-##
+## SBW1
 covs <- c("X1", "X2")
 zform1 <- as.formula(paste0("Z ~ ", paste0(covs, collapse="+")))
-(bal_est_att = get_att_bal(df_six_points,
-                   zform1,
-                   rep(0.01, length(covs))))
+m_bal_1 <- optweight(zform1,
+                   data = df_six_points,
+                   tols = rep(0.01, length(covs)),
+                   estimand = "ATT")
+m_bal_1$weights[3:6]
+(bal_1_est_att <-
+    get_est_att_from_wt(df=df_six_points,
+                        input_wt=m_bal_1$weights))
+zform2 <- as.formula("Z ~ X1*X2")
+m_bal_2 <- optweight(zform2,
+                     data = df_six_points,
+                     tols = c(0.01, 0.01, 0.1),
+                     estimand = "ATT")
+m_bal_1$weights[3:6]
+m_bal_2$weights[3:6]
+(bal_2_est_att <-
+    get_est_att_from_wt(df=df_six_points,
+                        input_wt=m_bal_2$weights))
 
-expect_true(bad_est_att, bal_est_att, tolerance=0.0001)
 
-# okay so bad_est_att and good_est_att does not
-#   differ that much. This is really a bad news
-# Reason this is bad:
-# Solution: increase f_0(x) by scaling up
+# (bal_est_att = get_att_bal(df_six_points,
+#                    zform1,
+#                    rep(0.01, length(covs))))
+
 
 
 
@@ -76,13 +96,19 @@ wtd_centers_df
 
 ### Step 2: make it work on CSM
 # source("R/matching.R")
+load_all()
 cal_matches <- get_cal_matches(df_six_points,
-                metric = c("maximum"),
-                caliper = 1,
-                cal_method = "adaptive",
-                est_method = "average",
-                return = "sc_units",
-                dist_scaling = 1)
+                covs=c("X1","X2"),
+                treatment = "Z",
+                metric = c("maximum"), # semi-important
+                caliper = 1,  # impt: caliper
+                cal_method = "adaptive", # not important
+                est_method = "scm", # impt: weighting method
+                return = "all",
+                dist_scaling = 1 # impt: scaling matrix
+                )
+
+CSM_est <- get_att_ests(cal_matches)
 
 ### Step 2.5: Choose Mtd_Comp, and make it work
 covs <- c("X1", "X2")

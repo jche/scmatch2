@@ -42,8 +42,8 @@ calc_N_T_N_C <- function(preds_csm){
   tmp <- preds_csm %>%
     filter(Z==F) %>%
     group_by(id) %>%
-    summarise(w_i_sq = sum(weights^2))
-  N_C_tilde <- N_T^2 / sum(tmp$w_i_sq)
+    summarise(w_i = sum(weights))
+  N_C_tilde <- N_T^2 / sum(tmp$w_i^2)
   return(list(N_T = N_T,
               N_C_tilde = N_C_tilde ))
 }
@@ -595,7 +595,10 @@ boot_CSM <- function(dgp_name,
     att_true <- att_est <- att_debiased <-
     sd_boot <-
     time_on_matching <-
-    time_on_bootstrap <- numeric(I)
+    time_on_bootstrap <-
+    noise <-
+    bias <-
+    N_T <- N_C <- numeric(I)
   T_star <- numeric(B)
   set.seed(123)
   for (i in 1:I){
@@ -699,14 +702,49 @@ boot_CSM <- function(dgp_name,
     covered[i] = (CI_lower[i] < att) & (att < CI_upper[i])
 
 
+
+
+    # Get the CSM estimate
+    N_C[i] <- preds_csm %>%
+      filter(!(id %in% attr(preds_csm, "unmatched_units"))) %>%
+      group_by(Z) %>%
+      summarize(sum_weights = sum(weights)) %>%
+      slice(1) %>%
+      pull(sum_weights)
+
+    N_T[i] <- preds_csm %>%
+      filter(!(id %in% attr(preds_csm, "unmatched_units"))) %>%
+      group_by(Z) %>%
+      summarize(sum_weights = sum(weights)) %>%
+      slice(2) %>%
+      pull(sum_weights)
+
+    att_est[i] <- preds_csm %>%
+      filter(!(id %in% attr(preds_csm, "unmatched_units"))) %>%
+      group_by(Z) %>%
+      summarize(mn = sum(Y*weights) / sum(weights)) %>%
+      summarize(est = last(mn) - first(mn)) %>%
+      pull(est)
+
+    noise[i] <- preds_csm %>%
+      filter(!(id %in% attr(preds_csm, "unmatched_units"))) %>%
+      group_by(Z) %>%
+      summarize(mn = sum(noise*weights) / sum(weights)) %>%
+      summarize(est = last(mn) - first(mn)) %>%
+      pull(est)
+
+    bias[i] <- preds_csm %>%
+      filter(!(id %in% attr(preds_csm, "unmatched_units"))) %>%
+      group_by(Z) %>%
+      summarize(mn = sum(Y0*weights) / sum(weights)) %>%
+      summarize(est = last(mn) - first(mn)) %>%
+      pull(est)
+
     print(paste0("att_est is ", signif(att_est[i],3),
                  "; LB is ", signif(CI_lower[i],3),
                  "; UB is ", signif(CI_upper[i],3)))
     print(paste0("Bootstrap s.e. is ", sd_boot[i]))
     print(paste0("Covered is ", covered[i]))
-
-    # Get the CSM estimate
-    att_est[i] <- get_att_ests(preds_csm)
 
   }
   mean(covered)
@@ -723,6 +761,10 @@ boot_CSM <- function(dgp_name,
                                    n_split=n_split,
                                    mu_model=mu_model,
                                    time_on_matching=time_on_matching,
-                                   time_on_bootstrap=time_on_bootstrap)
+                                   time_on_bootstrap=time_on_bootstrap,
+                                   noise=noise,
+                                   bias=bias,
+                                   N_T =N_T,
+                                   N_C = N_C)
   return(res_save_bayesian_boot)
 }

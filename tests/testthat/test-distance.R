@@ -1,3 +1,5 @@
+
+
 test_that("Making the {{ }} call work", {
   df <- data.frame(X1=1:4,
                    X2=4:1,
@@ -28,6 +30,23 @@ test_that("coerce_covs coerces T/F into 1/2, and turn factor types into numerics
 })
 
 test_that("scale_covs correctly scales the input data",{
+  # 1-d case
+  covs <- data.frame(X1=1:4)
+  scaling <- 2
+
+  expected <-
+    data.frame(X1=(1:4)*2) %>%
+    as.matrix()
+
+  actual <- scale_covs(covs, scaling)
+
+  dimnames(actual) <- NULL
+  dimnames(expected) <- NULL
+
+  expect_equal(expected,
+               actual)
+
+  # 2-d case
   covs <- data.frame(X1=1:4,
                      X2=c(2,1,1,2))
   scaling <- c(2, 1/2)
@@ -44,6 +63,7 @@ test_that("scale_covs correctly scales the input data",{
 
   expect_equal(expected,
                actual)
+
 })
 
 test_that("Manual computation should match the gen_dm output",{

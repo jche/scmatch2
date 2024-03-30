@@ -1,15 +1,38 @@
 # full analysis of simulation results
 library(tidyverse)
-source("analysis/plot_sim.R")
+source("scripts/analysis/plot_sim.R")
 
 # toy sim -----------------------------------------------------------------
 
-res_toy <- readr::read_csv("sim_toy_results/toy_spaceship7.csv")
+res_toy <- readr::read_csv("data/outputs/sim_toy_results/toy_spaceship7.csv")
 res_toy <- res_toy %>%  # rename to keep consistency as other results
   rename(tmle2="tmle3",
          aipw2="aipw3")
 
-RMSE_plot(res_toy,
+org_df_toy <-
+  res_toy %>%
+  pivot_longer(diff:aipw2, names_to="method") %>%
+  summarize_bias_rmse()
+
+res_toy_cem_csm <- readr::read_csv("data/outputs/sim_toy_results/toy_spaceship8.csv")
+
+org_df_toy_cem_csm <-
+  res_toy_cem_csm %>%
+  pivot_longer(csm_scm:cem_avg, names_to="method") %>%
+  summarize_bias_rmse()
+
+CEM_CSM_names <- c("csm_scm",
+                   "csm_avg",
+                   "cem_scm",
+                   "cem_avg")
+
+org_df_toy_total <-
+  rbind(org_df_toy %>%
+        filter(!(method %in%  CEM_CSM_names) ),
+      org_df_toy_cem_csm)
+
+
+plot_org_df(org_df_toy_total,
           title="Toy Example",
           xlab="Value",
           ylab="Method",

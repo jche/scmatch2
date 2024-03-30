@@ -65,7 +65,7 @@ res <- foreach(
     source("R/utils.R")
 
 # for (i in 1:250) {
-
+# i <- 1
   tic()
 
   nc <- 500
@@ -88,13 +88,13 @@ res <- foreach(
   dist_scaling <- df %>%
     summarize(across(starts_with("X"),
                      function(x) {
-                       if (is.numeric(x)) num_bins / (max(x) - min(x))
+                       if (is.numeric(x)) 2 * num_bins / (max(x) - min(x))
                        else 1000
                      }))
 
 
-  # for acic simulation: drop units that don't get a within-caliper matches
-  preds_csm <- get_cal_matches(
+
+  preds_csm_avg <- get_cal_matches(
     df = df,
     metric = "maximum",
     dist_scaling = dist_scaling,
@@ -102,6 +102,16 @@ res <- foreach(
     est_method = "average",
     return = "all",
     knn = 25)
+
+  preds_csm_scm <- get_cal_matches(
+    df = df,
+    metric = "maximum",
+    dist_scaling = dist_scaling,
+    cal_method = "fixed",
+    est_method = "scm",
+    return = "all",
+    knn = 25)
+
   preds_cem <- get_cem_matches(
     df = df,
     num_bins = num_bins,
@@ -133,39 +143,48 @@ res <- foreach(
 
     diff = get_att_diff(df),
 
-    bal1 = get_att_bal(df, zform1, c(0.01, 0.01)),
-    bal2 = get_att_bal(df, zform2, c(0.01, 0.01, 0.1)),
-
-    or_lm = get_att_or_lm(df, form=form2),
-    or_bart = get_att_or_bart(df, covs=c(X1,X2)),
-    ps_lm = get_att_ps_lm(df, zform2),
-    ps_bart = get_att_ps_bart(df, covs=c(X1,X2)),
-
-    csm_scm = get_att_csm(df, dist_scaling=dist_scaling, est_method="scm",
-                          cal_method = "fixed"),
-    csm_avg = get_att_csm(df, dist_scaling=dist_scaling, est_method="average",
-                          cal_method = "fixed"),
-    cem_scm = get_att_cem(df, num_bins=num_bins, est_method="scm",
+    # bal1 = get_att_bal(df, zform1, c(0.01, 0.01)),
+    # bal2 = get_att_bal(df, zform2, c(0.01, 0.01, 0.1)),
+    #
+    # or_lm = get_att_or_lm(df, form=form2),
+    # or_bart = get_att_or_bart(df, covs=c(X1,X2)),
+    # ps_lm = get_att_ps_lm(df, zform2),
+    # ps_bart = get_att_ps_bart(df, covs=c(X1,X2)),
+    csm_scm = get_att_ests(preds_csm_scm),
+    csm_avg = get_att_ests(preds_csm_avg),
+    # csm_scm = get_att_csm(df,
+    #                       dist_scaling=dist_scaling,
+    #                       est_method="scm",
+    #                       rad_method = "fixed"),
+    # csm_avg = get_att_csm(df,
+    #                       dist_scaling=dist_scaling,
+    #                       est_method="average",
+    #                       rad_method = "fixed"),
+    cem_scm = get_att_cem(df,
+                          num_bins=num_bins,
+                          est_method="scm",
                           estimand = "CEM-ATT"),
-    cem_avg = get_att_cem(df, num_bins=num_bins, est_method="average",
+    cem_avg = get_att_cem(df,
+                          num_bins=num_bins,
+                          est_method="average",
                           estimand = "CEM-ATT"),
     onenn = get_att_1nn(df, dist_scaling=dist_scaling),
 
-    tmle1 = get_att_tmle(df,
-                         covs=c(X1,X2),
-                         Q.SL.library = SL.library1,
-                         g.SL.library = SL.library1),
-    aipw1 = get_att_aipw(df,
-                         covs=c(X1,X2),
-                         Q.SL.library = SL.library1,
-                         g.SL.library = SL.library1),
-
-    tmle3 = get_att_tmle(df, covs=c(X1,X2),
-                         Q.SL.library = SL.library3Q,
-                         g.SL.library = SL.library3g),
-    aipw3 = get_att_aipw(df, covs=c(X1,X2),
-                         Q.SL.library = SL.library2,
-                         g.SL.library = SL.library2)
+    # tmle1 = get_att_tmle(df,
+    #                      covs=c(X1,X2),
+    #                      Q.SL.library = SL.library1,
+    #                      g.SL.library = SL.library1),
+    # aipw1 = get_att_aipw(df,
+    #                      covs=c(X1,X2),
+    #                      Q.SL.library = SL.library1,
+    #                      g.SL.library = SL.library1),
+    #
+    # tmle3 = get_att_tmle(df, covs=c(X1,X2),
+    #                      Q.SL.library = SL.library3Q,
+    #                      g.SL.library = SL.library3g),
+    # aipw3 = get_att_aipw(df, covs=c(X1,X2),
+    #                      Q.SL.library = SL.library2,
+    #                      g.SL.library = SL.library2)
   )
 
   toc()
@@ -278,15 +297,17 @@ if (F) {
 
 
 
-total_res <- read_csv("sim_toy_results/toy_spaceship7.csv")
+total_res <- read_csv("data/outputs/sim_toy_results/toy_spaceship8.csv")
 
-total_res %>%
+res_df <- total_res %>%
   pivot_longer(-(runid:true_ATT)) %>%
   group_by(nc,nt,f0_sd,name) %>%
   summarize(rmse = sqrt(mean((value-true_ATT)^2)),
             bias = mean(value-true_ATT),
             sd   = sd(value)) %>%
-  rename(method = name) %>%
+  rename(method = name)
+
+res_df %>%
   pivot_longer(c(rmse, bias, sd)) %>%
   ggplot(aes(x=method)) +
   geom_col(aes(y=value)) +

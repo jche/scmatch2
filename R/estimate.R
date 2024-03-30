@@ -14,6 +14,8 @@ get_est_att_from_wt <-
     return(est_att)
   }
 
+
+
 get_att_ests <- function(matched_df) {
   matched_df %>%
     group_by(Z) %>%

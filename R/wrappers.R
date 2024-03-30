@@ -31,6 +31,37 @@ get_SL_fit <- function(df_to_fit,
                SL.library = SL.library)
 }
 
+fit_CSM <- function(df,
+                    covs = starts_with("X"),
+                    treatment = "Z",
+                    metric = c("maximum", "euclidean", "manhattan"),
+                    caliper = 1,
+                    rad_method = c("adaptive", "fixed", "1nn"),
+                    est_method = c("scm", "scm_extrap", "average"),
+                    return = c("sc_units", "agg_co_units", "all"),
+                    dist_scaling = df %>%
+                      summarize(across(starts_with("X"),
+                                       function(x) {
+                                         if (is.numeric(x)) 1/sd(x)
+                                         else 1000
+                                       })),
+                    ...){
+  match_weighted_df <- df %>%
+    get_cal_matches(
+      covs = covs,
+      treatment = treatment,
+      metric = metric,
+      caliper = caliper,
+      rad_method = rad_method,
+      est_method = est_method,
+      return = return,
+      dist_scaling = dist_scaling,
+      ...
+    )
+  est <- get_att_ests(match_weighted_df)
+  return(est)
+}
+
 #' Get prediction from the fitted SuperLearner object
 #'
 #' @param SL_fit A fitted SuperLearner object
@@ -52,6 +83,104 @@ get_SL_pred <-
                            newdata = df_test[,X_names])
     return(SL_pred_obj$library.predict)
   }
+
+#' Main matching function
+#'
+#' @param df
+#' @param metric
+#' @param caliper
+#' @param rad_method adaptive caliper, fixed caliper, only 1nn caliper
+#' @param est_method
+#' @param return
+#' @param dist_scaling
+#' @param ...
+#'
+#' @return df with a bunch of attributes
+get_cal_matches <- function(df,
+                            covs = starts_with("X"),
+                            treatment = "Z",
+                            metric = c("maximum", "euclidean", "manhattan"),
+                            caliper = 1,
+                            rad_method = c("adaptive", "fixed", "1nn"),
+                            est_method = c("scm", "scm_extrap", "average"),
+                            return = c("sc_units", "agg_co_units", "all"),
+                            dist_scaling = df %>%
+                              summarize(across(starts_with("X"),
+                                               function(x) {
+                                                 if (is.numeric(x)) 1/sd(x)
+                                                 else 1000
+                                               })),
+                            ...) {
+  metric <- match.arg(metric)
+  rad_method <- match.arg(rad_method)
+  est_method <- match.arg(est_method)
+  return <- match.arg(return)
+  args <- list(...)
+  df$id <- 1:nrow(df)
+
+  ### use rad_method: generate matches
+  # get caliper matches
+  scmatches <- df %>%
+    gen_matches(
+      covs = covs,
+      treatment = treatment,
+      scaling = dist_scaling,
+      metric = metric,
+      caliper = caliper,
+      rad_method = rad_method,
+      ...)
+
+  # scmatches$matches is a list of length ntx.
+  #   Each element is a data frame of matched controls
+
+  ### use est_method: scm or average
+  scweights <- est_weights(df,
+                           covs=covs,
+                           matched_gps = scmatches$matches,
+                           dist_scaling = dist_scaling,
+                           est_method = est_method,
+                           metric = metric)
+
+  ### use return: sc units, aggregated weights per control, all weights
+  m.data <- switch(return,
+                   sc_units     = agg_sc_units(scweights),
+                   agg_co_units = agg_co_units(scweights),
+                   all          = bind_rows(scweights))
+
+  unmatched_units <- setdiff(df %>% filter(.data[[treatment]]==1) %>% pull(id),
+                             m.data %>% filter(.data[[treatment]]==1) %>% pull(id))
+  if (length(unmatched_units) > 0) {
+    warning(glue::glue("Dropped the following treated units from data:
+                        \t {paste(unmatched_units, collapse=\", \")}"))
+  }
+
+  # aggregate results
+  res <- m.data
+
+  # store information about scaling and adaptive calipers
+  adacalipers_df <- tibble(
+    id = df %>% filter(Z == 1) %>% pull(id),
+    adacal = scmatches$adacalipers)
+  attr(res, "scaling") <- dist_scaling
+  attr(res, "adacalipers") <- adacalipers_df
+
+  # store information about feasible units/subclasses
+  feasible_units <- adacalipers_df %>%
+    filter(adacal <= caliper) %>%
+    pull(id)
+  attr(res, "unmatched_units") <- unmatched_units
+  attr(res, "feasible_units")  <- feasible_units
+  attr(res, "feasible_subclasses") <- res %>%
+    filter(id %in% feasible_units) %>%
+    pull(subclass)
+
+  # keep a bunch of data around, just in case
+  attr(res, "scweights") <- scweights
+  attr(res, "dm") <- scmatches$dm
+  attr(res, "dm_uncapped") <- scmatches$dm_uncapped
+
+  return(res)
+}
 
 
 gen_one_toy <- function(ctr_dist = 0.5){
@@ -262,7 +391,8 @@ get_att_cem <- function(d,
     num_bins = num_bins,
     est_method = est_method,
     return = "sc_units")
-
+  # print("Printing preds_feasible")
+  # print(preds_feasible)
   # get ATT estimate:
   att_feasible <- preds_feasible %>%
     group_by(Z) %>%

@@ -21,14 +21,14 @@ save_res_to_csv<-
     }
   } # save_res_to_csv
 
-I = 100; B=40;
+I = 1000; B=40;
 BOOT_MTD = "A-E"
 # BOOT_MTD = "regression_debiased"
 # BOOT_MTD = "regression"
 # BOOT_MTD = "cluster"
 # BOOT_MTD = "naive"
 FNAME =
-  paste0("./sim_toy_results/",BOOT_MTD,"_toy_low_mid_high.csv")
+  paste0("data/outputs/bootstrap_toy_rad_new/",BOOT_MTD,"_toy_low_mid_high.csv")
 source("R/bootstrap.R")
 source("R/sim_data.R")
 toy_naive_low<-
@@ -41,6 +41,7 @@ toy_naive_low<-
            n_split=1,
            kang_true = F,
            toy_ctr_dist = 0.5)
+toy_naive_low$deg_overlap <- "low"
 save_res_to_csv(toy_naive_low,
                 FNAME = FNAME)
 
@@ -54,8 +55,10 @@ toy_naive_mid<-
            n_split=1,
            kang_true = F,
            toy_ctr_dist = 0.3)
+toy_naive_mid$deg_overlap <- "mid"
 save_res_to_csv(toy_naive_mid,
                 FNAME = FNAME)
+
 
 toy_naive_high<-
   boot_CSM(dgp_name="toy",
@@ -67,6 +70,7 @@ toy_naive_high<-
            n_split=1,
            kang_true = F,
            toy_ctr_dist = 0.1)
+toy_naive_high$deg_overlap <- "high"
 save_res_to_csv(toy_naive_high,
                 FNAME = FNAME)
 

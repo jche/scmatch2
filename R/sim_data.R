@@ -69,10 +69,9 @@ gen_df_adv <- function(nc, nt,
                    dat_conear)
 
   res <- dat %>%
-    mutate(Y0 = f0_fun(X1,X2) +
-             rnorm(n(), mean=0, sd=f0_sd),
-           Y1 = f0_fun(X1,X2) + tx_effect_fun(X1,X2) +
-             rnorm(n(), mean=0, sd=f0_sd),
+    mutate(noise = rnorm(n(), mean=0, sd=f0_sd)) %>%
+    mutate(Y0 = f0_fun(X1,X2) + noise) %>%
+    mutate(Y1 = Y0 + tx_effect_fun(X1,X2),
            Y  = ifelse(Z, Y1, Y0)) %>%
     mutate(id = 1:n(), .before=X1)
   # print(paste0("SD of control outcomes: ", round(sd(res$Y0),4)))
@@ -541,12 +540,14 @@ get_df_scaling_from_dgp_name <-
            toy_ctr_dist=0.5){
   if (dgp_name == "toy"){
     df_dgp <- gen_one_toy(ctr_dist=toy_ctr_dist)
-    dist_scaling <- df_dgp %>%
-      summarize(across(starts_with("X"),
-                       function(x) {
-                         if (is.numeric(x)) 6 / (max(x) - min(x))
-                         else 1000
-                       }))
+    # Edit 4 Mar 2024:
+    dist_scaling <- 8
+    # dist_scaling <- df_dgp %>%
+    #   summarize(across(starts_with("X"),
+    #                    function(x) {
+    #                      if (is.numeric(x)) 6 / (max(x) - min(x))
+    #                      else 1000
+    #                    }))
   }else if(dgp_name=="kang"){
     df_dgp <- gen_df_kang(n = 1000)
     if (kang_true){ # Replace X1 to X4 by V1 to V4

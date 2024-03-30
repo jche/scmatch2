@@ -41,9 +41,15 @@ scale_covs <- function(covs, scaling){
     scaling <- rep(scaling, p)
   }
 
-  covs_scaled <- covs %>%
-    as.matrix() %*%
-    diag(scaling)
+  if (p > 1){
+    covs_scaled <- covs %>%
+      as.matrix() %*%
+      diag(scaling)
+  }else{
+    covs_scaled <- covs %>%
+      as.matrix() * scaling
+  }
+
 
   return(covs_scaled)
 }

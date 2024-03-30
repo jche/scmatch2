@@ -104,6 +104,19 @@ RMSE_plot <- function(df,
                       ylab="",
                       legend.position="none"){
   org_df <- prepare_method_comparison_df(df)
+  p_res <- plot_org_df(org_df,
+                       title=title,
+                       xlab=xlab,
+                       ylab=ylab,
+                       legend.position=legend.position)
+  return(p_res)
+}
+
+plot_org_df <- function(org_df,
+                  title="",
+                  xlab="",
+                  ylab="",
+                  legend.position="none"){
   p_outline <-
     RMSE_plot_outline(org_df,
                       legend.position=legend.position)
@@ -115,6 +128,7 @@ RMSE_plot <- function(df,
       ylab)
   return(p_res)
 }
+
 
 acic_plot <- function(simname,
                       title="",

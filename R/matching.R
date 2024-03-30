@@ -5,100 +5,6 @@
 
 # wrapper function --------------------------------------------------------
 
-
-
-#' Main matching function
-#'
-#' @param df
-#' @param metric
-#' @param caliper
-#' @param rad_method adaptive caliper, fixed caliper, only 1nn caliper
-#' @param est_method
-#' @param return
-#' @param dist_scaling
-#' @param ...
-#'
-#' @return df with a bunch of attributes
-get_cal_matches <- function(df,
-                            metric = c("maximum", "euclidean", "manhattan"),
-                            caliper = 1,
-                            rad_method = c("adaptive", "fixed", "1nn"),
-                            est_method = c("scm", "scm_extrap", "average"),
-                            return = c("sc_units", "agg_co_units", "all"),
-                            dist_scaling = df %>%
-                              summarize(across(starts_with("X"),
-                                               function(x) {
-                                                 if (is.numeric(x)) 1/sd(x)
-                                                 else 1000
-                                               })),
-                            ...) {
-  metric <- match.arg(metric)
-  rad_method <- match.arg(rad_method)
-  est_method <- match.arg(est_method)
-  return <- match.arg(return)
-  args <- list(...)
-
-  ### use rad_method: generate matches
-
-  # get caliper matches
-  scmatches <- df %>%
-    gen_matches(
-      scaling = dist_scaling,
-      metric = metric,
-      caliper = caliper,
-      rad_method = rad_method,
-      ...)
-
-  ### use est_method: scm or average
-
-  scweights <- est_weights(df,
-                           matched_gps = scmatches$matches,
-                           dist_scaling = dist_scaling,
-                           est_method = est_method,
-                           metric = metric)
-
-  ### use return: sc units, aggregated weights per control, all weights
-  m.data <- switch(return,
-                   sc_units     = agg_sc_units(scweights),
-                   agg_co_units = agg_co_units(scweights),
-                   all          = bind_rows(scweights))
-
-  unmatched_units <- setdiff(df %>% filter(Z==1) %>% pull(id),
-                             m.data %>% filter(Z==1) %>% pull(id))
-  if (length(unmatched_units) > 0) {
-    warning(glue::glue("Dropped the following treated units from data:
-                        \t {paste(unmatched_units, collapse=\", \")}"))
-  }
-
-  # aggregate results
-  res <- m.data
-
-  # store information about scaling and adaptive calipers
-  adacalipers_df <- tibble(
-    id = df %>% filter(Z == 1) %>% pull(id),
-    adacal = scmatches$adacalipers)
-  attr(res, "scaling") <- dist_scaling
-  attr(res, "adacalipers") <- adacalipers_df
-
-  # store information about feasible units/subclasses
-  feasible_units <- adacalipers_df %>%
-    filter(adacal <= caliper) %>%
-    pull(id)
-  attr(res, "unmatched_units") <- unmatched_units
-  attr(res, "feasible_units")  <- feasible_units
-  attr(res, "feasible_subclasses") <- res %>%
-    filter(id %in% feasible_units) %>%
-    pull(subclass)
-
-  # keep a bunch of data around, just in case
-  attr(res, "scweights") <- scweights
-  attr(res, "dm") <- scmatches$dm
-  attr(res, "dm_uncapped") <- scmatches$dm_uncapped
-
-  return(res)
-}
-
-
 # TODO
 get_cem_matches <- function(
     df,
@@ -110,7 +16,8 @@ get_cem_matches <- function(
     return = c("sc_units", "agg_co_units", "all")) {
   est_method <- match.arg(est_method)
   return <- match.arg(return)
-
+  # print(Z_FORMULA)
+  # print(head(df))
   m.out3 <- MatchIt::matchit(
     Z_FORMULA,
     data = df,
@@ -147,6 +54,7 @@ get_cem_matches <- function(
 
   # estimate outcomes within cells
   scweights <- est_weights(df,
+                           covs=names(df),
                            matched_gps = cem_matched_gps,
                            dist_scaling = df %>%
                              summarize(across(starts_with("X"),
@@ -177,36 +85,58 @@ get_cem_matches <- function(
   return(m.data)
 }
 
-
+# get the radius size for each treated unit
+# input: dm, rad_method, ntx
+get_radius_size <- function(dm,
+                            rad_method,
+                            caliper){
+  ntx = nrow(dm)
+  radius_sizes <- numeric(ntx)
+  if (rad_method == "adaptive") {
+    # Adaptive: r = max(caliper, 1nn)
+    for (i in 1:ntx) {
+      temp <- dm[i,]
+      temp_sorted <- sort(temp)
+      radius_sizes[i] <- max(caliper, temp_sorted[1])
+    }
+  } else if (rad_method == "1nn") {
+    radius_sizes <- apply(dm, 1, min)
+  } else {
+    radius_sizes <- rep(caliper, nrow(dm))
+  }
+  return(radius_sizes)
+}
 
 
 
 
 # matching method ---------------------------------------------------------
 # generate df of matched controls for each treated unit
-get_matched_co_from_dm <-
+get_matched_co_from_dm_trimmed <-
   function(df, dm_trimmed, treatment){
     ntx <- nrow(dm_trimmed)
     df_trt <- df %>%
-      filter(as.logical({{treatment}}))
-    map(1:ntx, function(x) {
-
-      # record which co units are matched to each tx unit
-      #  - name: row number in df
-      #  - value: col number in dm_trimmed
+      filter(.data[[treatment]] == 1)
+    for (x in 1:ntx){
       matched_obs <- which(!is.na(dm_trimmed[x,]))
+    }
+
+    map(1:ntx, function(x) {
+      # Step 1: get which co units are matched to each tx unit
+      matched_obs <- which(!is.na(dm_trimmed[x,]))
+      # if no matches, drop treated unit
+      if (length(matched_obs) == 0) {
+        return(NULL)
+      }
+
 
       # for each matched co unit, record distance from tx unit
       distances <- dm_trimmed[x, matched_obs]
       matched_rows <- df[names(matched_obs),] %>%
+        ungroup() %>%
         mutate(dist = distances)
 
-      # if no matches, drop treated unit
-      if (nrow(matched_rows) == 0) {
-        # warning(glue::glue("Dropped treated unit {x} from data:
-        #                       unable to exact-match categorical covariates"))
-        return(NULL)
-      }
+      ## Step 2: get the treat uni
       df_trt_x <- df_trt %>%
         ungroup() %>%
         slice(x)
@@ -220,10 +150,28 @@ get_matched_co_from_dm <-
     })
   }
 
-# get caliper matches
-#' Title
+set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
+  ntx <- nrow(dm_uncapped)
+  for (i in 1:ntx) {
+    temp <- dm_uncapped[i,]
+    temp[temp > radius_sizes[i]] <- NA
+    dm_uncapped[i,] <- temp
+  }
+  return(dm_uncapped)
+}
+
+#
 #'
-#' @param df
+#' Generate matches for each treatment over controls
+#' using specified covariate names,
+#' distance metric specified by the scaling parameter
+#' and the method of metric.
+#' Finally, there is a selection of the units
+#'
+#' Note: we allow controls to be repeatedly used
+#'
+#'
+#' @param df A df containing at least covs and treatment
 #' @param covs
 #' @param treatment
 #' @param scaling
@@ -257,65 +205,32 @@ gen_matches <- function(df,
   ### step 0: generate distance matrix, and
   #   store an uncapped version as well.
   dm_uncapped <- dm <- gen_dm(df,
-               covs={{covs}},
-               treatment={{treatment}},
+               covs=covs,
+               treatment=treatment,
                scaling=scaling,
                metric=metric)
 
 
   ### step 1: get the radius size for each treated unit
-  # input: rad_method,
-  if (rad_method == "adaptive") {
-    # Adaptive: r = min(caliper, 1nn)
-    if (is.null(args$knn)) {
-      knn <- p+1
-    } else {
-      knn <- args$knn
-    }
-
-    min_dists <- 1:ntx
-    for (i in 1:ntx) {
-      temp <- dm[i,]
-      temp_sorted <- sort(temp)
-
-      # idea:
-      #  - if 1nn farther than caliper: caliper becomes 1nn
-      #  - if 1nn closer than caliper: caliper becomes min(caliper, knn)
-      if (temp_sorted[1] > caliper) {       # 1nn is farther than caliper
-        min_dists[i] <- temp_sorted[1]
-      } else {                              # 1nn is closer than caliper
-        min_dists[i] <- min(caliper, temp_sorted[knn])
-      }
-    }
-  } else if (rad_method == "1nn") {
-    min_dists <- apply(dm, 1, min)
-  } else {
-    min_dists <- rep(caliper, nrow(dm))
-  }
+  radius_sizes <-
+    get_radius_size(dm, rad_method, caliper)
 
 
   ### step 2: remove all control units farther than caliper
-  # per tx unit (row), remove all co units (cols) farther than min_dists away
-  for (i in 1:ntx) {
-    temp <- dm[i,]
-    temp[temp > min_dists[i]] <- NA
-    dm[i,] <- temp
+  # per tx unit (row), remove all co units (cols)
+  # farther than radius_sizes away
+  dm_trimmed <-
+    set_NA_to_unmatched_co(dm_uncapped, radius_sizes)
 
-    # if min_dists is too big (i.e., no exact match on discrete covs),
-    #  ensure that no matches are returned
-    if (min_dists[i] >= 1000) {
-      dm[i,] <- NA
-    }
-  }
 
-  ### step 3:
-
+  ### step 3: generate df of matched controls for
+  #   each treated unit
   df_list <-
-    get_matched_co_from_dm(df, dm,treatment)
+    get_matched_co_from_dm_trimmed(df, dm_trimmed,treatment)
 
   return(list(matches = df_list %>% discard(is.null),   # drop unmatched tx units
-              adacalipers = min_dists,
-              dm = dm,
+              adacalipers = radius_sizes,
+              dm_trimmed = dm_trimmed,
               dm_uncapped = dm_uncapped))
 }
 
@@ -333,6 +248,7 @@ gen_matches <- function(df,
 #'
 #' @return list of matched sets, with 'weights'
 est_weights <- function(df,
+                        covs,
                         matched_gps,
                         dist_scaling,
                         est_method = c("scm", "average"),
@@ -344,13 +260,16 @@ est_weights <- function(df,
     # generate SCM matching formula
     #  - NOTE: non-numeric columns crashed augsynth for some reason,
     #          so I still don't mess with them here.
-    match_cols <- df %>%
-      select(starts_with("X") & where(is.numeric)) %>%
-      names()
+    match_cols <- covs
 
     scweights <- map(matched_gps,
-                     ~gen_sc_weights(.x, match_cols, dist_scaling, metric),
-                     .progress="Producing SCM units...")   # add progress bar
+                     ~gen_sc_weights(.x, match_cols,
+                                     dist_scaling,
+                                     metric),
+                     .progress="Producing SCM units...")
+    # needs to modify gen_sc_weights to get clear:
+    #   a) what type of matched_gps is required
+    #   b) whether match_cols can be ignored
   } else if (est_method == "average") {
     scweights <- map(matched_gps,
                      function(x) {
