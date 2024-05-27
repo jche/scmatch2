@@ -12,7 +12,8 @@ boot_CSM(
   mu_model = "linear",
   boot_mtd = "Bayesian",
   n_split = 1,
-  kang_true = F
+  kang_true = F,
+  toy_ctr_dist = 0.5
 )
 }
 \arguments{

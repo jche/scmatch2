@@ -8,7 +8,7 @@ boot_naive(
   d,
   caliper,
   metric,
-  cal_method,
+  rad_method,
   dist_scaling,
   est_method = "scm",
   knn = 25,

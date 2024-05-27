@@ -6,6 +6,7 @@
 \usage{
 est_weights(
   df,
+  covs,
   matched_gps,
   dist_scaling,
   est_method = c("scm", "average"),

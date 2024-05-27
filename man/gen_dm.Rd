@@ -7,21 +7,24 @@
 gen_dm(
   df,
   covs = starts_with("X"),
-  treatment = Z,
+  treatment = "Z",
   scaling = 1,
   metric = c("maximum", "euclidean", "manhattan")
 )
 }
 \arguments{
-\item{df}{dataframe}
+\item{df}{dataframe contains at least covariates and treatments
+specified by "covs" and "treatment" argument}
 
-\item{covs}{covariates; default all "X" variables}
+\item{covs}{a vector of characters,
+name of covariates to be matched; default all "X" variables}
 
-\item{treatment}{treatment variable; default "Z"}
+\item{treatment}{name of the treatment variable; default "Z"}
 
 \item{scaling}{vector of scaling constants for covariates}
 
-\item{metric}{distance metric to use}
+\item{metric}{a character vector, distance metric to use.
+Default is c("maximum", "euclidean", "manhattan")}
 }
 \value{
 (#tx) by (#co) distance matrix

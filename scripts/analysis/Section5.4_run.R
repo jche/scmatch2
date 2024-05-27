@@ -74,8 +74,10 @@ toy_naive_high$deg_overlap <- "high"
 save_res_to_csv(toy_naive_high,
                 FNAME = FNAME)
 
-
-
+####
+## The following was inference on Kang-Schafer
+#   DGP whihc has not been reported
+#   to the main paper anymore.
 I = 40; B=40
 FNAME =
   paste0("./sim_toy_results/kang_toy_naive_I_",I,"_B_",B,".csv")
