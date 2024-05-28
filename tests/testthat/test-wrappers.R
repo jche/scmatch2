@@ -20,7 +20,8 @@ test_that("fit_CSM works well",{
 test_that("get_cal_matches works well", {
   test_df <-
     data.frame(Z=c(1,0,0,0,1),
-               X=c(0,0.5,0.8,3,1.6))
+               X=c(0,-0.5,0.8,3,1.6))
+  attr(res, "feasible_units")
   res <- get_cal_matches(df = test_df,
                          covs = "X",
                          treatment = "Z",
@@ -30,8 +31,6 @@ test_that("get_cal_matches works well", {
                          est_method = "scm",
                          return = "agg_co_units",
                          dist_scaling = 1)
-
-
 })
 
 test_that("get_att_ests works well",{

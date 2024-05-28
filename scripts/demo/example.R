@@ -2,7 +2,7 @@
 # example run
 
 require(tidyverse)
-
+source("R/wrappers.R")
 source("R/distance.R")
 source("R/sc.R")
 source("R/matching.R")
@@ -103,10 +103,35 @@ CI_upper[i] = mean_tilde_tau + 1.96 * sd_boot[i]
 write_csv(boot_naive_res, file="sim_canonical_results/boot_naive_res.csv")
 
 
+# Love plot vs. # co units added
+set.seed(2)
+love_plot(calada_scm,
+          covs=paste0("X",5:8), B=NA) +
+  scale_color_manual(
+    values = wesanderson::wes_palette("Zissou1", 5)[c(5,3,2,1)]) +
+  guides(color=F) +
+  scale_x_continuous(breaks = c(174, 177, 180, 183))
+ggsave("writeup/figures/lalonde_love.png", height=3, width=4)
+
+
+love_labs <- c("Age", "Years of Education", "Earnings (1974)", "Earnings (1975)")
+names(love_labs) <- paste0("X", 5:8)
+tmp <- attr(calada_scm,  "adacalipers")
+love_plot2(calada_scm, covs = paste0("X", 5:8)) +
+  theme(legend.background = element_blank(),
+        legend.box.background = element_rect(colour = "black")) +
+  scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(1,5)]) +
+  facet_wrap(~name,
+             scales="free",
+             labeller = labeller(name = love_labs))
+ggsave("writeup/figures/lalonde_love2.png", height=3, width=6)
+
+
 
 # FSATT results -----------------------------------------------------------
 
-feasible <- attr(calada_scm, "scweights") %>%
+feasible <-
+  attr(calada_scm, "scweights") %>%
   bind_rows() %>%
   filter(subclass %in% attr(calada_scm, "feasible_subclasses"))
 get_att_ests(feasible)
@@ -181,29 +206,6 @@ foo +
 ggsave("writeup/figures/lalonde_att.png", height=3, width=6)
 # [1] "FSATT: (339.098, 2851.353)"
 # [1] "SATT: (76.115, 2612.28)"
-
-
-# Love plot vs. # co units added
-set.seed(2)
-love_plot(calada_scm, covs=paste0("X",5:8), B=NA) +
-  scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(5,3,2,1)]) +
-  guides(color=F) +
-  scale_x_continuous(breaks = c(174, 177, 180, 183))
-ggsave("writeup/figures/lalonde_love.png", height=3, width=4)
-
-
-love_labs <- c("Age", "Years of Education", "Earnings (1974)", "Earnings (1975)")
-names(love_labs) <- paste0("X", 5:8)
-tmp <- attr(calada_scm,  "adacalipers")
-love_plot2(calada_scm, covs = paste0("X", 5:8)) +
-  theme(legend.background = element_blank(),
-        legend.box.background = element_rect(colour = "black")) +
-  scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(1,5)]) +
-  facet_wrap(~name,
-             scales="free",
-             labeller = labeller(name = love_labs))
-ggsave("writeup/figures/lalonde_love2.png", height=3, width=6)
-
 
 
 

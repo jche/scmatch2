@@ -83,3 +83,4 @@ test_that("Manual computation should match the gen_dm output",{
   dimnames(expected_dm) <- NULL
   expect_equal(as.matrix(actual_dm), expected_dm, ignore_attr = FALSE)
 })
+
