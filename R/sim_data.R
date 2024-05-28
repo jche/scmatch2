@@ -38,6 +38,7 @@ gen_df_adv <- function(nc, nt,
                        ctr_dist = 0.5 # from 0 to 1;
                        #            lower means better overlap
                        ) {
+  require( tidyverse )
 
   SD <- 0.1
 
@@ -87,7 +88,7 @@ if (F) {
     tx_effect_fun = function(X1, X2) {1},
     f0_fun = function(x,y) {
       matrix(c(x,y), ncol=2) %>%
-        dmvnorm(mean = c(0.5,0.5),
+        mvtnorm::dmvnorm(mean = c(0.5,0.5),
                 sigma = matrix(c(1,0.8,0.8,1), nrow=2))}) %>%
     mutate(X3 = X1*X2)
   df %>%

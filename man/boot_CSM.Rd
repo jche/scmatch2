@@ -12,13 +12,26 @@ boot_CSM(
   mu_model = "linear",
   boot_mtd = "Bayesian",
   n_split = 1,
-  kang_true = F
+  kang_true = FALSE,
+  toy_ctr_dist = 0.5
 )
 }
 \arguments{
 \item{dgp_name}{Name of the DGP}
 
-\item{kang_true}{}
+\item{att0}{True ATT}
+
+\item{I}{Number of MC runs}
+
+\item{B}{Number of bootstrap samples per MC run}
+
+\item{mu_model}{Model for the potential outcomes}
+
+\item{boot_mtd}{Method for the bootstrap}
+
+\item{n_split}{Number of splits for sample splitting}
+
+\item{kang_true}{Whether to use the true ATT from Kang et al. (2021)}
 }
 \description{
 Title

@@ -157,7 +157,7 @@ get_matches_and_debiased_residuals <-
 
     # Assign group_label to df_dgp
     df_dgp_splitted <- assign_group_label(df_dgp,
-                                  n_split = n_split)
+                                          n_split = n_split)
     preds_csm <- get_matches(dgp_name=dgp_name,
                              df_dgp=df_dgp,
                              dist_scaling=dist_scaling)
@@ -217,9 +217,9 @@ get_matches_and_debiased_residuals <-
 
       models_n_split[[i]]<-
         SL_fit <- get_SL_fit(df_to_fit=df_to_fit_i,
-                              X_names = X_names,
-                              Y_name = "Y",
-                              SL.library = SL_lib)
+                             X_names = X_names,
+                             Y_name = "Y",
+                             SL.library = SL_lib)
       # get predictions:
       preds_csm[,paste0("hat_mu_0_pred_",i)] <-
         SL_pred  <- get_SL_pred(SL_fit=SL_fit,
@@ -248,9 +248,9 @@ get_matches_and_debiased_residuals <-
     mean_tilde_tau <- mean(tilde_tau)
     tilde_tau_resids <- tilde_tau - mean_tilde_tau
     return(list(preds_csm=preds_csm,
-        tilde_tau=tilde_tau,
-        mean_tilde_tau=mean_tilde_tau,
-        tilde_tau_resids=tilde_tau_resids))
+                tilde_tau=tilde_tau,
+                mean_tilde_tau=mean_tilde_tau,
+                tilde_tau_resids=tilde_tau_resids))
   }
 
 # Function: boot_bayesian
@@ -266,11 +266,11 @@ get_matches_and_debiased_residuals <-
 # att_est= att_est, att_est_debiased = att_debiased,
 # lower=CI_lower,upper=CI_upper, covered=covered, sd_boot=sd_boot)
 boot_bayesian <- function(dgp_name,
-                     att0,
-                     I=100,
-                     B=250,
-                     mu_model="linear",
-                     n_split=1){
+                          att0,
+                          I=100,
+                          B=250,
+                          mu_model="linear",
+                          n_split=1){
   boot_CSM(dgp_name,
            att0,
            I,
@@ -281,10 +281,10 @@ boot_bayesian <- function(dgp_name,
 }
 
 boot_wild <- function(dgp_name,
-                          att0,
-                          I=100,
-                          B=250,
-                          mu_model="linear",
+                      att0,
+                      I=100,
+                      B=250,
+                      mu_model="linear",
                       n_split=1){
   boot_CSM(dgp_name,
            att0,
@@ -314,11 +314,11 @@ boot_by_resids <- function(resids, B,boot_mtd, seed_addition){
   return(T_star)
 }
 
-boot_naive <- function(df_dgp,
-                       B,
-                       seed_addition,
-                       dgp_name="otsu",
-                       mu_model="linear"){
+boot_naive <- function( df_dgp,
+                        B,
+                        seed_addition,
+                        dgp_name="otsu",
+                        mu_model="linear") {
   # B <- 100; seed_addition <- 1
   # dgp_name <- "toy"; mu_model = "linear"
   # df_dgp <- gen_one_toy()
@@ -423,10 +423,10 @@ boot_naive <- function(df_dgp,
 
 
 boot_cluster <-function(df_dgp,
-  B,
-  seed_addition,
-  dgp_name="otsu",
-  mu_model="linear"){
+                        B,
+                        seed_addition,
+                        dgp_name="otsu",
+                        mu_model="linear"){
 
   # function(df_dgp,
   #                                 B,
@@ -511,8 +511,8 @@ boot_cluster <-function(df_dgp,
 }
 
 boot_cluster_for_otsu <- function(df_dgp,
-                       B,
-                       seed_addition){
+                                  B,
+                                  seed_addition){
   # B <- 100; seed_addition <- 1
   # df_dgp <- generate_one_otsu()
   obj <- get_matches_and_debiased_residuals(
@@ -567,13 +567,13 @@ boot_cluster_for_otsu <- function(df_dgp,
 #' Title
 #'
 #' @param dgp_name Name of the DGP
-#' @param att0
-#' @param I
-#' @param B
-#' @param mu_model
-#' @param boot_mtd
-#' @param n_split
-#' @param kang_true
+#' @param att0 True ATT
+#' @param I Number of MC runs
+#' @param B Number of bootstrap samples per MC run
+#' @param mu_model Model for the potential outcomes
+#' @param boot_mtd Method for the bootstrap
+#' @param n_split Number of splits for sample splitting
+#' @param kang_true Whether to use the true ATT from Kang et al. (2021)
 #'
 #' @return
 #' @export
@@ -582,13 +582,13 @@ boot_cluster_for_otsu <- function(df_dgp,
 #' boot_otsu_to_test <-
 #' boot_CSM(dgp_name="otsu", att0=T,I=100, B=100,mu_model="linear", boot_mtd="Bayesian",n_split=2)
 boot_CSM <- function(dgp_name,
-                          att0,
-                          I=100,
-                          B=250,
-                          mu_model="linear",
-                          boot_mtd="Bayesian",
+                     att0,
+                     I=100,
+                     B=250,
+                     mu_model="linear",
+                     boot_mtd="Bayesian",
                      n_split=1,
-                     kang_true=F,
+                     kang_true=FALSE,
                      toy_ctr_dist=0.5){
 
   covered <- CI_lower <- CI_upper <-
@@ -612,7 +612,7 @@ boot_CSM <- function(dgp_name,
     time_before_matching <- proc.time()
     matches_and_debiased_residuals<-
       get_matches_and_debiased_residuals(
-         dgp_name, df_dgp,
+        dgp_name, df_dgp,
         dist_scaling, mu_model,n_split)
     list2env(matches_and_debiased_residuals,
              envir = environment())
@@ -634,22 +634,22 @@ boot_CSM <- function(dgp_name,
       CI_lower[i] = mean_tilde_tau - quantile(T_star, 0.975)
       CI_upper[i] = mean_tilde_tau - quantile(T_star, 0.025)
       sd_boot[i] = sd(T_star)
-    }else if (boot_mtd == "naive"){
-      T_star <- boot_naive(df_dgp = df_dgp,
-                 B = B,
-                 seed_addition = seed_addition,
-                 dgp_name=dgp_name,
-                 mu_model=mu_model)
+    } else if (boot_mtd == "naive"){
+      T_star <- boot_naive( df_dgp = df_dgp,
+                            B = B,
+                            seed_addition = seed_addition,
+                            dgp_name=dgp_name,
+                            mu_model=mu_model)
 
       sd_boot[i] = sd(T_star)
       CI_lower[i] = mean_tilde_tau -1.96 *  sd_boot[i]
       CI_upper[i] = mean_tilde_tau + 1.96 * sd_boot[i]
     }else if (boot_mtd == "cluster"){
       T_star <- boot_cluster(df_dgp = df_dgp,
-                           B = B,
-                           seed_addition = seed_addition,
-                           dgp_name=dgp_name,
-                           mu_model=mu_model)
+                             B = B,
+                             seed_addition = seed_addition,
+                             dgp_name=dgp_name,
+                             mu_model=mu_model)
 
       sd_boot[i] = sd(T_star)
       CI_lower[i] = mean_tilde_tau -1.96 *  sd_boot[i]

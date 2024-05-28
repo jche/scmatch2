@@ -4,7 +4,7 @@ test_that("fit_CSM works well",{
     data.frame(Z=c(1,0,0,0,1),
                X=c(0,0.5,0.8,3,1.6),
                Y = c(1,0,0,0,1))
-  res <- fit_CSM(df = test_df,
+  res <- CSM:::fit_CSM(df = test_df,
                          covs = "X",
                          treatment = "Z",
                          metric = "maximum",
@@ -21,7 +21,7 @@ test_that("get_cal_matches works well", {
   test_df <-
     data.frame(Z=c(1,0,0,0,1),
                X=c(0,0.5,0.8,3,1.6))
-  res <- get_cal_matches(df = test_df,
+  res <- CSM:::get_cal_matches(df = test_df,
                          covs = "X",
                          treatment = "Z",
                          metric = "maximum",
@@ -31,28 +31,34 @@ test_that("get_cal_matches works well", {
                          return = "agg_co_units",
                          dist_scaling = 1)
 
-
+  res
+  expect_equal( nrow( res ), 4 )
 })
 
 test_that("get_att_ests works well",{
   test_matched_weighted_df <-
     data.frame(Z= c(1,0,0,0,1),
-               Y = c(1,0,0,0,1),
-               weights = )
-  get_att_ests(res)
+               Y = c(1,-1,1,0,1),
+               weights = c(1,0.5,0.5,1,1) )
+  test_matched_weighted_df
+  atts <- CSM:::get_att_ests(test_matched_weighted_df)
+  atts
+  expect_equal( atts, 1 )
 })
+
 
 
 test_that("get_att_bal should work for a example dataset with either
           Z in 0,1 or Z in F,T, but not in other numerical Z",{
-  source("./scripts/datagen/gen_six_points.R")
+
+  source( here::here( "scripts/datagen/gen_six_points.R" ) )
   df_six_points <- gen_six_points()
   covs <- c("X1", "X2")
   zform1 <-
     as.formula(paste0("Z ~ ",
                       paste0(covs, collapse="+")))
 
-  test_att_bal = get_att_bal(d = df_six_points,
+  test_att_bal = CSM:::get_att_bal(d = df_six_points,
                      form = zform1,
                      tols = rep(0.01, length(covs)))
   expect_equal(test_att_bal, 9.0399,tolerance=1e-3)
@@ -60,16 +66,17 @@ test_that("get_att_bal should work for a example dataset with either
   df_Z_logical <-
     df_six_points %>%
     mutate(Z=as.logical(Z))
-  test_att_bal = get_att_bal(d = df_Z_logical,
+  test_att_bal = CSM:::get_att_bal(d = df_Z_logical,
                      form = zform1,
                      tols = rep(0.01, length(covs)))
   expect_equal(test_att_bal, 9.0399,tolerance=1e-3)
 
+  # Make sure treatment is binary is checked
   df_Z_random <- df_six_points %>%
     ungroup() %>%
-    mutate(Z= as.numeric(1:6))
+    mutate( Z = as.numeric(1:6))
   expect_error(
-    get_att_bal(d = df_Z_random,
+    CSM:::get_att_bal(d = df_Z_random,
                 form = zform1,
                 tols = rep(0.01, length(covs))),
     "Treatment variable must be either 0, 1 or FALSE, TRUE")
@@ -86,6 +93,8 @@ test_that("get_SL_pred returns correct output structure", {
 
   expect_true(is.matrix(result) == T)
 })
+
+
 
 test_that("get_SL_fit returns a correct output data type", {
   result = create_mock_SL_fit()

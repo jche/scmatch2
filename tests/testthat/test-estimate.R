@@ -1,4 +1,6 @@
 
+
+
 test_that("agg_co_units works", {
     df1 <- data.frame(
       Z = c(1, 0, 0),
@@ -27,10 +29,10 @@ test_that("agg_co_units works", {
 
   test_scweights <- nested_list
 
-  res <- agg_co_units(test_scweights)
+  res <- CSM:::agg_co_units(test_scweights)
   expected_weights <- c(1, 0.3, 1.7, 1)
-
   expect_equal(res$weights, expected_weights)
+
 })
 
 
@@ -57,15 +59,18 @@ test_that("agg_sc_units works", {
     unit = c("tx1", "c1"),
     weights = c(1, 1)
   )
-
+  df1
+  df2
   nested_list <- list(df1, df2)
 
   test_scweights <- nested_list
 
-  res <- agg_sc_units(test_scweights)
-  # expected_weights <- c(1, 0.3, 1.7, 1)
-  #
-  # expect_equal(res$weights, expected_weights)
+  res <- CSM:::agg_sc_units(test_scweights)
+  #expected_weights <- c(1, 0.3, 1.7, 1)
+  #expect_equal(res$weights, expected_weights)
+  # Once aggregated, each treated unit has a single synthetic control unit.
+  expect_equal( res$weights, c( 1, 1, 1, 1 ) )
+
 })
 
 

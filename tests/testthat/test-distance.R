@@ -4,7 +4,7 @@ test_that("Making the {{ }} call work", {
   df <- data.frame(X1=1:4,
                    X2=4:1,
                    Z = c(0, 1, 0, 1))
-  dm <- gen_dm(df,
+  dm <- CSM:::gen_dm(df,
                covs=starts_with("X"),
                treatment=Z)
   expect_true(is.matrix(dm))
@@ -75,7 +75,7 @@ test_that("Manual computation should match the gen_dm output",{
   expected_dm <-
     matrix(c(sqrt(2), sqrt(18), sqrt(2),  sqrt(2)), nrow = 2)
 
-  actual_dm <- gen_dm(df, covs, treatment,
+  actual_dm <- CSM:::gen_dm(df, covs, treatment,
                       scaling=1,
                       metric = "euclidean")
   # only check
@@ -83,3 +83,6 @@ test_that("Manual computation should match the gen_dm output",{
   dimnames(expected_dm) <- NULL
   expect_equal(as.matrix(actual_dm), expected_dm, ignore_attr = FALSE)
 })
+
+
+

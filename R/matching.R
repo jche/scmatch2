@@ -85,8 +85,13 @@ get_cem_matches <- function(
   return(m.data)
 }
 
-# get the radius size for each treated unit
-# input: dm, rad_method, ntx
+#' get the radius size for each treated unit
+#'
+#' @param dm data
+#' @param rad_method Method for radius
+#' @param caliper Caliper size
+#'
+#' @export
 get_radius_size <- function(dm,
                             rad_method,
                             caliper){
@@ -160,29 +165,41 @@ set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
   return(dm_uncapped)
 }
 
-#
+
+#' Match treated units to control units
 #'
-#' Generate matches for each treatment over controls
-#' using specified covariate names,
-#' distance metric specified by the scaling parameter
-#' and the method of metric.
-#' Finally, there is a selection of the units
+#' Generate matches for each treatment over controls using specified
+#' covariate names, distance metric specified by the scaling parameter
+#' and the method of metric. Finally, there is a selection of the
+#' units
 #'
-#' Note: we allow controls to be repeatedly used
+#' Note: we allow controls to be repeatedly used (we match with
+#' replacement).
 #'
 #'
-#' @param df A df containing at least covs and treatment
-#' @param covs
-#' @param treatment
-#' @param scaling
-#' @param metric Character specifying the distance metric.
-#'  One of "maximum", "euclidean", "manhattan"
-#' @param caliper Caliper on the scaled distance. Usually set to 1, and control matches
-#' using the scaling paramter
-#' @param rad_method
-#' @param ...
+#' @param df A data frame containing all the listed covariates and the
+#'   treatment indicator.
+#' @param covs List of covariates names.
+#' @param treatment Variable in df that has treatment indicator (0/1
+#'   variable).
+#' @param scaling Scaling factor, defaults to 1.  Each covariate will
+#'   be scaled by scaling factor.  Can be a vector of length P, with P
+#'   being number of covariates.
+#' @param metric Character specifying the distance metric. One of
+#'   "maximum", "euclidean", "manhattan"
+#' @param caliper Caliper on the scaled distance. Usually set to 1;
+#'   control variable importance via the scaling paramter
+#' @param rad_method Method to determine the adaptive radius size for
+#'   each treated unit.  fixed means drop treated units with no
+#'   matches closer than caliper. 1nn means largest of closest control
+#'   and caliper.
+#' @param ... Extra arguments
 #'
-#' @return
+#' @return A list of results.  matches: list of small datasets of
+#'   matched control units for each treated unit.  adacalipers: vector
+#'   of adaptive calipers for each treated unit.  dm_trimmed: distance
+#'   matrix with control units farther than caliper censored with NA
+#'   dm_uncapped: distance matrix without any control units censored.
 #' @export
 #'
 #' @examples
@@ -194,9 +211,13 @@ gen_matches <- function(df,
                         caliper=1,
                         rad_method = c("adaptive", "1nn", "fixed"),
                         ...) {
+
   ### Step -1: set up some constants
   rad_method <- match.arg(rad_method)
   args <- list(...)
+
+  stopifnot( treatment %in% colnames(df) )
+  stopifnot( all( covs %in% colnames(df) ) )
 
   # store helpful constants
   ntx <- df %>% pull({{treatment}}) %>% sum()   # number of tx units
@@ -205,10 +226,10 @@ gen_matches <- function(df,
   ### step 0: generate distance matrix, and
   #   store an uncapped version as well.
   dm_uncapped <- dm <- gen_dm(df,
-               covs=covs,
-               treatment=treatment,
-               scaling=scaling,
-               metric=metric)
+                              covs=covs,
+                              treatment=treatment,
+                              scaling=scaling,
+                              metric=metric)
 
 
   ### step 1: get the radius size for each treated unit
@@ -239,7 +260,9 @@ gen_matches <- function(df,
 
 # estimate within matched sets --------------------------------------------
 
-#' Generate weights for list of matched sets
+#' Generate weights for list of matched sets, typically by the
+#' synthetic control method (but you can also simply average).
+#'
 #'
 #' @param df full dataframe
 #' @param matched_gps list of matched sets: tx unit in first row
@@ -247,6 +270,8 @@ gen_matches <- function(df,
 #' @param est_method "scm" or "average"
 #'
 #' @return list of matched sets, with 'weights'
+#'
+#' @export
 est_weights <- function(df,
                         covs,
                         matched_gps,
