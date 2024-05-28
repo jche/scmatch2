@@ -74,35 +74,6 @@ toy_example_six_points_plot <-
 ggsave("figures/toyexample2_no_circle.png", width=3, height=3)
 
 
-# plot scaled plot
-three_points<- six_points_df[c(1,3,5),]
-orig_plot <-
-  ggplot(data=three_points,
-          aes(x1,x2,pch=as.factor(z)))+
-  geom_point(size=2) +
-  xlim(c(0,2.5)) +
-  ylim(c(0,2.5)) +
-  ggforce::geom_circle(aes(x0=X1,
-                           y0=Y1,
-                           r=NUDGE*4),
-                       lty = "dotted")
-ggsave(
-  filename = "figures/orig_circle.png",
-  orig_plot)
-
-new_plot <-
-  ggplot(data=three_points,
-         aes(x1*1000,x2*5,pch=as.factor(z)))+
-  geom_point(size=20) +
-  xlim(c(500,1000)) +
-  ylim(c(0,15)) +
-  ggforce::geom_circle(aes(x0=X1*1000,
-                           y0=Y1*5,
-                           r=NUDGE*70),
-                       lty = "dotted")
-ggsave("figures/new_circle.png",
-       width=30,
-       height=10)
 # plot dataset ------------------------------------------------------------
 
 nc <- 500

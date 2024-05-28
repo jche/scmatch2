@@ -23,11 +23,17 @@ library( CSM )
 
 
 # load data ---------------------------------------------------------------
-LOAD_OPTION <- "lalonde_w_cps"
+LOAD_OPTION <- "lalonde_w_cps_cos"
 # option 1: "lalonde_only": use only experimental data
+<<<<<<< HEAD
 # option 2: "lalonde_w_cps": use experimental treateds and all controls
 # option 3: use experimental treateds and nonexperimental controls
 load(file = here::here( paste0("data/inputs/", LOAD_OPTION,".RData")) )
+=======
+# option 2: "lalonde_w_cps": use experimental treats and all controls
+# option 3: "lalonde_w_cps_cos": use experimental treateds and nonexperimental controls
+load(file = paste0("data/inputs/", LOAD_OPTION,".RData"))
+>>>>>>> 743271c0e88de25d10fb753dd403e5c190584b72
 
 ggplot(lalonde_df,
        aes(x = married, y=re74 ))+
@@ -70,21 +76,32 @@ DIST_SCALING <- tibble(
 
 
 # run matching ------------------------------------------------------------
-
 calada_scm <- lalonde_df_renamed %>%
-  get_cal_matches(caliper = CALIPER,
+  get_cal_matches(caliper = 2000,
                   metric = METRIC,
                   cal_method = CAL_METHOD,
                   dist_scaling = DIST_SCALING,
                   est_method = "scm",
                   return = "sc_units",
-                  knn = 10,         # for ada
-                  num_bins = 5,     # for cem
-                  wider = F)        # for cem
+                  knn = 10,
+                  num_bins = 5,
+                  wider = F)
 get_att_ests(calada_scm)
 
+### Inference with the A-E method
+calada_scm$hat_mu_0 <- 0
 
-# get_cem_matches(df, num_bins=5, method="average", return="sc_units")
+calada_scm_filtered <-
+  calada_scm %>%
+  filter(Z==F) %>%
+  group_by(subclass) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+
+sd_est = get_se_AE(calada_scm)
+CI_lower[i] = mean_tilde_tau -1.96 *  sd_boot[i]
+CI_upper[i] = mean_tilde_tau + 1.96 * sd_boot[i]
+write_csv(boot_naive_res, file="sim_canonical_results/boot_naive_res.csv")
 
 
 
@@ -190,13 +207,4 @@ ggsave("writeup/figures/lalonde_love2.png", height=3, width=6)
 
 
 
-### naive bootstrap
 
-boot_naive_res <- boot_naive(df,
-                             caliper = CALIPER,
-                             metric = METRIC,
-                             cal_method = CAL_METHOD,
-                             dist_scaling = DIST_SCALING,
-                             B = 50)
-
-write_csv(boot_naive_res, file="sim_canonical_results/boot_naive_res.csv")

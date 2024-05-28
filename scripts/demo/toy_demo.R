@@ -1,14 +1,10 @@
-
 source("./scripts/datagen/gen_six_points.R")
-source("./R/wrappers.R")
-source("./R/estimate.R")
 
 ### Step 1: generate data
 df_six_points <-
   gen_six_points(tau=function(x1,x2) 0,
                  scale_Y0 = 10)
 # we tune hardly to see how bad balancing
-
 
 # Plot
 ggplot(df_six_points,
@@ -57,7 +53,7 @@ m_bal_1 <- optweight(zform1,
                    data = df_six_points,
                    tols = rep(0.01, length(covs)),
                    estimand = "ATT")
-m_bal_1$weights[3:6]
+m_bal_1$weights[3:6] * 0.5
 (bal_1_est_att <-
     get_est_att_from_wt(df=df_six_points,
                         input_wt=m_bal_1$weights))

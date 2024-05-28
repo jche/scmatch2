@@ -67,8 +67,16 @@ create_toy_example_six_points_plot <-
       create_toy_example_four_points_plot(background_plot, six_points_df)
     with_point_text_plot <-
       toy_example_four_points_plot +
-      annotate("text", x=X1-2.9*NUDGE, y=Y1-0.5*NUDGE, label="c[3]", parse=T) +
-      annotate("text", x=X2-2.3*NUDGE, y=Y2+0.7*NUDGE, label="c[4]", parse=T)
+      annotate("text",
+               x=X1-2.9*NUDGE,
+               y=Y1-0.5*NUDGE,
+               label="c[3]",
+               parse=T) +
+      annotate("text",
+               x=X2-2.3*NUDGE,
+               y=Y2+0.7*NUDGE,
+               label="c[4]",
+               parse=T)
     if (draw_circle){
       with_caliper_plot <-
         with_point_text_plot +

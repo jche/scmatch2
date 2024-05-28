@@ -51,8 +51,10 @@ calc_N_T_N_C <- function(preds_csm){
 
 get_se_AE <- function(preds_csm){
   # 1. Get debiased units; Get the subclasses
+
   preds_csm <- preds_csm %>%
-    mutate(Y_bias_corrected = Y - hat_mu_0)
+      mutate(Y_bias_corrected = Y - hat_mu_0)
+
   # 2. Filter the controls
   #     and the subclasses with n_controls >= 2
   preds_csm_filtered <-
