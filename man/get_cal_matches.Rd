@@ -2,7 +2,7 @@
 % Please edit documentation in R/wrappers.R
 \name{get_cal_matches}
 \alias{get_cal_matches}
-\title{Main matching function}
+\title{Main adaptive radius matching function}
 \usage{
 get_cal_matches(
   df,
@@ -23,13 +23,25 @@ get_cal_matches(
 )
 }
 \arguments{
+\item{df}{The data frame to be matched}
+
+\item{metric}{A string specifying the distance metric}
+
+\item{caliper}{A numeric specifying the caliper size}
+
 \item{rad_method}{adaptive caliper, fixed caliper, only 1nn caliper}
 
-\item{...}{}
+\item{est_method}{A string specifying the estimation method}
+
+\item{return}{A string specifying what to return}
+
+\item{dist_scaling}{A vector of scaling constants for covariates}
+
+\item{...}{Additional arguments}
 }
 \value{
-df with a bunch of attributes
+df with a bunch of attributes.
 }
 \description{
-Main matching function
+Main adaptive radius matching function
 }

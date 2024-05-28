@@ -2,8 +2,11 @@
 
 export(boot_CSM)
 export(coerce_covs)
+export(est_weights)
 export(gen_matches)
 export(gen_toy_covar)
 export(get_SL_fit)
 export(get_SL_pred)
+export(get_cal_matches)
+export(get_radius_size)
 export(scale_covs)

@@ -32,16 +32,22 @@ get_att_ests <- function(matched_df) {
 
 #' aggregate scweights to tx/sc units
 #'
-#' @param scweights list of sc weights (tibbles with tx unit in first row)
+#' Aggregate by cluster defined by treated unit, calculating the
+#' weighted average of the control units in the cluster for all
+#' variables that start with "X" or "Y" in the dataframes.
+#'
+#' @param scweights list of sc weights (tibbles with tx unit in first
+#'   row).
 #'
 #' @return df with tx and corresponding sc units
 agg_sc_units <- function(scweights) {
+
   if (!is.data.frame(scweights)) {
     scweights <- scweights %>%
       map_dfr(~mutate(., subclass=id[1]))
   }
 
-  scweights %>%
+  rs <- scweights %>%
     group_by(subclass, Z) %>%
     summarize(across(starts_with("X"),
                      ~sum(.x * weights)),
@@ -51,6 +57,12 @@ agg_sc_units <- function(scweights) {
     mutate(id = c(NA, subclass[1]), .before="subclass") %>%
     mutate(weights = 1) %>%
     ungroup()
+
+  # Make IDs for the synthetic controls
+  rs$id = as.character(rs$id)
+  rs$id[ is.na(rs$id) ] <- paste0( rs$subclass[ is.na(rs$id) ], "_syn" )
+
+  rs
 }
 
 

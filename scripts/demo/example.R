@@ -2,13 +2,7 @@
 # example run
 
 require(tidyverse)
-source("R/wrappers.R")
-source("R/distance.R")
-source("R/sc.R")
-source("R/matching.R")
-source("R/estimate.R")
-source("R/inference.R")
-source("R/diagnostic_plots.R")
+library( CSM )
 
 
 # NAME ASSUMPTIONS:
@@ -24,7 +18,7 @@ source("R/diagnostic_plots.R")
 
 # DISTANCE ASSUMPTIONS:
 #  - default scaling is 1/sd(x)
-#  - (default categorical scaling is 1000, i.e., some big number)
+#  - (default categorical scaling is 1000, i.e., some big number, which forces exact matching on categoricals)
 
 
 # load data ---------------------------------------------------------------
@@ -33,6 +27,7 @@ LOAD_OPTION <- "lalonde_w_cps_cos"
 # option 2: "lalonde_w_cps": use experimental treats and all controls
 # option 3: "lalonde_w_cps_cos": use experimental treateds and nonexperimental controls
 load(file = paste0("data/inputs/", LOAD_OPTION,".RData"))
+
 
 ggplot(lalonde_df,
        aes(x = married, y=re74 ))+

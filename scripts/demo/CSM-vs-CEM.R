@@ -1,5 +1,8 @@
-load_all()
-source("./scripts/datagen/gen_uniform.R")
+
+library( tidyverse )
+library( CSM )
+source( here::here( "scripts/datagen/gen_uniform.R" ) )
+
 xlim <- ylim<-  c(0, 2.25)
 uniform_df <- gen_uniform(n = 500,
                           p_trt = 0.5,

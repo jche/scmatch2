@@ -2,7 +2,8 @@
 % Please edit documentation in R/matching.R
 \name{est_weights}
 \alias{est_weights}
-\title{Generate weights for list of matched sets}
+\title{Generate weights for list of matched sets, typically by the
+synthetic control method (but you can also simply average).}
 \usage{
 est_weights(
   df,
@@ -26,5 +27,6 @@ est_weights(
 list of matched sets, with 'weights'
 }
 \description{
-Generate weights for list of matched sets
+Generate weights for list of matched sets, typically by the
+synthetic control method (but you can also simply average).
 }

@@ -1,13 +1,14 @@
 
-# wrapper functions:
+# wrapper functions of other packages:
 #  an adaptive implementation of wide-use basic
 #  functions for convenience
 
-require(optweight)
-require(dbarts)
-require(tmle)
-require(AIPW)
-require(mvtnorm)
+
+# TODO: Move these into relevant functions so it doesn't load unless called
+#require(optweight)
+#require(dbarts)
+#require(AIPW)
+#require(mvtnorm)
 
 
 #' SuperLearner fitting
@@ -26,6 +27,7 @@ get_SL_fit <- function(df_to_fit,
                        X_names,
                        Y_name,
                        SL.library){
+  require(tmle)
   SuperLearner(Y = df_to_fit[,Y_name,drop=T],
                X = df_to_fit[,X_names],
                SL.library = SL.library)
@@ -45,7 +47,7 @@ fit_CSM <- function(df,
                                          if (is.numeric(x)) 1/sd(x)
                                          else 1000
                                        })),
-                    ...){
+                    ...) {
   match_weighted_df <- df %>%
     get_cal_matches(
       covs = covs,
@@ -62,6 +64,9 @@ fit_CSM <- function(df,
   return(est)
 }
 
+
+
+
 #' Get prediction from the fitted SuperLearner object
 #'
 #' @param SL_fit A fitted SuperLearner object
@@ -77,40 +82,42 @@ fit_CSM <- function(df,
 #' result <- get_SL_pred(mock_SL_fit,
 #'                       mock_df_test,
 #'                       X_names)
-get_SL_pred <-
-  function(SL_fit, df_test, X_names){
-    SL_pred_obj <- predict(SL_fit,
-                           newdata = df_test[,X_names])
-    return(SL_pred_obj$library.predict)
-  }
+get_SL_pred <- function(SL_fit, df_test, X_names){
+  require(tmle)
 
-#' Main matching function
+  SL_pred_obj <- predict(SL_fit,
+                         newdata = df_test[,X_names])
+  return(SL_pred_obj$library.predict)
+}
+
+#' Main adaptive radius matching function
 #'
-#' @param df
-#' @param metric
-#' @param caliper
+#' @param df The data frame to be matched
+#' @param metric A string specifying the distance metric
+#' @param caliper A numeric specifying the caliper size
 #' @param rad_method adaptive caliper, fixed caliper, only 1nn caliper
-#' @param est_method
-#' @param return
-#' @param dist_scaling
-#' @param ...
+#' @param est_method A string specifying the estimation method
+#' @param return A string specifying what to return
+#' @param dist_scaling A vector of scaling constants for covariates
+#' @param ... Additional arguments
 #'
-#' @return df with a bunch of attributes
-get_cal_matches <- function(df,
-                            covs = starts_with("X"),
-                            treatment = "Z",
-                            metric = c("maximum", "euclidean", "manhattan"),
-                            caliper = 1,
-                            rad_method = c("adaptive", "fixed", "1nn"),
-                            est_method = c("scm", "scm_extrap", "average"),
-                            return = c("sc_units", "agg_co_units", "all"),
-                            dist_scaling = df %>%
-                              summarize(across(starts_with("X"),
-                                               function(x) {
-                                                 if (is.numeric(x)) 1/sd(x)
-                                                 else 1000
-                                               })),
-                            ...) {
+#' @return df with a bunch of attributes.
+#' @export
+get_cal_matches <- function( df,
+                             covs = starts_with("X"),
+                             treatment = "Z",
+                             metric = c("maximum", "euclidean", "manhattan"),
+                             caliper = 1,
+                             rad_method = c("adaptive", "fixed", "1nn"),
+                             est_method = c("scm", "scm_extrap", "average"),
+                             return = c("sc_units", "agg_co_units", "all"),
+                             dist_scaling = df %>%
+                               summarize(across(starts_with("X"),
+                                                function(x) {
+                                                  if (is.numeric(x)) 1/sd(x)
+                                                  else 1000
+                                                })),
+                             ...) {
   metric <- match.arg(metric)
   rad_method <- match.arg(rad_method)
   est_method <- match.arg(est_method)
@@ -191,8 +198,8 @@ gen_one_toy <- function(ctr_dist = 0.5){
     tx_effect_fun = function(X1, X2) {3*X1+3*X2},
     f0_fun = function(x,y) {
       matrix(c(x,y), ncol=2) %>%
-        dmvnorm(mean = c(0.5,0.5),
-                sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
+        mvtnorm::dmvnorm(mean = c(0.5,0.5),
+                         sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
     },
     ctr_dist = ctr_dist)
 }
@@ -218,10 +225,10 @@ get_att_bal <- function(d,
   }
 
   ## Fit model
-  m_bal <- optweight(form,
-                     data = d,
-                     tols = tols,
-                     estimand = "ATT")
+  m_bal <- optweight::optweight(form,
+                                data = d,
+                                tols = tols,
+                                estimand = "ATT")
 
   ### output ATT estimate
   d <- d %>%
@@ -481,8 +488,8 @@ if (F) {
                      sd=0.03,
                      effect_fun = function(x,y) {
                        matrix(c(x,y), ncol=2) %>%
-                         dmvnorm(mean = c(0.5,0.5),
-                                 sigma = matrix(c(1,0.8,0.8,1), nrow=2))
+                         mvtnorm::dmvnorm(mean = c(0.5,0.5),
+                                          sigma = matrix(c(1,0.8,0.8,1), nrow=2))
                      })
 
   df <- gen_df_full(nc=1000, nt=50, eps_sd=0,

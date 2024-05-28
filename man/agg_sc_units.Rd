@@ -7,11 +7,14 @@
 agg_sc_units(scweights)
 }
 \arguments{
-\item{scweights}{list of sc weights (tibbles with tx unit in first row)}
+\item{scweights}{list of sc weights (tibbles with tx unit in first
+row).}
 }
 \value{
 df with tx and corresponding sc units
 }
 \description{
-aggregate scweights to tx/sc units
+Aggregate by cluster defined by treated unit, calculating the
+weighted average of the control units in the cluster for all
+variables that start with "X" or "Y" in the dataframes.
 }

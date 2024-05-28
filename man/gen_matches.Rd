@@ -2,11 +2,7 @@
 % Please edit documentation in R/matching.R
 \name{gen_matches}
 \alias{gen_matches}
-\title{Generate matches for each treatment over controls
-using specified covariate names,
-distance metric specified by the scaling parameter
-and the method of metric.
-Finally, there is a selection of the units}
+\title{Match treated units to control units}
 \usage{
 gen_matches(
   df,
@@ -20,16 +16,45 @@ gen_matches(
 )
 }
 \arguments{
-\item{df}{A df containing at least covs and treatment}
+\item{df}{A data frame containing all the listed covariates and the
+treatment indicator.}
 
-\item{metric}{Character specifying the distance metric.
-One of "maximum", "euclidean", "manhattan"}
+\item{covs}{List of covariates names.}
 
-\item{caliper}{Caliper on the scaled distance. Usually set to 1, and control matches
-using the scaling paramter}
+\item{treatment}{Variable in df that has treatment indicator (0/1
+variable).}
 
-\item{...}{}
+\item{scaling}{Scaling factor, defaults to 1.  Each covariate will
+be scaled by scaling factor.  Can be a vector of length P, with P
+being number of covariates.}
+
+\item{metric}{Character specifying the distance metric. One of
+"maximum", "euclidean", "manhattan"}
+
+\item{caliper}{Caliper on the scaled distance. Usually set to 1;
+control variable importance via the scaling paramter}
+
+\item{rad_method}{Method to determine the adaptive radius size for
+each treated unit.  fixed means drop treated units with no
+matches closer than caliper. 1nn means largest of closest control
+and caliper.}
+
+\item{...}{Extra arguments}
+}
+\value{
+A list of results.  matches: list of small datasets of
+matched control units for each treated unit.  adacalipers: vector
+of adaptive calipers for each treated unit.  dm_trimmed: distance
+matrix with control units farther than caliper censored with NA
+dm_uncapped: distance matrix without any control units censored.
 }
 \description{
-Note: we allow controls to be repeatedly used
+Generate matches for each treatment over controls using specified
+covariate names, distance metric specified by the scaling parameter
+and the method of metric. Finally, there is a selection of the
+units
+}
+\details{
+Note: we allow controls to be repeatedly used (we match with
+replacement).
 }
