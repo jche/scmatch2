@@ -7,9 +7,18 @@
 coerce_covs(covs)
 }
 \arguments{
-\item{covs}{2-d dataframe of N x p, where N is number of data,
-p is dimension of features}
+\item{covs}{2-d dataframe of N x p, where N is number of data, p is
+dimension of features}
+}
+\value{
+Coerced dataframe where factors are turned into integers.
+If these are scaled by K >> 1, and caliper is less than 1, then
+this will enforce exact matching on the category.
 }
 \description{
 Coerce non-numeric factor columns to integer values
+}
+\examples{
+df = data.frame( A = c( "A", "B", "A", "C" ) )
+coerce_covs( df )
 }

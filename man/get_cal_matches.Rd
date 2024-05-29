@@ -2,7 +2,7 @@
 % Please edit documentation in R/wrappers.R
 \name{get_cal_matches}
 \alias{get_cal_matches}
-\title{Main adaptive radius matching function}
+\title{Caliper Synthetic Matching}
 \usage{
 get_cal_matches(
   df,
@@ -13,10 +13,10 @@ get_cal_matches(
   rad_method = c("adaptive", "fixed", "1nn"),
   est_method = c("scm", "scm_extrap", "average"),
   return = c("sc_units", "agg_co_units", "all"),
-  dist_scaling = df \%>\% summarize(across(starts_with("X"), function(x) {
-     if
-    (is.numeric(x)) 
-         1/sd(x)
+  dist_scaling = df \%>\% summarize(across(covs, function(x) {
+     if (is.numeric(x)) 
+ 
+           1/sd(x)
      else 1000
  })),
   ...
@@ -43,5 +43,6 @@ get_cal_matches(
 df with a bunch of attributes.
 }
 \description{
-Main adaptive radius matching function
+This function implements (adaptive) radius matching with optional
+synthetic step on the resulting sets of controls.
 }
