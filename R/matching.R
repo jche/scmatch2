@@ -14,6 +14,7 @@ get_cem_matches <- function(
     num_bins,
     est_method = c("average", "scm"),
     return = c("sc_units", "agg_co_units", "all")) {
+
   est_method <- match.arg(est_method)
   return <- match.arg(return)
   # print(Z_FORMULA)
@@ -217,7 +218,7 @@ gen_matches <- function(df,
   args <- list(...)
 
   stopifnot( treatment %in% colnames(df) )
-  stopifnot( all( covs %in% colnames(df) ) )
+  #stopifnot( all( covs %in% colnames(df) ) )
 
   # store helpful constants
   ntx <- df %>% pull({{treatment}}) %>% sum()   # number of tx units
@@ -260,6 +261,8 @@ gen_matches <- function(df,
 
 # estimate within matched sets --------------------------------------------
 
+#' Estimate control weights within matched sets
+#'
 #' Generate weights for list of matched sets, typically by the
 #' synthetic control method (but you can also simply average).
 #'
@@ -269,7 +272,7 @@ gen_matches <- function(df,
 #' @param dist_scaling tibble with scaling for each covariate
 #' @param est_method "scm" or "average"
 #'
-#' @return list of matched sets, with 'weights'
+#' @return list of matched sets, with 'weights' for each control unit.
 #'
 #' @export
 est_weights <- function(df,
@@ -287,11 +290,11 @@ est_weights <- function(df,
     #          so I still don't mess with them here.
     match_cols <- covs
 
-    scweights <- map(matched_gps,
-                     ~gen_sc_weights(.x, match_cols,
-                                     dist_scaling,
-                                     metric),
-                     .progress="Producing SCM units...")
+    scweights <- map( matched_gps,
+                      ~gen_sc_weights(.x, match_cols,
+                                      dist_scaling,
+                                      metric),
+                      .progress="Producing SCM units...")
     # needs to modify gen_sc_weights to get clear:
     #   a) what type of matched_gps is required
     #   b) whether match_cols can be ignored

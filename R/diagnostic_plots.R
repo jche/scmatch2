@@ -1,4 +1,6 @@
 library(latex2exp)
+
+
 # functions to generate diagnostic plots
 create_toy_df_plot <- function(toy_df) {
   toy_df_plot <- toy_df %>%

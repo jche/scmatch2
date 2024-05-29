@@ -90,7 +90,10 @@ get_SL_pred <- function(SL_fit, df_test, X_names){
   return(SL_pred_obj$library.predict)
 }
 
-#' Main adaptive radius matching function
+#' Caliper Synthetic Matching
+#'
+#' This function implements (adaptive) radius matching with optional
+#' synthetic step on the resulting sets of controls.
 #'
 #' @param df The data frame to be matched
 #' @param metric A string specifying the distance metric
@@ -112,7 +115,7 @@ get_cal_matches <- function( df,
                              est_method = c("scm", "scm_extrap", "average"),
                              return = c("sc_units", "agg_co_units", "all"),
                              dist_scaling = df %>%
-                               summarize(across(starts_with("X"),
+                               summarize(across(covs,
                                                 function(x) {
                                                   if (is.numeric(x)) 1/sd(x)
                                                   else 1000
@@ -157,8 +160,12 @@ get_cal_matches <- function( df,
   unmatched_units <- setdiff(df %>% filter(.data[[treatment]]==1) %>% pull(id),
                              m.data %>% filter(.data[[treatment]]==1) %>% pull(id))
   if (length(unmatched_units) > 0) {
-    warning(glue::glue("Dropped the following treated units from data:
+    if ( length( unmatched_units <= 20 ) ) {
+      warning(glue::glue("Dropped the following treated units from data:
                         \t {paste(unmatched_units, collapse=\", \")}"))
+    } else {
+      warning(glue::glue("Dropped {length(unmatched_units) treated units from data.") )
+    }
   }
 
   # aggregate results
@@ -386,6 +393,9 @@ get_att_csm <- function(d,
     pull(ATT)
 }
 
+
+
+
 # estimates ATT!
 get_att_cem <- function(d,
                         num_bins,
@@ -440,6 +450,8 @@ get_att_cem <- function(d,
 }
 
 
+
+
 get_att_1nn <- function(d, dist_scaling) {
   preds_1nn <- get_cal_matches(
     df = d,
@@ -466,7 +478,7 @@ get_att_1nn <- function(d, dist_scaling) {
 
 # test these --------------------------------------------------------------
 
-if (F) {
+if (FALSE) {
   require(tidyverse)
   require(mvtnorm)
 

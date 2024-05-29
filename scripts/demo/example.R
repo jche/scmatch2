@@ -79,7 +79,9 @@ calada_scm <- lalonde_df_renamed %>%
                   return = "sc_units",
                   knn = 10,
                   num_bins = 5,
-                  wider = F)
+                  wider = FALSE)
+calada_scm
+
 get_att_ests(calada_scm)
 
 ### Inference with the A-E method

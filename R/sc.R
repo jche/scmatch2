@@ -2,7 +2,8 @@
 # functions related to synthetic controls
 
 
-#' Solve the synth QP directly (from augsynth package)
+#' Solve the synth QP directly (code taken from augsynth package)
+#'
 #' @param X1 Target vector
 #' @param X0 Matrix of control outcomes
 #' @param V Scaling matrix

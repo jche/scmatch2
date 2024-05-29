@@ -45,6 +45,7 @@ test_that("scale_covs correctly scales the input data",{
 
   expect_equal(expected,
                actual)
+  expect_true( is.matrix(actual) )
 
   # 2-d case
   covs <- data.frame(X1=1:4,
@@ -60,6 +61,7 @@ test_that("scale_covs correctly scales the input data",{
 
   dimnames(actual) <- NULL
   dimnames(expected) <- NULL
+  expect_true( is.matrix(actual) )
 
   expect_equal(expected,
                actual)
