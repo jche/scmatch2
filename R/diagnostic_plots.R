@@ -463,32 +463,54 @@ satt_plot4 <- function(res, B=NA) {
 
 # love plot ---------------------------------------------------------------
 
-love_plot <- function(res, covs, B=NA) {
-  feasible_subclasses <- attr(res, "feasible_subclasses")
-  n_feasible <- length(feasible_subclasses)
-
-  love_steps <- res %>%
-    left_join(attr(res, "adacalipers"), by="id") %>%
+get_diff_scm_co_and_tx <- function(res,covs){
+  df_diff_scm_co_and_tx <- res %>%
+    left_join(attr(res, "adacalipers"),
+              by="id") %>%
     group_by(subclass) %>%
     summarize(adacal = last(adacal),
               across(all_of(covs),
-                     ~.[2] - .[1])) %>%
+                     ~.[2] - .[1]))
+  return(df_diff_scm_co_and_tx)
+}
+
+create_love_plot_df <- function(res, covs){
+  feasible_subclasses <-
+    attr(res, "feasible_subclasses")
+  n_feasible <- length(feasible_subclasses)
+
+  df_step_1<-
+    get_diff_scm_co_and_tx(res,covs)
+
+  df_step_2<-df_step_1 %>%
     arrange(adacal) %>%
     mutate(order = 1:n(),
            across(all_of(covs),
-                  ~cumsum(.) / order)) %>%
+                  ~cumsum(.) / order))
+
+  df_step_3 <- df_step_2 %>%
     slice((n_feasible):n()) %>%
     pivot_longer(all_of(covs))
+  love_plot_df <- df_step_3
+  return(love_plot_df)
+}
 
+love_plot <-
+  function(res, covs, B=NA) {
+  love_steps <- create_love_plot_df(res, covs)
   p <- love_steps %>%
     ggplot(aes(x=order, color=name)) +
-    geom_point(data=. %>% slice(c(1:length(covs),
-                                  (n()-length(covs)):n())),
+    geom_point(data=. %>%
+                 slice(c(1:length(covs),
+                      (n()-length(covs)):n())),
                aes(y=value), size=2) +
-    geom_step(aes(y=value, group=name), linewidth=1.1) +
+    geom_step(aes(y=value, group=name),
+              linewidth=1.1) +
     expand_limits(y = 0) +
-    geom_hline(yintercept=0, lty="dotted") +
-    facet_wrap(~name, scales="free_y") +
+    geom_hline(yintercept=0,
+               lty="dotted") +
+    facet_wrap(~name,
+               scales="free_y") +
     labs(y = "\n Covariate balance (tx-co)",
          x = "Total number of treated units used",
          color = "Covariate") +
