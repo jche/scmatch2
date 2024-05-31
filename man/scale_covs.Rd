@@ -12,8 +12,8 @@ scale_covs(covs, scaling)
 \item{scaling}{A vector of length = ncol(covs), or a scalar}
 }
 \value{
-covs becomes:  covs * scaling
+Scaled matrix of same dimension as covs
 }
 \description{
-Scale covariates by scaling factor specified by the "scaling" variable
+Note this converts a dataframe to a matrix.
 }

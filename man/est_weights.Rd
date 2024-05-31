@@ -2,8 +2,7 @@
 % Please edit documentation in R/matching.R
 \name{est_weights}
 \alias{est_weights}
-\title{Generate weights for list of matched sets, typically by the
-synthetic control method (but you can also simply average).}
+\title{Estimate control weights within matched sets}
 \usage{
 est_weights(
   df,
@@ -24,7 +23,7 @@ est_weights(
 \item{est_method}{"scm" or "average"}
 }
 \value{
-list of matched sets, with 'weights'
+list of matched sets, with 'weights' for each control unit.
 }
 \description{
 Generate weights for list of matched sets, typically by the

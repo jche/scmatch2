@@ -3,10 +3,11 @@
 # Conclusion:
 #   - return = "sc_units" is a must
 #   - return = "agg_co_units" cannot make it work
+
 test_df <-
   data.frame(Z=c(1,0,0,0,1),
              X=c(0,-0.5,0.8,3,1.6))
-attr(res, "feasible_units")
+
 res <- get_cal_matches(df = test_df,
                        covs = "X",
                        treatment = "Z",
@@ -17,6 +18,8 @@ res <- get_cal_matches(df = test_df,
                        return = "sc_units",
                        # return = "agg_co_units",
                        dist_scaling = 1)
+attr(res, "feasible_units")
+
 feasible_subclasses <-
   attr(res, "feasible_subclasses")
 n_feasible <- length(feasible_subclasses)
@@ -26,5 +29,5 @@ n_feasible <- length(feasible_subclasses)
 covs = "X"
 
 love_plot_df <-
-  create_love_plot_df(res = res,
-                      covs = "X")
+  CSM:::create_love_plot_df( res = res,
+                             covs = "X")

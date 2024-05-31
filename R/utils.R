@@ -25,3 +25,8 @@ weighted_var <- function(x, wt) {
 weighted_se <- function(x, wt) {
   sqrt(weighted_var(x, wt) / length(x))
 }
+
+get_x_vars <- function(df) {
+  names(df) %>%
+    grep("^X", ., value = TRUE)
+}

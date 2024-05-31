@@ -6,7 +6,7 @@
 \usage{
 gen_dm(
   df,
-  covs = starts_with("X"),
+  covs = get_x_vars(df),
   treatment = "Z",
   scaling = 1,
   metric = c("maximum", "euclidean", "manhattan")

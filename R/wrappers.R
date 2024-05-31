@@ -1,14 +1,10 @@
 
-# wrapper functions of other packages:
-#  an adaptive implementation of wide-use basic
-#  functions for convenience
+# wrapper functions of other packages: an adaptive implementation of
+# wide-use basic functions for convenience
+#
+# This includes a set of functions that simply estimates and returns
+# the att as a single number, useful for the simulaton studies.
 
-
-# TODO: Move these into relevant functions so it doesn't load unless called
-#require(optweight)
-#require(dbarts)
-#require(AIPW)
-#require(mvtnorm)
 
 
 #' SuperLearner fitting
@@ -33,36 +29,6 @@ get_SL_fit <- function(df_to_fit,
                SL.library = SL.library)
 }
 
-fit_CSM <- function(df,
-                    covs = starts_with("X"),
-                    treatment = "Z",
-                    metric = c("maximum", "euclidean", "manhattan"),
-                    caliper = 1,
-                    rad_method = c("adaptive", "fixed", "1nn"),
-                    est_method = c("scm", "scm_extrap", "average"),
-                    return = c("sc_units", "agg_co_units", "all"),
-                    dist_scaling = df %>%
-                      summarize(across(starts_with("X"),
-                                       function(x) {
-                                         if (is.numeric(x)) 1/sd(x)
-                                         else 1000
-                                       })),
-                    ...) {
-  match_weighted_df <- df %>%
-    get_cal_matches(
-      covs = covs,
-      treatment = treatment,
-      metric = metric,
-      caliper = caliper,
-      rad_method = rad_method,
-      est_method = est_method,
-      return = return,
-      dist_scaling = dist_scaling,
-      ...
-    )
-  est <- get_att_ests(match_weighted_df)
-  return(est)
-}
 
 
 
@@ -115,7 +81,7 @@ get_cal_matches <- function( df,
                              est_method = c("scm", "scm_extrap", "average"),
                              return = c("sc_units", "agg_co_units", "all"),
                              dist_scaling = df %>%
-                               summarize(across(covs,
+                               summarize(across(all_of(covs),
                                                 function(x) {
                                                   if (is.numeric(x)) 1/sd(x)
                                                   else 1000
@@ -173,7 +139,7 @@ get_cal_matches <- function( df,
 
   # store information about scaling and adaptive calipers
   adacalipers_df <- tibble(
-    id = df %>% filter(Z == 1) %>% pull(id),
+    id = df %>% filter(Z == 1) %>% pull(id) %>% as.character(),
     adacal = scmatches$adacalipers)
   attr(res, "scaling") <- dist_scaling
   attr(res, "adacalipers") <- adacalipers_df
@@ -197,19 +163,6 @@ get_cal_matches <- function( df,
 }
 
 
-gen_one_toy <- function(ctr_dist = 0.5){
-  gen_df_adv(
-    nc=500,
-    nt=100,
-    f0_sd = 0.5,
-    tx_effect_fun = function(X1, X2) {3*X1+3*X2},
-    f0_fun = function(x,y) {
-      matrix(c(x,y), ncol=2) %>%
-        mvtnorm::dmvnorm(mean = c(0.5,0.5),
-                         sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
-    },
-    ctr_dist = ctr_dist)
-}
 
 
 get_att_diff <- function(d) {
@@ -261,16 +214,17 @@ get_att_or_lm <- function(d,
 
 get_att_or_bart <- function(d,
                             covs) {
+  require( dbarts )
 
   m_bart <- bart(x.train = d %>%
                    filter(Z==0) %>%
-                   select({{covs}}),
+                   select( all_of(covs) ),
                  y.train = d %>%
                    filter(Z==0) %>%
                    pull(Y),
                  x.test = d %>%
                    filter(Z==1) %>%
-                   select({{covs}}),
+                   select(all_of(covs)),
                  verbose=F)
 
   # output ATT estimate
@@ -297,11 +251,13 @@ get_att_ps_lm <- function(d,
 get_att_ps_bart <- function(d,
                             covs) {
 
+  require( dbarts )
+
   m_bart <- bart(x.train = d %>%
-                   select({{covs}}),
+                   select(all_of(covs)),
                  y.train = d$Z %>% as.numeric(),
                  x.test = d %>%
-                   select({{covs}}),
+                   select(all_of(covs)),
                  verbose=F)
 
   # output ATT estimate
@@ -318,13 +274,17 @@ get_att_tmle <- function(d,
                          covs,
                          Q.SL.library,
                          g.SL.library) {
+
+  require( tmle )
+
   tmle <- tmle(Y = d$Y,
                A = as.numeric(d$Z),
                W = d %>%
-                 select({{covs}}),
+                 select(all_of(covs)),
                Q.SL.library = Q.SL.library,
                g.SL.library = g.SL.library,
-               V = 5)
+               V.Q = 5, V.g = 5, V.Delta = 5, V.Z = 5)
+
   tmle$estimates$ATT$psi
 }
 
@@ -332,11 +292,13 @@ get_att_aipw <- function(d,
                          covs,
                          Q.SL.library,
                          g.SL.library) {
+
+  require( AIPW )
   aipw <- AIPW$
     new(Y = d$Y,
         A = d$Z,
         W = d %>%
-          select({{covs}}),
+          select(all_of(covs)),
         Q.SL.library = Q.SL.library,
         g.SL.library = g.SL.library,
         k_split = 5,
@@ -347,6 +309,8 @@ get_att_aipw <- function(d,
   aipw$ATT_estimates$RD['Estimate'] %>%
     as.numeric()
 }
+
+
 
 get_att_csm <- function(d,
                         metric = "maximum",
@@ -394,6 +358,88 @@ get_att_csm <- function(d,
 }
 
 
+
+# Code to implement CEM matching via the MatchIt package
+get_cem_matches <- function(
+    df,
+    covs = get_x_vars(df),
+    Z_FORMULA = as.formula(paste0("Z~",
+                                  paste0(grep("^X", names(df), value=T),
+                                         collapse="+"))),
+    num_bins,
+    est_method = c("average", "scm"),
+    return = c("sc_units", "agg_co_units", "all")) {
+
+  est_method <- match.arg(est_method)
+  return <- match.arg(return)
+  # print(Z_FORMULA)
+  # print(head(df))
+  m.out3 <- MatchIt::matchit(
+    Z_FORMULA,
+    data = df,
+    method = "cem",
+    estimand = "ATT",
+    grouping = NULL,   # exact match factor covariates
+    cutpoints = num_bins,
+    k2k = F)   # not 1:1 matching
+  m.data3 <- MatchIt::match.data(m.out3)
+  # print(glue("Number of tx units kept: {sum(m.data3$Z)}"))
+
+  # transform m.data3 into our format
+  co_units <- m.data3 %>%
+    filter(Z == 0)
+  tx_units <- m.data3 %>%
+    filter(Z == 1) %>%
+    mutate(subclass_new = 1:n())  # give each tx unit its own subclass,
+  # instead of letting multiple tx units share subclass
+
+  # generate list of dfs, tx unit in first row
+  # TODO: this is terribly slow, for no good reason...
+  cem_matched_gps <- tx_units %>%
+    split(f = ~subclass_new) %>%
+    map(function(d) {
+      d %>%
+        bind_rows(
+          co_units %>%
+            filter(subclass == d$subclass) %>%
+            mutate(subclass_new = d$subclass_new))
+    }) %>%
+    map(~.x %>%
+          mutate(subclass = subclass_new) %>%
+          select(-subclass_new, -weights))
+
+  # estimate outcomes within cells
+  scweights <- est_weights(df,
+                           covs=names(df),
+                           matched_gps = cem_matched_gps,
+                           dist_scaling = df %>%
+                             summarize(across(all_of(covs),
+                                              function(x) {
+                                                if (is.numeric(x)) num_bins / (max(x) - min(x))
+                                                else 1000
+                                              })),
+                           est_method = est_method,
+                           metric = "maximum")
+
+  # aggregate outcomes as desired
+  m.data <- switch(return,
+                   sc_units     = agg_sc_units(scweights),
+                   agg_co_units = agg_co_units(scweights),
+                   all          = bind_rows(scweights))
+
+  unmatched_units <- setdiff(df %>% filter(Z==1) %>% pull(id),
+                             m.data %>% filter(Z==1) %>% pull(id))
+  if (length(unmatched_units) > 0) {
+    warning(glue::glue("Dropped the following treated units from data:
+                        \t {paste(unmatched_units, collapse=\", \")}"))
+  }
+
+  attr(m.data, "feasible_units") <- m.data %>%
+    filter(Z) %>%
+    pull(id)
+
+  return(m.data)
+}
 
 
 # estimates ATT!
@@ -476,37 +522,79 @@ get_att_1nn <- function(d, dist_scaling) {
 
 
 
+
+
+run_all_methods <- function( df, skip_slow = TRUE ) {
+
+  bal <- CSM:::get_att_bal(df,
+                           form=as.formula('Z ~ X1+X2'),
+                           tols=c(0.01, 0.01))
+
+  bal_int <- CSM:::get_att_bal(df,
+                               form=as.formula('Z ~ X1*X2'),
+                               tols=c(0.01, 0.01, 0.1))
+
+  or_lm <- CSM:::get_att_or_lm(df, form=as.formula('Y ~ X1*X2'))
+
+  or_bart <- CSM:::get_att_or_bart(df, covs=c("X1", "X2"))
+
+  lm_ps <- CSM:::get_att_ps_lm(df, form=as.formula('Z ~ X1*X2'))
+
+  ps_bart <- CSM:::get_att_ps_bart(df, covs=c("X1", "X2"))
+
+  one_nn <- get_att_1nn( df, dist_scaling = 1/5 )
+
+  # TODO: What are these libraries?  They don't seem to be defined.
+  SL.library1 = c("SL.glm", "tmle.SL.dbarts2", "SL.glmnet")
+
+  if ( skip_slow ) {
+    tmle = NA
+    aipw = NA
+  } else {
+    tmle <- CSM:::get_att_tmle(df %>%
+                                 mutate(X3 = X1*X2),
+                               covs=c("X1","X2","X3"),
+                               Q.SL.library = SL.library1,
+                               g.SL.library = SL.library1)
+
+    aipw <- CSM:::get_att_aipw(df %>%
+                                 mutate(X3 = X1*X2),
+                               covs=c("X1","X2","X3"),
+                               Q.SL.library = SL.library1,
+                               g.SL.library = SL.library1)
+  }
+  csm <- CSM:::get_att_csm(df, dist_scaling = 1/5, est_method="scm")
+
+  cem <- CSM:::get_att_cem(df, num_bins=5, est_method="scm")
+
+  tibble(method = c("bal", "bal_int", "or_lm", "or_bart",
+                    "lm_ps", "ps_bart", "tmle", "aipw",
+                    "csm", "cem", "1nn"),
+         att = c(bal, bal_int, or_lm, or_bart,
+                 lm_ps, ps_bart, tmle, aipw,
+                 csm, cem, one_nn) )
+}
+
 # test these --------------------------------------------------------------
 
 if (FALSE) {
   require(tidyverse)
-  require(mvtnorm)
+  require( CSM )
 
-  require(optweight)
-  require(dbarts)
-  require(tmle)
-  require(AIPW)
+  # df <- CSM:::gen_df_adv2d(nc=1000, nt=50,
+  #                    tx_effect=0.2,
+  #                    sd=0.03,
+  #                    effect_fun = function(x,y) {
+  #                      matrix(c(x,y), ncol=2) %>%
+  #                        mvtnorm::dmvnorm(mean = c(0.5,0.5),
+  #                                         sigma = matrix(c(1,0.8,0.8,1), nrow=2))
+  #                    })
 
-  require(tictoc)
+  # df <- CSM:::gen_df_full(nc=1000, nt=50, eps_sd=0,
+  #                   tx_effect = function(x,y) {(0.5*(x+y))},
+  #                   effect_fun = function(x,y) {x+y})
 
-  source("R/distance.R")
-  source("R/sc.R")
-  source("R/matching.R")
-  source("R/estimate.R")
-  source("R/sim_data.R")
-
-  df <- gen_df_adv2d(nc=1000, nt=50,
-                     tx_effect=0.2,
-                     sd=0.03,
-                     effect_fun = function(x,y) {
-                       matrix(c(x,y), ncol=2) %>%
-                         mvtnorm::dmvnorm(mean = c(0.5,0.5),
-                                          sigma = matrix(c(1,0.8,0.8,1), nrow=2))
-                     })
-
-  df <- gen_df_full(nc=1000, nt=50, eps_sd=0,
-                    tx_effect = function(x,y) {(0.5*(x+y))},
-                    effect_fun = function(x,y) {x+y})
+  df <- CSM:::gen_one_toy()
 
   df %>%
     ggplot(aes(X1,X2)) +
@@ -523,30 +611,7 @@ if (FALSE) {
     summarize(eff = mean(Y1-Y0))
 
 
-  get_att_bal(df,
-              form=as.formula('Z ~ X1+X2'),
-              tols=c(0.01, 0.01))
-  get_att_bal(df,
-              form=as.formula('Z ~ X1*X2'),
-              tols=c(0.01, 0.01, 0.1))
+  run_all_methods( df )
 
-  get_att_or_lm(df, form=as.formula('Y ~ X1*X2'))
-  get_att_or_bart(df, covs=c(X1, X2))
-  get_att_ps_lm(df, form=as.formula('Z ~ X1*X2'))
-  get_att_ps_bart(df, covs=c(X1, X2))
-
-  get_att_tmle(df %>%
-                 mutate(X3 = X1*X2),
-               covs=c(X1,X2,X3),
-               Q.SL.library = SL.library1,
-               g.SL.library = SL.library1)
-  get_att_aipw(df %>%
-                 mutate(X3 = X1*X2),
-               covs=c(X1,X2,X3),
-               Q.SL.library = SL.library1,
-               g.SL.library = SL.library1)
-
-  get_att_csm(df, num_bins=5, est_method="scm")
-  get_att_cem(df, num_bins=5, est_method="scm")
 }
 

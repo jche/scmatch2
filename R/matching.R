@@ -3,88 +3,6 @@
 
 
 
-# wrapper function --------------------------------------------------------
-
-# TODO
-get_cem_matches <- function(
-    df,
-    Z_FORMULA = as.formula(paste0("Z~",
-                                  paste0(grep("^X", names(df), value=T),
-                                         collapse="+"))),
-    num_bins,
-    est_method = c("average", "scm"),
-    return = c("sc_units", "agg_co_units", "all")) {
-
-  est_method <- match.arg(est_method)
-  return <- match.arg(return)
-  # print(Z_FORMULA)
-  # print(head(df))
-  m.out3 <- MatchIt::matchit(
-    Z_FORMULA,
-    data = df,
-    method = "cem",
-    estimand = "ATT",
-    grouping = NULL,   # exact match factor covariates
-    cutpoints = num_bins,
-    k2k = F)   # not 1:1 matching
-  m.data3 <- MatchIt::match.data(m.out3)
-  # print(glue("Number of tx units kept: {sum(m.data3$Z)}"))
-
-  # transform m.data3 into our format
-  co_units <- m.data3 %>%
-    filter(Z == 0)
-  tx_units <- m.data3 %>%
-    filter(Z == 1) %>%
-    mutate(subclass_new = 1:n())  # give each tx unit its own subclass,
-  # instead of letting multiple tx units share subclass
-
-  # generate list of dfs, tx unit in first row
-  # TODO: this is terribly slow, for no good reason...
-  cem_matched_gps <- tx_units %>%
-    split(f = ~subclass_new) %>%
-    map(function(d) {
-      d %>%
-        bind_rows(
-          co_units %>%
-            filter(subclass == d$subclass) %>%
-            mutate(subclass_new = d$subclass_new))
-    }) %>%
-    map(~.x %>%
-          mutate(subclass = subclass_new) %>%
-          select(-subclass_new, -weights))
-
-  # estimate outcomes within cells
-  scweights <- est_weights(df,
-                           covs=names(df),
-                           matched_gps = cem_matched_gps,
-                           dist_scaling = df %>%
-                             summarize(across(starts_with("X"),
-                                              function(x) {
-                                                if (is.numeric(x)) num_bins / (max(x) - min(x))
-                                                else 1000
-                                              })),
-                           est_method = est_method,
-                           metric = "maximum")
-
-  # aggregate outcomes as desired
-  m.data <- switch(return,
-                   sc_units     = agg_sc_units(scweights),
-                   agg_co_units = agg_co_units(scweights),
-                   all          = bind_rows(scweights))
-
-  unmatched_units <- setdiff(df %>% filter(Z==1) %>% pull(id),
-                             m.data %>% filter(Z==1) %>% pull(id))
-  if (length(unmatched_units) > 0) {
-    warning(glue::glue("Dropped the following treated units from data:
-                        \t {paste(unmatched_units, collapse=\", \")}"))
-  }
-
-  attr(m.data, "feasible_units") <- m.data %>%
-    filter(Z) %>%
-    pull(id)
-
-  return(m.data)
-}
 
 #' get the radius size for each treated unit
 #'
@@ -118,43 +36,42 @@ get_radius_size <- function(dm,
 
 # matching method ---------------------------------------------------------
 # generate df of matched controls for each treated unit
-get_matched_co_from_dm_trimmed <-
-  function(df, dm_trimmed, treatment){
-    ntx <- nrow(dm_trimmed)
-    df_trt <- df %>%
-      filter(.data[[treatment]] == 1)
-    for (x in 1:ntx){
-      matched_obs <- which(!is.na(dm_trimmed[x,]))
+get_matched_co_from_dm_trimmed <- function(df, dm_trimmed, treatment) {
+  ntx <- nrow(dm_trimmed)
+  df_trt <- df %>%
+    filter(.data[[treatment]] == 1)
+  for (x in 1:ntx){
+    matched_obs <- which(!is.na(dm_trimmed[x,]))
+  }
+
+  map(1:ntx, function(x) {
+    # Step 1: get which co units are matched to each tx unit
+    matched_obs <- which(!is.na(dm_trimmed[x,]))
+    # if no matches, drop treated unit
+    if (length(matched_obs) == 0) {
+      return(NULL)
     }
 
-    map(1:ntx, function(x) {
-      # Step 1: get which co units are matched to each tx unit
-      matched_obs <- which(!is.na(dm_trimmed[x,]))
-      # if no matches, drop treated unit
-      if (length(matched_obs) == 0) {
-        return(NULL)
-      }
 
+    # for each matched co unit, record distance from tx unit
+    distances <- dm_trimmed[x, matched_obs]
+    matched_rows <- df[names(matched_obs),] %>%
+      ungroup() %>%
+      mutate(dist = distances)
 
-      # for each matched co unit, record distance from tx unit
-      distances <- dm_trimmed[x, matched_obs]
-      matched_rows <- df[names(matched_obs),] %>%
-        ungroup() %>%
-        mutate(dist = distances)
+    ## Step 2: get the treat uni
+    df_trt_x <- df_trt %>%
+      ungroup() %>%
+      slice(x)
 
-      ## Step 2: get the treat uni
-      df_trt_x <- df_trt %>%
-        ungroup() %>%
-        slice(x)
+    df_tmp <- df_trt_x %>%
+      mutate(dist = 0) %>%
+      rbind(matched_rows)
 
-      df_tmp <- df_trt_x %>%
-        mutate(dist = 0) %>%
-        rbind(matched_rows)
-
-      df_tmp %>%
-        mutate(subclass = x)
-    })
-  }
+    df_tmp %>%
+      mutate(subclass = x)
+  })
+}
 
 set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
   ntx <- nrow(dm_uncapped)
@@ -204,8 +121,11 @@ set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
 #' @export
 #'
 #' @examples
+#' df <- CSM:::gen_one_toy()
+#' mtch <- gen_matches(df, covs = c("X1", "X2"), treatment = "Z")
+#' names( mtch )
 gen_matches <- function(df,
-                        covs = starts_with("X"),
+                        covs = get_x_vars(df),
                         treatment = "Z",
                         scaling=1,
                         metric="maximum",
@@ -222,7 +142,7 @@ gen_matches <- function(df,
 
   # store helpful constants
   ntx <- df %>% pull({{treatment}}) %>% sum()   # number of tx units
-  p   <- df %>% select({{covs}}) %>% ncol()     # number of matched covariates
+  p   <- df %>% select(all_of(covs)) %>% ncol()     # number of matched covariates
 
   ### step 0: generate distance matrix, and
   #   store an uncapped version as well.
