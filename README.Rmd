@@ -26,7 +26,7 @@ You should not need it unless generating synthetic data.
 
 - Move the wrappers file to the scripts/simulation folder (it is utilities for simulation, not core package stuff) 
 - Keep boot_CSM (and the utility functions it uses), but move the other bootstrap stuff out of the main package.
-- 
+- Make a separate folder for the inference simulation and it should have the annalysis file and the simulation file in it.
 
 # Notes on scripts directory
 
@@ -48,6 +48,7 @@ Thing we want:
  - demo: Illustrates use of the package (only).  Not anything included in the main paper.
  - sims: The code to run the simulations
  - sim_analysis: The code to analyze the simulation results
+ - sim_inference: The simulation and analysis code for the simulations evaluating inference.
  - datagen: Move this folder to old code, unless it is used by something else?
 
 
