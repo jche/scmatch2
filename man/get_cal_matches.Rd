@@ -13,10 +13,10 @@ get_cal_matches(
   rad_method = c("adaptive", "fixed", "1nn"),
   est_method = c("scm", "scm_extrap", "average"),
   return = c("sc_units", "agg_co_units", "all"),
-  dist_scaling = df \%>\% summarize(across(covs, function(x) {
-     if (is.numeric(x)) 
- 
-           1/sd(x)
+  dist_scaling = df \%>\% summarize(across(all_of(covs), function(x) {
+     if
+    (is.numeric(x)) 
+         1/sd(x)
      else 1000
  })),
   ...
