@@ -3,6 +3,7 @@
 export(coerce_covs)
 export(est_weights)
 export(gen_matches)
+export(gen_one_toy)
 export(gen_toy_covar)
 export(get_SL_fit)
 export(get_SL_pred)

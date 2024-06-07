@@ -69,9 +69,14 @@ DIST_SCALING <- tibble(
 # )
 
 
-# run matching ------------------------------------------------------------
+# Number of treated units
+sum( lalonde_df_renamed$Z )
+sum( lalonde_df_renamed$Z ) * 2
+
+# run matching
+# TODO / NOTE: I reduced caliper to 1 from 2000.  Why was it 2000?
 calada_scm <- lalonde_df_renamed %>%
-  get_cal_matches(caliper = 2000,
+  get_cal_matches(caliper = 1,
                   metric = METRIC,
                   cal_method = CAL_METHOD,
                   dist_scaling = DIST_SCALING,

@@ -1,154 +1,52 @@
 
+# Code to run the section5.4 simulation
 
-assign_group_label <- function(df_to_split, n_split) {
-  df_to_split$group_label <-
-    sample(1:n_split,
-           nrow(df_to_split),
-           replace = TRUE)
-  return(df_to_split)
-}
 
-get_pred_label_map <- function(n){
-  if (n == 1){
-    return(tibble(group_label=1, pred_label=1))
-  }else{
-    return(tibble(group_label=1:n,
-                  pred_label=c(2:n, 1) )) # index for cross-fitting
-  }
-}
 
-get_matches <- function(dgp_name, df_dgp,dist_scaling){
-  if (dgp_name == "toy" || dgp_name == "kang") {
-    df_dgp_with_matches <- get_cal_matches(
-      df = df_dgp,
-      metric = "maximum",
-      dist_scaling = dist_scaling,
-      rad_method = "fixed",
-      est_method = "scm",
-      return = "all",
-      knn = 25
-    )
-  } else if (dgp_name == "otsu") {
-    df_dgp_with_matches <- get_NN_matches(df_dgp)
+#### Helper functions ####
 
+
+get_df_scaling_from_dgp_name <- function(dgp_name,
+                                          kang_true = F,
+                                          toy_ctr_dist=0.5){
+  if (dgp_name == "toy"){
+    df_dgp <- gen_one_toy(ctr_dist=toy_ctr_dist)
+    # Edit 4 Mar 2024:
+    dist_scaling <- 8
+    # dist_scaling <- df_dgp %>%
+    #   summarize(across(starts_with("X"),
+    #                    function(x) {
+    #                      if (is.numeric(x)) 6 / (max(x) - min(x))
+    #                      else 1000
+    #                    }))
+  }else if(dgp_name=="kang"){
+    df_dgp <- gen_df_kang(n = 1000)
+    if (kang_true){ # Replace X1 to X4 by V1 to V4
+      df_dgp[, paste0("X",1:4)] <-
+        df_dgp %>% select(starts_with("V"))
+    }
+    dist_scaling <- df_dgp %>%
+      summarize(across(starts_with("X"),
+                       function(x) {
+                         if (is.numeric(x)) 5 / (max(x) - min(x))
+                         else 1000
+                       }))
+  }else if (dgp_name == "otsu"){
+    df_dgp <- generate_one_otsu()
+    dist_scaling <- df_dgp %>%
+      summarize(across(starts_with("X"),
+                       function(x) {
+                         if (is.numeric(x)) 6 / (max(x) - min(x))
+                         else 1000
+                       }))
   } else {
-    stop("dgp_name must be toy, kang, or otsu")
+    stop("dgp_name must be toy or kang or otsu")
   }
-  return(df_dgp_with_matches)
-}
-
-calc_N_T_N_C <- function(preds_csm){
-  N_T <- nrow(preds_csm %>% filter(Z==T))
-  tmp <- preds_csm %>%
-    filter(Z==F) %>%
-    group_by(id) %>%
-    summarise(w_i = sum(weights))
-  N_C_tilde <- N_T^2 / sum(tmp$w_i^2)
-  return(list(N_T = N_T,
-              N_C_tilde = N_C_tilde ))
+  return(list(df_dgp=df_dgp,
+              dist_scaling=dist_scaling))
 }
 
 
-get_se_AE <- function(preds_csm){
-  # 1. Get debiased units; Get the subclasses
-
-  preds_csm <- preds_csm %>%
-      mutate(Y_bias_corrected = Y - hat_mu_0)
-
-  # 2. Filter the controls
-  #     and the subclasses with n_controls >= 2
-  preds_csm_filtered <-
-    preds_csm %>%
-    filter(Z==F) %>%
-    group_by(subclass) %>%
-    filter(n() >= 2) %>%
-    ungroup()
-  # 3. For each filtered subclass,
-  #   calculate the cluster residual s_j^2 = se(debiased_units)
-  weighted_var <- function(x, wt) {
-    n <- length(x)
-    wm <- weighted.mean(x, wt)
-    sum(wt * (x - wm)^2) * n / (n-1)
-  }
-
-  weighted_se <- function(x, wt) {
-    sqrt(weighted_var(x, wt) / length(x))
-  }
-  cluster_var_df <-
-    preds_csm_filtered %>%
-    group_by(subclass) %>%
-    summarise(nj = n(),
-              var_cluster = var(Y_bias_corrected))
-  # var_cluster = weighted_var(Y_bias_corrected, weights))
-  # 4. Get the weighted average of s_j^2, weighted by n_j, number of units in the subclass
-  weighted_var_df <- cluster_var_df %>%
-    summarise(weighted_var = weighted.mean(var_cluster, w = nj))
-  sigma_hat <- sqrt(weighted_var_df$weighted_var)
-
-  # 5. calculate N_T and N_C
-  list2env(calc_N_T_N_C(preds_csm),
-           envir = environment())
-
-  # 6. Calculate the variance of the estimator
-  res <- sqrt((1/N_T + 1/N_C_tilde)) * sigma_hat
-  return(res)
-}
-
-get_NN_matches <- function(df_dgp){
-  library(MatchIt)
-
-  m.out <- matchit(Z ~ X1 + X2,
-                   data = df_dgp,
-                   method = "nearest",
-                   replace = TRUE,
-                   mahvars = ~ X1 + X2,
-                   ratio = 8)
-
-  # # Obtain matched dataset
-  # df_matched <- match.data(m.out)
-
-  df_matched_ids <- data.frame(m.out$match.matrix)
-
-  # # Inverting the treatment indicator
-  # df_dgp$Z_inv <- ifelse(df_dgp$Z == 1, 0, 1)
-  #
-  # m.out2 <- matchit(Z_inv ~ X1 + X2,
-  #                   data = df_dgp,
-  #                   method = "nearest",
-  #                   replace = TRUE,
-  #                   mahvars = ~ X1 + X2,
-  #                   ratio = 8)
-  # df_matched_ids.2 <- data.frame(m.out2$match.matrix)
-  #
-  # df_matched_ids <- rbind(df_matched_ids,
-  #                         df_matched_ids.2)
-
-  id <- subclass <- weights <- c()
-
-  for(i in 1:nrow(df_matched_ids)) {
-    # Concatenate row name (treated id) with matched control ids
-    # i <- 1
-    row_ids <- c(as.integer(rownames(df_matched_ids)[i]),
-                 as.integer(unlist(df_matched_ids[i, ])))
-    id <- c(id, row_ids)
-    # Add subclass
-    M <- length(row_ids) - 1
-    subclass <- c(subclass, rep(i, M + 1))
-    weights <- c(weights, c(1, rep(1/M, M )) )
-  }
-
-  # Create the new dataframe
-  new_df <- data.frame(id = id,
-                       subclass = subclass,
-                       weights)
-
-  # Display the first few rows of the new dataframe
-  head(new_df)
-
-  preds_matching <-
-    left_join(new_df, df_dgp%>%distinct(id, .keep_all=T), by = "id")
-  return(preds_matching)
-}
 
 get_matches_and_debiased_residuals <-
   function(dgp_name,
@@ -243,7 +141,7 @@ get_matches_and_debiased_residuals <-
       summarize(mn = sum(Y_bias_corrected*weights))
     tmp <- tmp0 %>%
       group_by(subclass) %>%
-      summarise(tilde_tau = last(mn)-first(mn))
+      summarise(tilde_tau = last(mn)-first(mn), .groups="drop")
     tilde_tau = tmp$tilde_tau
 
     # Second, residual = \tilde \tau_i - mean(\tilde \tau_i)
@@ -254,6 +152,157 @@ get_matches_and_debiased_residuals <-
                 mean_tilde_tau=mean_tilde_tau,
                 tilde_tau_resids=tilde_tau_resids))
   }
+
+
+
+get_matches <- function(dgp_name, df_dgp,dist_scaling){
+  if (dgp_name == "toy" || dgp_name == "kang") {
+    df_dgp_with_matches <- get_cal_matches(
+      df = df_dgp,
+      metric = "maximum",
+      dist_scaling = dist_scaling,
+      rad_method = "fixed",
+      est_method = "scm",
+      return = "all",
+      knn = 25
+    )
+  } else if (dgp_name == "otsu") {
+    df_dgp_with_matches <- get_NN_matches(df_dgp)
+
+  } else {
+    stop("dgp_name must be toy, kang, or otsu")
+  }
+  return(df_dgp_with_matches)
+}
+
+
+
+get_pred_label_map <- function(n){
+  if (n == 1){
+    return(tibble(group_label=1, pred_label=1))
+  }else{
+    return(tibble(group_label=1:n,
+                  pred_label=c(2:n, 1) )) # index for cross-fitting
+  }
+}
+
+
+
+get_se_AE <- function(preds_csm){
+  # 1. Get debiased units; Get the subclasses
+
+  preds_csm <- preds_csm %>%
+    mutate(Y_bias_corrected = Y - hat_mu_0)
+
+  # 2. Filter the controls
+  #     and the subclasses with n_controls >= 2
+  preds_csm_filtered <-
+    preds_csm %>%
+    filter(Z==F) %>%
+    group_by(subclass) %>%
+    filter(n() >= 2) %>%
+    ungroup()
+  # 3. For each filtered subclass,
+  #   calculate the cluster residual s_j^2 = se(debiased_units)
+  weighted_var <- function(x, wt) {
+    n <- length(x)
+    wm <- weighted.mean(x, wt)
+    sum(wt * (x - wm)^2) * n / (n-1)
+  }
+
+  weighted_se <- function(x, wt) {
+    sqrt(weighted_var(x, wt) / length(x))
+  }
+  cluster_var_df <-
+    preds_csm_filtered %>%
+    group_by(subclass) %>%
+    summarise(nj = n(),
+              var_cluster = var(Y_bias_corrected), .groups="drop")
+  # var_cluster = weighted_var(Y_bias_corrected, weights))
+  # 4. Get the weighted average of s_j^2, weighted by n_j, number of units in the subclass
+  weighted_var_df <- cluster_var_df %>%
+    summarise(weighted_var = weighted.mean(var_cluster, w = nj), .groups="drop")
+  sigma_hat <- sqrt(weighted_var_df$weighted_var)
+
+  # 5. calculate N_T and N_C
+  list2env(calc_N_T_N_C(preds_csm),
+           envir = environment())
+
+  # 6. Calculate the variance of the estimator
+  res <- sqrt((1/N_T + 1/N_C_tilde)) * sigma_hat
+  return(res)
+}
+
+
+
+
+calc_N_T_N_C <- function(preds_csm){
+  N_T <- nrow(preds_csm %>% filter(Z==T))
+  tmp <- preds_csm %>%
+    filter(Z==F) %>%
+    group_by(id) %>%
+    summarise(w_i = sum(weights), .groups="drop")
+  N_C_tilde <- N_T^2 / sum(tmp$w_i^2)
+  return(list(N_T = N_T,
+              N_C_tilde = N_C_tilde ))
+}
+
+
+get_NN_matches <- function(df_dgp){
+  library(MatchIt)
+
+  m.out <- matchit(Z ~ X1 + X2,
+                   data = df_dgp,
+                   method = "nearest",
+                   replace = TRUE,
+                   mahvars = ~ X1 + X2,
+                   ratio = 8)
+
+  # # Obtain matched dataset
+  # df_matched <- match.data(m.out)
+
+  df_matched_ids <- data.frame(m.out$match.matrix)
+
+  # # Inverting the treatment indicator
+  # df_dgp$Z_inv <- ifelse(df_dgp$Z == 1, 0, 1)
+  #
+  # m.out2 <- matchit(Z_inv ~ X1 + X2,
+  #                   data = df_dgp,
+  #                   method = "nearest",
+  #                   replace = TRUE,
+  #                   mahvars = ~ X1 + X2,
+  #                   ratio = 8)
+  # df_matched_ids.2 <- data.frame(m.out2$match.matrix)
+  #
+  # df_matched_ids <- rbind(df_matched_ids,
+  #                         df_matched_ids.2)
+
+  id <- subclass <- weights <- c()
+
+  for(i in 1:nrow(df_matched_ids)) {
+    # Concatenate row name (treated id) with matched control ids
+    # i <- 1
+    row_ids <- c(as.integer(rownames(df_matched_ids)[i]),
+                 as.integer(unlist(df_matched_ids[i, ])))
+    id <- c(id, row_ids)
+    # Add subclass
+    M <- length(row_ids) - 1
+    subclass <- c(subclass, rep(i, M + 1))
+    weights <- c(weights, c(1, rep(1/M, M )) )
+  }
+
+  # Create the new dataframe
+  new_df <- data.frame(id = id,
+                       subclass = subclass,
+                       weights)
+
+  # Display the first few rows of the new dataframe
+  head(new_df)
+
+  preds_matching <-
+    left_join(new_df, df_dgp%>%distinct(id, .keep_all=T), by = "id")
+  return(preds_matching)
+}
 
 # Function: boot_bayesian
 # input:
@@ -500,7 +549,7 @@ boot_cluster <-function(df_dgp,
         summarize(mn = sum(Y_bias_corrected*weights))
       tmp <- tmp0 %>%
         group_by(subclass) %>%
-        summarise(tilde_tau = last(mn)-first(mn))
+        summarise(tilde_tau = last(mn)-first(mn), .groups="drop")
       tilde_tau = tmp$tilde_tau
       mean_tilde_tau <- mean(tilde_tau)
       return(mean_tilde_tau)
@@ -554,7 +603,7 @@ boot_cluster_for_otsu <- function(df_dgp,
         summarize(mn = sum(Y_bias_corrected*weights))
       tmp <- tmp0 %>%
         group_by(subclass) %>%
-        summarise(tilde_tau = last(mn)-first(mn))
+        summarise(tilde_tau = last(mn)-first(mn), .groups="drop")
       tilde_tau = tmp$tilde_tau
       mean_tilde_tau <- mean(tilde_tau)
       return(mean_tilde_tau)
@@ -566,7 +615,20 @@ boot_cluster_for_otsu <- function(df_dgp,
   return(bootstrap_estimates)
 }
 
-#' Title
+
+assign_group_label <- function(df_to_split, n_split) {
+  df_to_split$group_label <-
+    sample(1:n_split,
+           nrow(df_to_split),
+           replace = TRUE)
+  return(df_to_split)
+}
+
+
+
+#### Primary simulation function ####
+
+#' Run a simulation to check inference
 #'
 #' @param dgp_name Name of the DGP
 #' @param att0 True ATT
@@ -770,3 +832,9 @@ boot_CSM <- function(dgp_name,
                                    N_C = N_C)
   return(res_save_bayesian_boot)
 }
+
+
+
+
+
+
