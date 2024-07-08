@@ -398,7 +398,8 @@ satt_plot3 <- function(res, B=NA) {
 
 # fixed, with wild bootstrap
 satt_plot4 <- function(res, B=NA) {
-  feasible_subclasses <- attr(res, "feasible_subclasses")
+  feasible_subclasses <-
+    attr(res, "feasible_subclasses")
   n_feasible <- length(feasible_subclasses)
 
   # ATT estimate vs. # co units added
@@ -415,13 +416,14 @@ satt_plot4 <- function(res, B=NA) {
   p <- ggd_att %>%
     ggplot(aes(x=order, y=cum_avg)) +
     geom_line(alpha=0.5) +
-    geom_point(aes(color=adacal),
+    geom_point(
+      # aes(color=adacal),
                size=3) +
     theme_classic() +
     labs(y = "Cumulative ATT Estimate",
          x = "Total number of treated units used",
          color = "Maximum caliper size used") +
-    scale_color_continuous(low="blue", high="orange") +
+    # scale_color_continuous(low="blue", high="orange") +
     expand_limits(color=1)
 
   if (!is.na(B)) {
