@@ -2,9 +2,8 @@ library(haven)
 library(CSM)
 library(latex2exp)
 
-data_ferman <- read_dta(
-  file = "./data/inputs/Final.dta"
-)
+data_ferman <- read_dta( file = here::here( "data/inputs/Final.dta" ) )
+
 colnames(data_ferman)
 hist(data_ferman$y2008 -
        data_ferman$OBJETIVA2008)

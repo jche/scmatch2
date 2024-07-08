@@ -2,16 +2,25 @@
 # functions for working with the distance metric
 library(tidyverse)
 
+
+
 #' Coerce non-numeric factor columns to integer values
 #'
-#' @param covs 2-d dataframe of N x p, where N is number of data,
-#' p is dimension of features
+#' @param covs 2-d dataframe of N x p, where N is number of data, p is
+#'   dimension of features
 #'
-#' @return
+#' @return Coerced dataframe where factors are turned into integers.
+#'   If these are scaled by K >> 1, and caliper is less than 1, then
+#'   this will enforce exact matching on the category.
+#'
 #' @export
 #'
 #' @examples
-coerce_covs <- function(covs){
+#' df = data.frame( A = c( "A", "B", "A", "C" ) )
+#' coerce_covs( df )
+coerce_covs <- function(covs) {
+  # TODO: Change this to using model.matrix to make dummy variables
+
   covs_coerced <-  covs %>%
     mutate(across(!where(is.numeric), ~as.numeric(as.factor(.))))
   return(covs_coerced)
@@ -20,14 +29,15 @@ coerce_covs <- function(covs){
 
 #' Scale covariates by scaling factor specified by the "scaling" variable
 #'
+#' Note this converts a dataframe to a matrix.
+#'
 #' @param covs A dataframe of covariates
 #' @param scaling A vector of length = ncol(covs), or a scalar
 #'
-#' @return covs becomes:  covs * scaling
-#               (nxp)    (pxp)
+#' @return Scaled matrix of same dimension as covs
+#'
 #' @export
 #'
-#' @examples
 scale_covs <- function(covs, scaling){
   p <- ncol(covs)
   len_scaling <- length(scaling)
@@ -50,9 +60,10 @@ scale_covs <- function(covs, scaling){
       as.matrix() * scaling
   }
 
-
   return(covs_scaled)
 }
+
+
 
 #' Generate (#tx) by (#co) distance matrix
 #'
@@ -67,7 +78,7 @@ scale_covs <- function(covs, scaling){
 #'
 #' @return (#tx) by (#co) distance matrix
 gen_dm <- function(df,
-                   covs = starts_with("X"),
+                   covs = get_x_vars(df),
                    treatment = "Z",
                    scaling = 1,
                    metric = c("maximum", "euclidean", "manhattan")) {
@@ -85,7 +96,7 @@ gen_dm <- function(df,
 
   # pull out df with only covariates
   covs <- df %>%
-    select(all_of({{covs}}))
+    select(all_of(covs))
 
   covs_coerced <-  coerce_covs(covs)
 

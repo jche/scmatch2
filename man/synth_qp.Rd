@@ -2,7 +2,7 @@
 % Please edit documentation in R/sc.R
 \name{synth_qp}
 \alias{synth_qp}
-\title{Solve the synth QP directly (from augsynth package)}
+\title{Solve the synth QP directly (code taken from augsynth package)}
 \usage{
 synth_qp(X1, X0, V)
 }
@@ -14,5 +14,5 @@ synth_qp(X1, X0, V)
 \item{V}{Scaling matrix}
 }
 \description{
-Solve the synth QP directly (from augsynth package)
+Solve the synth QP directly (code taken from augsynth package)
 }

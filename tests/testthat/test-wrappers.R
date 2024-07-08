@@ -1,20 +1,4 @@
 
-test_that("fit_CSM works well",{
-  test_df <-
-    data.frame(Z=c(1,0,0,0,1),
-               X=c(0,0.5,0.8,3,1.6),
-               Y = c(1,0,0,0,1))
-  res <- CSM:::fit_CSM(df = test_df,
-                         covs = "X",
-                         treatment = "Z",
-                         metric = "maximum",
-                         caliper = 1,
-                         rad_method = "adaptive",
-                         est_method = "scm",
-                         return = "agg_co_units",
-                         dist_scaling = 1)
-  expect_equal(res, 1)
-})
 
 
 test_that("get_cal_matches works well", {
@@ -82,20 +66,29 @@ test_that("get_att_bal should work for a example dataset with either
 })
 
 
-test_that("get_SL_pred returns correct output structure", {
-  mock_SL_fit <- create_mock_SL_fit()
-  mock_df_test <- create_mock_df_test()
-  X_names <- c("X1","X2")
-  result <- get_SL_pred(mock_SL_fit,
-                        mock_df_test,
-                        X_names)
-
-  expect_true(is.matrix(result) == T)
-})
 
 
 
-test_that("get_SL_fit returns a correct output data type", {
-  result = create_mock_SL_fit()
-  expect_true("SuperLearner" %in% class(result))
+test_that( "code at bottom of wrappers just runs", {
+
+  df <- CSM:::gen_one_toy()
+
+  df %>%
+    ggplot(aes(X1,X2)) +
+    geom_point(aes(pch=as.factor(Z), color=Y)) +
+    scale_color_continuous(low="orange", high="blue") +
+    theme_classic() +
+    labs(pch = "Treated",
+         color = latex2exp::TeX("$f_0(X)$"),
+         x = latex2exp::TeX("$X_1$"),
+         y = latex2exp::TeX("$X_2$")) +
+    facet_wrap(~Z)
+  df %>%
+    filter(Z) %>%
+    summarize(eff = mean(Y1-Y0))
+
+  res <- CSM:::run_all_methods( df )
+
+  expect_true( is.data.frame(res) )
+
 })

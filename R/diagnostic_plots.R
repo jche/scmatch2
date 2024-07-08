@@ -1,4 +1,6 @@
 library(latex2exp)
+
+
 # functions to generate diagnostic plots
 create_toy_df_plot <- function(toy_df) {
   toy_df_plot <- toy_df %>%
@@ -466,8 +468,9 @@ satt_plot4 <- function(res, B=NA) {
 # love plot ---------------------------------------------------------------
 
 get_diff_scm_co_and_tx <- function(res,covs){
+  ada = attr(res, "adacalipers")
   df_diff_scm_co_and_tx <- res %>%
-    left_join(attr(res, "adacalipers"),
+    left_join(ada,
               by="id") %>%
     group_by(subclass) %>%
     summarize(adacal = last(adacal),

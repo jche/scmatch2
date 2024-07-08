@@ -6,7 +6,7 @@
 \usage{
 gen_matches(
   df,
-  covs = starts_with("X"),
+  covs = get_x_vars(df),
   treatment = "Z",
   scaling = 1,
   metric = "maximum",
@@ -57,4 +57,9 @@ units
 \details{
 Note: we allow controls to be repeatedly used (we match with
 replacement).
+}
+\examples{
+df <- CSM:::gen_one_toy()
+mtch <- gen_matches(df, covs = c("X1", "X2"), treatment = "Z")
+names( mtch )
 }
