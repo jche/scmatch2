@@ -15,7 +15,13 @@ get_est_att_from_wt <-
   }
 
 
-
+#' Estimate the ATT from a matched dataframe
+#'
+#' Given a matched dataset, calculate the estimated ATT
+#'
+#' @param matched_df A matched dataset
+#'
+#' @export
 get_att_ests <- function(matched_df) {
   matched_df %>%
     group_by(Z) %>%
