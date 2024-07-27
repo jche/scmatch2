@@ -13,9 +13,9 @@ test_that("get_cal_matches works well", {
                                rad_method = "adaptive",
                                est_method = "scm",
                                return = "agg_co_units",
-                               dist_scaling = 1)
+                               scaling = 1)
   res
-  expect_equal( nrow( res ), 4 )
+  expect_equal( nrow( res$result ), 4 )
 
 
 
@@ -37,9 +37,9 @@ test_that("get_cal_matches works well", {
                                rad_method = "adaptive",
                                est_method = "scm",
                                return = "agg_co_units",
-                               dist_scaling = c( 1, 5 ) )
+                               scaling = c( 1, 5 ) )
   res
-  expect_equal( nrow( res ), 4 )
+  expect_equal( nrow( res$result ), 4 )
 
 
   res <- CSM:::get_cal_matches(df = test_df,
@@ -50,9 +50,9 @@ test_that("get_cal_matches works well", {
                                rad_method = "adaptive",
                                est_method = "scm",
                                return = "all",
-                               dist_scaling = c( 1, 5 ) )
+                               scaling = c( 1, 5 ) )
   res
-  expect_equal( nrow( res ), 5 )
+  expect_equal( nrow( res$result ), 5 )
 
 })
 

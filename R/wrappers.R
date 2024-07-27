@@ -63,9 +63,10 @@ get_SL_pred <- function(SL_fit, df_test, X_names){
 get_att_diff <- function(d) {
   d %>%
     group_by(Z) %>%
-    summarize(mn = mean(Y)) %>%
+    summarize(mn = mean(Y) ) %>%
+    mutate( Z = as.numeric( Z != 0 ) ) %>%
     pivot_wider(names_from=Z, names_prefix="Y", values_from=mn) %>%
-    mutate(ATT = YTRUE - YFALSE) %>%
+    mutate(ATT = Y1 - Y0 ) %>%
     pull(ATT)
 }
 
@@ -101,7 +102,7 @@ get_att_or_lm <- function(d,
   m_lm <- lm(form, data = d %>% filter(!Z))
 
   d %>%
-    filter(Z) %>%
+    filter(Z==1) %>%
     mutate(mhat0 = predict(m_lm, newdata=.)) %>%
     summarize(ATThat = mean(Y - mhat0)) %>%
     pull(ATThat)
@@ -207,15 +208,16 @@ get_att_aipw <- function(d,
 
 
 
+
 get_att_csm <- function(d,
                         metric = "maximum",
-                        dist_scaling,
+                        scaling,
                         rad_method = "adaptive",
                         est_method = "scm") {
   preds_csm <- get_cal_matches(
     df = d,
     metric = metric,
-    dist_scaling = dist_scaling,
+    scaling = scaling,
     rad_method = rad_method,
     est_method = est_method,
     return = "sc_units",
@@ -225,7 +227,7 @@ get_att_csm <- function(d,
     # when return = "all":
     #  - in hain simulation, see that you get some
     #    very extreme estimates from units with 1 or 2 matched controls...
-    preds_csm %>%
+    preds_csm$result %>%
       group_by(subclass) %>%
       summarize(n = n(),
                 est = sum(weights*Y*Z) - sum(weights*Y*(1-Z))) %>%
@@ -235,7 +237,7 @@ get_att_csm <- function(d,
 
   # output average number of matches per unit
   if (F) {
-    n_matches <- attr(preds_csm, "scweights") %>%
+    n_matches <- preds_csm$matches %>%
       map_dbl(~nrow(.)-1)
     print(paste("Average number of co units per tx unit:", mean(n_matches)))
     p <- ggplot(tibble(x=n_matches)) +
@@ -243,18 +245,14 @@ get_att_csm <- function(d,
     print(p)
   }
 
-  # get ATT estimate:
-  preds_csm %>%
-    group_by(Z) %>%
-    summarize(Y = mean(Y)) %>%   # return = "sc_units" so this is okay
-    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>%
-    mutate(ATT = YTRUE - YFALSE) %>%
-    pull(ATT)
+  get_att_diff( preds_csm$result )
+
 }
 
 
 
 # Code to implement CEM matching via the MatchIt package
+# Allows SCM within cells if desired.
 get_cem_matches <- function(
     df,
     covs = get_x_vars(df),
@@ -263,7 +261,7 @@ get_cem_matches <- function(
                                          collapse="+"))),
     num_bins,
     est_method = c("average", "scm"),
-    return = c("sc_units", "agg_co_units", "all")) {
+    return = c("sc_units", "agg_co_units", "all"), warn = TRUE ) {
 
   est_method <- match.arg(est_method)
   return <- match.arg(return)
@@ -303,16 +301,18 @@ get_cem_matches <- function(
           mutate(subclass = subclass_new) %>%
           select(-subclass_new, -weights))
 
+  # calculate scaling
+  scaling = df %>%
+    summarize(across(all_of(covs),
+                     function(x) {
+                       if (is.numeric(x)) num_bins / (max(x) - min(x))
+                       else 1000
+                     }))
+
   # estimate outcomes within cells
-  scweights <- est_weights(df,
-                           covs=names(df),
-                           matched_gps = cem_matched_gps,
-                           dist_scaling = df %>%
-                             summarize(across(all_of(covs),
-                                              function(x) {
-                                                if (is.numeric(x)) num_bins / (max(x) - min(x))
-                                                else 1000
-                                              })),
+  scweights <- est_weights(matched_gps = cem_matched_gps,
+                           covs=covs,
+                           scaling = scaling,
                            est_method = est_method,
                            metric = "maximum")
 
@@ -324,13 +324,13 @@ get_cem_matches <- function(
 
   unmatched_units <- setdiff(df %>% filter(Z==1) %>% pull(id),
                              m.data %>% filter(Z==1) %>% pull(id))
-  if (length(unmatched_units) > 0) {
+  if (warn && length(unmatched_units) > 0) {
     warning(glue::glue("Dropped the following treated units from data:
                         \t {paste(unmatched_units, collapse=\", \")}"))
   }
 
   attr(m.data, "feasible_units") <- m.data %>%
-    filter(Z) %>%
+    filter(Z==1) %>%
     pull(id)
 
   return(m.data)
@@ -341,48 +341,40 @@ get_cem_matches <- function(
 get_att_cem <- function(d,
                         num_bins,
                         estimand = c("ATT", "CEM-ATT"),
-                        est_method = "average") {
+                        est_method = "average",
+                        extrapolate = TRUE ) {
   estimand <- match.arg(estimand)
 
   preds_feasible <- get_cem_matches(
     df = d,
     num_bins = num_bins,
     est_method = est_method,
-    return = "sc_units")
+    return = "sc_units", warn=FALSE )
   # print("Printing preds_feasible")
   # print(preds_feasible)
   # get ATT estimate:
-  att_feasible <- preds_feasible %>%
-    group_by(Z) %>%
-    summarize(Y = mean(Y)) %>%   # return = "sc_units" so this is okay
-    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>%
-    mutate(ATT = YTRUE - YFALSE) %>%
-    pull(ATT)
+  att_feasible <- get_att_diff( preds_feasible )
 
   if (estimand == "CEM-ATT") {
     return(att_feasible)
   }
 
-  if (length(attr(preds_feasible, "feasible_units")) < sum(d$Z)) {
+  # Extrapolate to units not in bins?
+  if (extrapolate && ( length(attr(preds_feasible, "feasible_units")) < sum(d$Z))) {
     preds_infeasible <- d %>%
       filter(!Z | !(id %in% attr(preds_feasible, "feasible_units"))) %>%
       get_cal_matches(.,
                       metric = "maximum",
                       rad_method = "1nn",
                       est_method = est_method,
-                      dist_scaling = d %>%
+                      scaling = d %>%
                         summarize(across(starts_with("X"),
                                          function(x) {
                                            if (is.numeric(x)) num_bins / (max(x) - min(x))
                                            else 1000
                                          })),
                       return = "sc_units")
-    att_infeasible <- preds_infeasible %>%
-      group_by(Z) %>%
-      summarize(Y = mean(Y*weights)) %>%
-      pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>%
-      mutate(ATT = YTRUE - YFALSE) %>%
-      pull(ATT)
+    att_infeasible <- get_att_diff( preds_infeasible$result )
 
     return((att_feasible * sum(preds_feasible$Z) +
               att_infeasible * sum(preds_infeasible$Z)) / sum(d$Z))
@@ -393,13 +385,14 @@ get_att_cem <- function(d,
 
 
 
-get_att_1nn <- function(d, dist_scaling) {
+get_att_1nn <- function(d, scaling) {
+
   preds_1nn <- get_cal_matches(
     df = d,
     metric = "maximum",
     rad_method = "1nn",
     est_method = "average",
-    dist_scaling = dist_scaling,
+    scaling = scaling,
     return = "sc_units",
     cem_tx_units = d %>%
       filter(Z==1) %>%
@@ -407,19 +400,14 @@ get_att_1nn <- function(d, dist_scaling) {
   )
 
   # get ATT estimate:
-  preds_1nn %>%
-    group_by(Z) %>%
-    summarize(Y = mean(Y)) %>%   # return = "sc_units" so this is okay
-    pivot_wider(names_from=Z, names_prefix="Y", values_from=Y) %>%
-    mutate(ATT = YTRUE - YFALSE) %>%
-    pull(ATT)
+  get_att_diff( preds_1nn$result )
 }
 
 
 
 
 
-run_all_methods <- function( df, skip_slow = TRUE ) {
+run_all_methods <- function( df, skip_slow = TRUE, num_bins = 5, extrapolate = TRUE ) {
 
   bal <- CSM:::get_att_bal(df,
                            form=as.formula('Z ~ X1+X2'),
@@ -437,15 +425,15 @@ run_all_methods <- function( df, skip_slow = TRUE ) {
 
   ps_bart <- CSM:::get_att_ps_bart(df, covs=c("X1", "X2"))
 
-  one_nn <- get_att_1nn( df, dist_scaling = 1/5 )
-
-  # TODO: What are these libraries?  They don't seem to be defined.
-  SL.library1 = c("SL.glm", "tmle.SL.dbarts2", "SL.glmnet")
+  one_nn <- get_att_1nn( df, scaling = 1/num_bins )
 
   if ( skip_slow ) {
     tmle = NA
     aipw = NA
   } else {
+    # TODO: What are these libraries?  They don't seem to be defined.
+    SL.library1 = c("SL.glm", "tmle.SL.dbarts2", "SL.glmnet")
+
     tmle <- CSM:::get_att_tmle(df %>%
                                  mutate(X3 = X1*X2),
                                covs=c("X1","X2","X3"),
@@ -458,9 +446,11 @@ run_all_methods <- function( df, skip_slow = TRUE ) {
                                Q.SL.library = SL.library1,
                                g.SL.library = SL.library1)
   }
-  csm <- CSM:::get_att_csm(df, dist_scaling = 1/5, est_method="scm")
 
-  cem <- CSM:::get_att_cem(df, num_bins=5, est_method="scm")
+  csm <- CSM:::get_att_csm(df, scaling = 1/num_bins, est_method="scm")
+
+  cem <- CSM:::get_att_cem(df, num_bins=num_bins, est_method="scm",
+                           extrapolate = extrapolate )
 
   tibble(method = c("bal", "bal_int", "or_lm", "or_bart",
                     "lm_ps", "ps_bart", "tmle", "aipw",

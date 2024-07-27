@@ -5,25 +5,28 @@
 \title{Estimate control weights within matched sets}
 \usage{
 est_weights(
-  df,
-  covs,
   matched_gps,
-  dist_scaling,
+  covs = attr(matched_gps, "covariates"),
+  scaling = attr(matched_gps, "settings")$scaling,
   est_method = c("scm", "average"),
-  metric = c("maximum", "euclidean", "manhattan")
+  metric = attr(matched_gps, "settings")$metric
 )
 }
 \arguments{
-\item{df}{full dataframe}
+\item{matched_gps}{Either a csm_matches object or a list of matched
+sets, with a tx unit in first row of each set.}
 
-\item{matched_gps}{list of matched sets: tx unit in first row}
+\item{covs}{List of covariates to calculate similarity scores on if
+using scm.}
 
-\item{dist_scaling}{tibble with scaling for each covariate}
+\item{scaling}{tibble with scaling for each covariate}
 
 \item{est_method}{"scm" or "average"}
 }
 \value{
-list of matched sets, with 'weights' for each control unit.
+If passed an csm object, an updated csm object with
+weights. Otherwise, return list of matched sets, with 'weights'
+for each control unit.
 }
 \description{
 Generate weights for list of matched sets, typically by the

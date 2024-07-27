@@ -58,7 +58,10 @@ agg_co_units <- function(scweights) {
 }
 
 
+
+
 agg_avg_units <- function(scweights) {
+
   if (!is.data.frame(scweights)) {
     scweights <- scweights %>%
       map_dfr(~mutate(., subclass=id[1]))

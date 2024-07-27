@@ -2,11 +2,16 @@ library(haven)
 library(CSM)
 library(latex2exp)
 
+options(list(dplyr.summarise.inform = FALSE))
+theme_set( theme_classic() )
+
+
 data_ferman <- read_dta( file = here::here( "data/inputs/Final.dta" ) )
 
 colnames(data_ferman)
 hist(data_ferman$y2008 -
        data_ferman$OBJETIVA2008)
+
 # The above shows that y2008 and OBJETIVA2008 are the same variable
 ferman_for_analysis <-
   data_ferman %>%
@@ -17,11 +22,7 @@ ferman_for_analysis <-
   filter(!is.na(Control)) %>%
   mutate(Y = y2010,
          Z = Control,
-         is_sao_paolo = UF == 35)%>%
-  mutate(`X1 (2007 score)` = y2007,
-         `X2 (2008 score)` = y2008,
-         `X3 (2009 score)` = y2009,
-         `X4 (pct Sao Paolo)` = is_sao_paolo)
+         is_sao_paolo = as.numeric(UF == 35))
 # UF == 35 means Sao Paolo
 # UF == 33 means Rio
 
@@ -63,6 +64,7 @@ plot_dm <- function(dist_to_plot){
 }
 dist_to_plot <- dm_col_sorted[1:3,] # choose top 3
 plot_dm(dist_to_plot)
+
 # Plot top 1, 2, 3 respectively
 library(gridExtra)
 dm_top_1 <- dm_col_sorted[1,]
@@ -75,17 +77,25 @@ plot_dm_all <- gridExtra::grid.arrange(
 )
 
 ggsave(
-  filename="writeup/figures/hist-top-k-distances.png",
+  filename= here::here( "writeup/figures/hist-top-k-distances.png" ),
   plot=plot_dm_all,
   width=5.3,
   height=7.7
 )
 
 ####
-### Love plot
+# Love plot  ----
 scaling <- 1/covariate_caliper
+
+ferman_for_analysis <- ferman_for_analysis %>%
+  mutate(`X1 (2007 score)` = y2007,
+       `X2 (2008 score)` = y2008,
+       `X3 (2009 score)` = y2009,
+       `X4 (pct Sao Paolo)` = is_sao_paolo)
+
 covs <-c("X1 (2007 score)", "X2 (2008 score)",
-"X3 (2009 score)", "X4 (pct Sao Paolo)")
+         "X3 (2009 score)", "X4 (pct Sao Paolo)")
+
 # covs <- starts_with("X")
 # covs <- c("X1", "X2", "X3", "X4")
 # scmatches <- ferman_for_analysis %>%
@@ -124,7 +134,7 @@ ferman_scm <- ferman_for_analysis %>%
     knn = 10,         # for ada
     num_bins = 5,     # for cem
     wider = F)
-source("R/diagnostic_plots.R")
+
 ferman_scm$id <-
   gsub("*_syn","",ferman_scm$id)
 ferman_scm$id <- as.integer(ferman_scm$id)
@@ -143,10 +153,10 @@ ggsave(
   filename="writeup/figures/love-plot-ferman.png",
   width=8.76,
   height=5.33
-  )
+)
 
 
-## ESS plots
+# ESS plots ----
 scweights_df <-
   attr(ferman_scm, "scweights") %>%
   bind_rows()
@@ -160,13 +170,12 @@ feasible <-
   scweights_df %>%
   filter(subclass %in%
            subclass_feasible)
-source("R/distance.R")
-source("R/estimate.R")
+
 ess_plot(feasible)
 
 
 #####
-## Get the balance table
+# Get the balance table ----
 #####
 d <- feasible
 metric <- "maximum"
@@ -230,7 +239,7 @@ n_feasible <- length(feasible_subclasses)
 n_c <- sum(ferman_for_analysis$Z==0)
 
 ######
-# Histogram
+# Histogram ----
 ######
 matched_controls <-
   attr(ferman_scm, "scweights") %>%
@@ -271,16 +280,15 @@ p <- grid.arrange(
   ncol=2
 )
 ggsave(
-  "writeup/figures/hist-n-co.png",
+  here::here( "writeup/figures/hist-n-co.png" ),
   plot=p,
   width=8.1,
   height=5.3
 )
 
 #####
-## SATT plot
+# SATT plot ----
 ######
-source("R/diagnostic_plots.R")
 ggd_att <- ferman_scm %>%
   left_join(attr(ferman_scm, "adacalipers"), by="id") %>%
   group_by(subclass) %>%

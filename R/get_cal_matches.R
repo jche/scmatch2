@@ -1,9 +1,52 @@
 
 
+# Scale each by standard deviation, and exact match on binary
+# covariates.
+default_scaling <- function( df, covs ) {
+  df %>%
+    summarize(across(all_of(covs),
+                     function(x) {
+                       if (is.numeric(x)) 1/sd(x)
+                       else 1000
+                     }))
+}
+
+
+
+make_treatment_table <- function( df, matches, caliper ) {
+
+  rs <- purrr::map_dfr( matches$matches,
+                        function( blob ) {
+                          summarise( blob,
+                                     id = id[[1]],
+                                     subclass = subclass[[1]],
+                                     nc = n() - 1,
+                                     ess = sum(weights[-1])^2 / sum( weights[-1]^2  ),
+                                     max_dist = max(dist) )
+                        }
+  )
+
+  # store information about scaling and adaptive calipers
+  adacalipers_df <- tibble(
+    id = df %>% filter(Z == 1) %>% pull(id),
+    adacal = matches$adacalipers )
+
+  rs <- left_join( rs, adacalipers_df, by = "id" ) %>%
+    mutate( nc = ifelse( is.na(nc), 0, nc ),
+            feasible = ifelse( !is.na(adacal) & adacal <= caliper, 1, 0 ),
+            matched = ifelse( nc > 0, 1, 0 ) )
+
+  rs
+}
+
+
+
+
+
 #' Caliper Synthetic Matching
 #'
-#' This function implements (adaptive) radius matching with optional
-#' synthetic step on the resulting sets of controls.
+#' Conduct (adaptive) radius matching with optional synthetic step on
+#' the resulting sets of controls.
 #'
 #' @param df The data frame to be matched
 #' @param metric A string specifying the distance metric
@@ -11,7 +54,10 @@
 #' @param rad_method adaptive caliper, fixed caliper, only 1nn caliper
 #' @param est_method A string specifying the estimation method
 #' @param return A string specifying what to return
-#' @param dist_scaling A vector of scaling constants for covariates
+#' @param scaling A vector of scaling constants for covariates (can
+#'   also be a single row matrix).
+#' @param warn A logical indicating whether to warn about dropped
+#'   units.
 #' @param ... Additional arguments
 #'
 #' @return df with a bunch of attributes.
@@ -24,12 +70,8 @@ get_cal_matches <- function( df,
                              rad_method = c("adaptive", "fixed", "1nn"),
                              est_method = c("scm", "scm_extrap", "average"),
                              return = c("sc_units", "agg_co_units", "all"),
-                             dist_scaling = df %>%
-                               summarize(across(all_of(covs),
-                                                function(x) {
-                                                  if (is.numeric(x)) 1/sd(x)
-                                                  else 1000
-                                                })),
+                             scaling = default_scaling(df,covs),
+                             warn = TRUE,
                              ...) {
   metric <- match.arg(metric)
   rad_method <- match.arg(rad_method)
@@ -44,7 +86,7 @@ get_cal_matches <- function( df,
     gen_matches(
       covs = covs,
       treatment = treatment,
-      scaling = dist_scaling,
+      scaling = scaling,
       metric = metric,
       caliper = caliper,
       rad_method = rad_method,
@@ -53,55 +95,45 @@ get_cal_matches <- function( df,
   # scmatches$matches is a list of length ntx.
   #   Each element is a data frame of matched controls
 
-  ### use est_method: scm or average
-  scweights <- est_weights(df,
-                           covs=covs,
-                           matched_gps = scmatches$matches,
-                           dist_scaling = dist_scaling,
-                           est_method = est_method,
-                           metric = metric)
 
-  ### use return: sc units, aggregated weights per control, all weights
-  m.data <- switch(return,
-                   sc_units     = agg_sc_units(scweights),
-                   agg_co_units = agg_co_units(scweights),
-                   all          = bind_rows(scweights))
+  ### use est_method to add individual unit weights: scm or average
+  scweights <- est_weights( matched_gps = scmatches,
+                            est_method = est_method)
 
-  unmatched_units <- setdiff(df %>% filter(.data[[treatment]]==1) %>% pull(id),
-                             m.data %>% filter(.data[[treatment]]==1) %>% pull(id))
-  if (length(unmatched_units) > 0) {
-    if ( length( unmatched_units <= 20 ) ) {
+  ### use return to figure out how to aggregate: sc units, aggregated weights per control, all weights
+  res <- switch(return,
+                sc_units     = agg_sc_units(scweights$matches),
+                agg_co_units = agg_co_units(scweights$matches),
+                all          = bind_rows(scweights$matches) )
+
+
+  # Make a tibble of treated units with calipers and number of controls, etc.
+  treatment_table <- make_treatment_table( df, scweights, caliper )
+
+  # Possibly warn if treated units were lost
+  unmatched_units <- filter( treatment_table, matched==0 )
+  if ( warn && nrow(unmatched_units) > 0) {
+    if ( length( nrow <= 20 ) ) {
       warning(glue::glue("Dropped the following treated units from data:
-                        \t {paste(unmatched_units, collapse=\", \")}"))
+                        \t {paste(unmatched_units$id, collapse=\", \")}"))
     } else {
-      warning(glue::glue("Dropped {length(unmatched_units) treated units from data.") )
+      warning(glue::glue("Dropped {nrow(unmatched_units) treated units from data.") )
     }
   }
 
-  # aggregate results
-  res <- m.data
+  scmatches$matches <- scweights$matches
+  scmatches$treatment_table <- treatment_table
+  scmatches$result <- res
 
-  # store information about scaling and adaptive calipers
-  adacalipers_df <- tibble(
-    id = df %>% filter(Z == 1) %>% pull(id) %>% as.character(),
-    adacal = scmatches$adacalipers)
-  attr(res, "scaling") <- dist_scaling
-  attr(res, "adacalipers") <- adacalipers_df
+  # keep a bunch of attributes around, just in case
+  settings <- attr(scmatches, "settings" )
+  settings$rad_method = rad_method
+  settings$est_method = est_method
+  settings$return = return
+  settings$treatment = treatment
+  attr( scmatches, "settings" ) <- settings
 
-  # store information about feasible units/subclasses
-  feasible_units <- adacalipers_df %>%
-    filter(adacal <= caliper) %>%
-    pull(id)
-  attr(res, "unmatched_units") <- unmatched_units
-  attr(res, "feasible_units")  <- feasible_units
-  attr(res, "feasible_subclasses") <- res %>%
-    filter(id %in% feasible_units) %>%
-    pull(subclass)
+  class(scmatches) = "csm_matches"
 
-  # keep a bunch of data around, just in case
-  attr(res, "scweights") <- scweights
-  attr(res, "dm") <- scmatches$dm
-  attr(res, "dm_uncapped") <- scmatches$dm_uncapped
-
-  return(res)
+  return(scmatches)
 }

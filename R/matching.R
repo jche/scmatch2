@@ -84,6 +84,10 @@ set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
 }
 
 
+
+
+
+
 #' Match treated units to control units
 #'
 #' Generate matches for each treatment over controls using specified
@@ -168,41 +172,60 @@ gen_matches <- function(df,
   ### step 3: generate df of matched controls for
   #   each treated unit
   df_list <-
-    get_matched_co_from_dm_trimmed(df, dm_trimmed,treatment)
+    get_matched_co_from_dm_trimmed(df, dm_trimmed, treatment)
+  nulls = map_lgl(df_list, is.null)
+  radius_sizes[nulls] = NA
 
-  return(list(matches = df_list %>% discard(is.null),   # drop unmatched tx units
+
+  res <- list(matches = df_list %>% discard(is.null),   # drop unmatched tx units
               adacalipers = radius_sizes,
               dm_trimmed = dm_trimmed,
-              dm_uncapped = dm_uncapped))
+              dm_uncapped = dm_uncapped)
+
+  class(res) <- "csm_matches"
+  attr( res, "settings" ) <- list( caliper = caliper,
+                                   rad_method = rad_method,
+                                   metric = metric,
+                                   scaling = scaling )
+  attr( res, "covariates" ) <- covs
+  return(res)
 }
 
 
 
-
-# estimate within matched sets --------------------------------------------
+# calculate unit weights within matched sets --------------------------------------------
 
 #' Estimate control weights within matched sets
 #'
 #' Generate weights for list of matched sets, typically by the
 #' synthetic control method (but you can also simply average).
 #'
-#'
-#' @param df full dataframe
-#' @param matched_gps list of matched sets: tx unit in first row
-#' @param dist_scaling tibble with scaling for each covariate
+#' @param matched_gps Either a csm_matches object or a list of matched
+#'   sets, with a tx unit in first row of each set.
+#' @param covs List of covariates to calculate similarity scores on if
+#'   using scm.
+#' @param scaling tibble with scaling for each covariate
 #' @param est_method "scm" or "average"
 #'
-#' @return list of matched sets, with 'weights' for each control unit.
+#' @return If passed an csm object, an updated csm object with
+#'   weights. Otherwise, return list of matched sets, with 'weights'
+#'   for each control unit.
 #'
 #' @export
-est_weights <- function(df,
-                        covs,
-                        matched_gps,
-                        dist_scaling,
+est_weights <- function(matched_gps,
+                        covs = attr( matched_gps, "covariates" ),
+                        scaling = attr( matched_gps, "settings" )$scaling,
                         est_method = c("scm", "average"),
-                        metric = c("maximum", "euclidean", "manhattan")) {
+                        metric = attr( matched_gps, "settings" )$metric ) {
+  #                          c("maximum", "euclidean", "manhattan")) {
+
   est_method = match.arg(est_method)
-  metric = match.arg(metric)
+  metric = match.arg(metric, choices=c("maximum", "euclidean", "manhattan"))
+
+  matches = matched_gps
+  if ( is.csm_matches(matched_gps) ) {
+    matches = matched_gps$matches
+  }
 
   if (est_method == "scm") {
     # generate SCM matching formula
@@ -210,24 +233,33 @@ est_weights <- function(df,
     #          so I still don't mess with them here.
     match_cols <- covs
 
-    scweights <- map( matched_gps,
+    scweights <- map( matches,
                       ~gen_sc_weights(.x, match_cols,
-                                      dist_scaling,
+                                      scaling,
                                       metric),
                       .progress="Producing SCM units...")
     # needs to modify gen_sc_weights to get clear:
     #   a) what type of matched_gps is required
     #   b) whether match_cols can be ignored
   } else if (est_method == "average") {
-    scweights <- map(matched_gps,
-                     function(x) {
-                       x %>%
-                         group_by(Z) %>%
-                         mutate(weights = 1/n()) %>%
-                         ungroup()
-                     })
+    scweights <- map( matches,
+                      function(x) {
+                        x %>%
+                          group_by(Z) %>%
+                          mutate(weights = 1/n()) %>%
+                          ungroup()
+                      })
   }
-  return(scweights)
+
+  # We should not lose any units when calculating weights.
+  stopifnot( length( matches ) == length( scweights ) )
+
+  if ( is.csm_matches(matched_gps) ) {
+    matched_gps$matches <- scweights
+    return( matched_gps )
+  } else {
+    return(scweights)
+  }
 }
 
 

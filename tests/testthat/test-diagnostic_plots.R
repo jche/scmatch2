@@ -5,8 +5,11 @@
 #   - return = "agg_co_units" cannot make it work
 
 test_df <-
-  data.frame(Z=c(1,0,0,0,1),
-             X=c(0,-0.5,0.8,3,1.6))
+  tibble(Z=c(1,0,0,0,1),
+             X=c(0,-0.5,0.8,3,1.6) ) %>%
+  mutate(
+         X2 = rnorm(n()),
+         X3 = rnorm(n()) + Z )
 
 res <- get_cal_matches(df = test_df,
                        covs = "X",
@@ -17,17 +20,19 @@ res <- get_cal_matches(df = test_df,
                        est_method = "scm",
                        return = "sc_units",
                        # return = "agg_co_units",
-                       dist_scaling = 1)
-attr(res, "feasible_units")
+                       scaling = 1)
 
-feasible_subclasses <-
-  attr(res, "feasible_subclasses")
-n_feasible <- length(feasible_subclasses)
+feasible <- feasible_units(res)
+n_feasible <- nrow(feasible)
 
 # It seems telling me that the NA is the aggregated control so it's one unit
 # attr(res, "adacalipers")
-covs = "X"
+covs = c( "X", "X2","X3" )
 
 love_plot_df <-
   CSM:::create_love_plot_df( res = res,
-                             covs = "X")
+                             covs = covs)
+love_plot_df
+
+expect_true( is.data.frame(love_plot_df) )
+

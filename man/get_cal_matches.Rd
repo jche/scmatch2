@@ -13,12 +13,8 @@ get_cal_matches(
   rad_method = c("adaptive", "fixed", "1nn"),
   est_method = c("scm", "scm_extrap", "average"),
   return = c("sc_units", "agg_co_units", "all"),
-  dist_scaling = df \%>\% summarize(across(all_of(covs), function(x) {
-     if
-    (is.numeric(x)) 
-         1/sd(x)
-     else 1000
- })),
+  scaling = default_scaling(df, covs),
+  warn = TRUE,
   ...
 )
 }
@@ -35,7 +31,11 @@ get_cal_matches(
 
 \item{return}{A string specifying what to return}
 
-\item{dist_scaling}{A vector of scaling constants for covariates}
+\item{scaling}{A vector of scaling constants for covariates (can
+also be a single row matrix).}
+
+\item{warn}{A logical indicating whether to warn about dropped
+units.}
 
 \item{...}{Additional arguments}
 }
@@ -43,6 +43,6 @@ get_cal_matches(
 df with a bunch of attributes.
 }
 \description{
-This function implements (adaptive) radius matching with optional
-synthetic step on the resulting sets of controls.
+Conduct (adaptive) radius matching with optional synthetic step on
+the resulting sets of controls.
 }
