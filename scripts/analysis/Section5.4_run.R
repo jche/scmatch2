@@ -4,8 +4,8 @@
 library(tidyverse)
 require(mvtnorm)
 
-library( scmatch2 )
-
+library( CSM )
+source( "scripts/analysis/boot_CSM_simulation_code.R" )
 
 save_res_to_csv<-
   function(curr_res,
@@ -40,6 +40,23 @@ ggplot( samp_dat, aes( X1, X2, col=as.factor(Z) ) ) +
 samp_dat$tau = samp_dat$Y1 - samp_dat$Y0
 skimr::skim( samp_dat )
 
+# Test simulation driver ----
+
+if ( FALSE ) {
+  tst <-
+    boot_CSM(dgp_name="toy",
+             att0=F,
+             I=5,
+             B=10,
+             mu_model="linear",
+             boot_mtd="A-E",
+             n_split=1,
+             kang_true = FALSE,
+             toy_ctr_dist = 0.5)
+
+}
+
+# Run the simulation for inference ----
 
 toy_naive_low<-
   boot_CSM(dgp_name="toy",
@@ -84,10 +101,14 @@ toy_naive_high$deg_overlap <- "high"
 save_res_to_csv(toy_naive_high,
                 FNAME = FNAME)
 
+
+
+
+
 ####
-## The following was inference on Kang-Schafer
-#   DGP whihc has not been reported
-#   to the main paper anymore.
+# Inference on Kang-Schafer ----
+
+#   The results of this DGP are no longer in the main paper anymore.
 I = 40; B=40
 FNAME =
   paste0("./sim_toy_results/kang_toy_naive_I_",I,"_B_",B,".csv")

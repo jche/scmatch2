@@ -141,10 +141,13 @@ print.csm_matches <- function(x, ...) {
 #'
 #' @param feasible_only TRUE means only return units which were
 #'   matched within the set caliper.
-#'
+#' @param nonzero_weight_only TRUE means drop any units with 0 weight
+#'   (e.g., due to scm weighting).
 #' @return dataframe
 #' @export
-full_unit_table <- function( csm, feasible_only = FALSE ) {
+full_unit_table <- function( csm,
+                             feasible_only = FALSE,
+                             nonzero_weight_only = FALSE ) {
   rs <- csm$matches %>%
     bind_rows()
 
@@ -153,6 +156,10 @@ full_unit_table <- function( csm, feasible_only = FALSE ) {
       filter( feasible == 1 ) %>%
       pull( subclass )
     rs <- filter( rs, subclass %in% fs )
+  }
+
+  if ( nonzero_weight_only ) {
+    rs <- filter( rs, weights > 0 )
   }
 
   return( rs )
@@ -209,13 +216,13 @@ unmatched_units <- function( csm ) {
 #' @export
 #'
 result_table <- function( csm,
-                          result = NULL,
+                          return = NULL,
                           feasible_only = FALSE ) {
 
   rs <- csm$result
 
   # Swap result type if asked
-  if ( !is.null( result ) ) {
+  if ( !is.null( return ) ) {
     rs <- switch(return,
                   sc_units     = agg_sc_units(csm$matches),
                   agg_co_units = agg_co_units(csm$matches),

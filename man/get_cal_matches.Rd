@@ -14,11 +14,14 @@ get_cal_matches(
   est_method = c("scm", "scm_extrap", "average"),
   return = c("sc_units", "agg_co_units", "all"),
   scaling = default_scaling(df, covs),
+  id_name = "id",
   warn = TRUE
 )
 }
 \arguments{
-\item{df}{The data frame to be matched}
+\item{df}{The data frame to be matched.  Option id column to
+uniquely identify units.  If missing, will make a new ID column
+(with name \code{id}).}
 
 \item{metric}{A string specifying the distance metric}
 
@@ -32,6 +35,9 @@ get_cal_matches(
 
 \item{scaling}{A vector of scaling constants for covariates (can
 also be a single row matrix).}
+
+\item{id_name}{Name of column to look for ID values.  If that
+column not found, make canonical \code{id}.}
 
 \item{warn}{A logical indicating whether to warn about dropped
 units.}

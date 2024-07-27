@@ -12,8 +12,8 @@ get_df_scaling_from_dgp_name <- function(dgp_name,
   if (dgp_name == "toy"){
     df_dgp <- gen_one_toy(ctr_dist=toy_ctr_dist)
     # Edit 4 Mar 2024:
-    dist_scaling <- 8
-    # dist_scaling <- df_dgp %>%
+    scaling <- 8
+    # scaling <- df_dgp %>%
     #   summarize(across(starts_with("X"),
     #                    function(x) {
     #                      if (is.numeric(x)) 6 / (max(x) - min(x))
@@ -25,7 +25,7 @@ get_df_scaling_from_dgp_name <- function(dgp_name,
       df_dgp[, paste0("X",1:4)] <-
         df_dgp %>% select(starts_with("V"))
     }
-    dist_scaling <- df_dgp %>%
+    scaling <- df_dgp %>%
       summarize(across(starts_with("X"),
                        function(x) {
                          if (is.numeric(x)) 5 / (max(x) - min(x))
@@ -33,7 +33,7 @@ get_df_scaling_from_dgp_name <- function(dgp_name,
                        }))
   }else if (dgp_name == "otsu"){
     df_dgp <- generate_one_otsu()
-    dist_scaling <- df_dgp %>%
+    scaling <- df_dgp %>%
       summarize(across(starts_with("X"),
                        function(x) {
                          if (is.numeric(x)) 6 / (max(x) - min(x))
@@ -43,7 +43,7 @@ get_df_scaling_from_dgp_name <- function(dgp_name,
     stop("dgp_name must be toy or kang or otsu")
   }
   return(list(df_dgp=df_dgp,
-              dist_scaling=dist_scaling))
+              scaling=scaling))
 }
 
 
@@ -51,16 +51,22 @@ get_df_scaling_from_dgp_name <- function(dgp_name,
 get_matches_and_debiased_residuals <-
   function(dgp_name,
            df_dgp,
-           dist_scaling,
+           scaling,
            mu_model,
            n_split=1){
 
-    # Assign group_label to df_dgp
-    df_dgp_splitted <- assign_group_label(df_dgp,
-                                          n_split = n_split)
+
+    # TODO: What is the following for?  What is n_split for?  Not
+    # following this code:
+
     preds_csm <- get_matches(dgp_name=dgp_name,
                              df_dgp=df_dgp,
-                             dist_scaling=dist_scaling)
+                             scaling=scaling)
+
+    #Assign group_label to df_dgp
+    df_dgp_splitted <- assign_group_label(df_dgp,
+                                          n_split = n_split) %>%
+      mutate( id = as.character(id) )
 
     id_to_group_map <-
       df_dgp_splitted %>%
@@ -68,7 +74,7 @@ get_matches_and_debiased_residuals <-
 
     # Append the same label to preds_csm through join
     preds_csm <-
-      left_join(preds_csm,
+      left_join(preds_csm$result,
                 id_to_group_map %>% distinct(id, .keep_all=T),
                 by="id")
 
@@ -102,6 +108,8 @@ get_matches_and_debiased_residuals <-
     else {
       stop("dgp_name must be toy or kang")
     }
+
+
     # Model fitting using sample splitting
     # Nest data
     df_to_fit_nested <-
@@ -155,16 +163,19 @@ get_matches_and_debiased_residuals <-
 
 
 
-get_matches <- function(dgp_name, df_dgp,dist_scaling){
+get_matches <- function(dgp_name, df_dgp, scaling){
+  # TODO: WHY should the type of dgp affect how to get matches?  E.g.,
+  # why is otsu different?  It should be a flag for kind of matching,
+  # instead.
+
   if (dgp_name == "toy" || dgp_name == "kang") {
     df_dgp_with_matches <- get_cal_matches(
       df = df_dgp,
       metric = "maximum",
-      dist_scaling = dist_scaling,
+      scaling = scaling,
       rad_method = "fixed",
       est_method = "scm",
-      return = "all",
-      knn = 25
+      return = "all"
     )
   } else if (dgp_name == "otsu") {
     df_dgp_with_matches <- get_NN_matches(df_dgp)
@@ -237,6 +248,10 @@ get_se_AE <- function(preds_csm){
 
 
 calc_N_T_N_C <- function(preds_csm){
+  if ( is.csm_matches( preds_csm ) ) {
+    preds_csm <- full_unit_table(preds_csm)
+  }
+
   N_T <- nrow(preds_csm %>% filter(Z==T))
   tmp <- preds_csm %>%
     filter(Z==F) %>%
@@ -414,14 +429,14 @@ boot_naive <- function( df_dgp,
     resampled_data$id <- df_dgp$id
 
     if (dgp_name == "toy"){
-      dist_scaling_resampled_data <- resampled_data %>%
+      scaling_resampled_data <- resampled_data %>%
         summarize(across(starts_with("X"),
                          function(x) {
                            if (is.numeric(x)) 6 / (max(x) - min(x))
                            else 1000
                          }))
     }else if (dgp_name == "kang"){
-      dist_scaling_resampled_data <- resampled_data %>%
+      scaling_resampled_data <- resampled_data %>%
         summarize(across(starts_with("X"),
                          function(x) {
                            if (is.numeric(x)) 5 / (max(x) - min(x))
@@ -433,7 +448,7 @@ boot_naive <- function( df_dgp,
     # estimator <- function(df){
     #   preds_csm <- get_matches(dgp_name=dgp_name,
     #                            df_dgp=df,
-    #                            dist_scaling=dist_scaling)
+    #                            scaling=scaling)
     #   preds_csm[,paste0("hat_mu_0")] <-
     #     SL_pred  <- get_SL_pred(SL_fit=SL_fit,
     #                             df_test=preds_csm,
@@ -456,7 +471,7 @@ boot_naive <- function( df_dgp,
       obj <- get_matches_and_debiased_residuals(
         dgp_name=dgp_name,
         df_dgp=df,
-        dist_scaling=dist_scaling_resampled_data,
+        scaling=scaling_resampled_data,
         mu_model=mu_model,
         n_split=1)
       return(obj$mean_tilde_tau)
@@ -485,7 +500,7 @@ boot_cluster <-function(df_dgp,
   # B <- 100; seed_addition <- 1
   # dgp_name <- "toy"; mu_model = "linear"
   # df_dgp <- gen_one_toy()
-  dist_scaling <- df_dgp %>%
+  scaling <- df_dgp %>%
     summarize(across(starts_with("X"),
                      function(x) {
                        if (is.numeric(x)) 6 / (max(x) - min(x))
@@ -494,7 +509,7 @@ boot_cluster <-function(df_dgp,
   obj <- get_matches_and_debiased_residuals(
     dgp_name=dgp_name,
     df_dgp=df_dgp,
-    dist_scaling=dist_scaling,
+    scaling=scaling,
     mu_model="linear",
     n_split=1)
   md <- obj$preds_csm
@@ -569,7 +584,7 @@ boot_cluster_for_otsu <- function(df_dgp,
   obj <- get_matches_and_debiased_residuals(
     dgp_name="otsu",
     df_dgp=df_dgp,
-    dist_scaling=0,
+    scaling=0,
     mu_model="linear",
     n_split=1)
   md <- obj$preds_csm
@@ -618,7 +633,7 @@ boot_cluster_for_otsu <- function(df_dgp,
 
 assign_group_label <- function(df_to_split, n_split) {
   df_to_split$group_label <-
-    sample(1:n_split,
+    sample( df_to_split$id,
            nrow(df_to_split),
            replace = TRUE)
   return(df_to_split)
@@ -653,7 +668,8 @@ boot_CSM <- function(dgp_name,
                      boot_mtd="Bayesian",
                      n_split=1,
                      kang_true=FALSE,
-                     toy_ctr_dist=0.5){
+                     toy_ctr_dist=0.5,
+                     seed = NULL ){
 
   covered <- CI_lower <- CI_upper <-
     att_true <- att_est <- att_debiased <-
@@ -664,7 +680,10 @@ boot_CSM <- function(dgp_name,
     bias <-
     N_T <- N_C <- numeric(I)
   T_star <- numeric(B)
-  set.seed(123)
+  if ( !is.null(seed) ) {
+    set.seed(123)
+  }
+
   for (i in 1:I){
     print(i)
     dgp_obj <-
@@ -677,7 +696,7 @@ boot_CSM <- function(dgp_name,
     matches_and_debiased_residuals<-
       get_matches_and_debiased_residuals(
         dgp_name, df_dgp,
-        dist_scaling, mu_model,n_split)
+        scaling, mu_model,n_split)
     list2env(matches_and_debiased_residuals,
              envir = environment())
     time_after_matching <- proc.time()

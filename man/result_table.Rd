@@ -5,7 +5,7 @@
 \title{Get table of aggregated results, with rows for synthetic units if
 that was asked for}
 \usage{
-result_table(csm, feasible_only = FALSE)
+result_table(csm, result = NULL, feasible_only = FALSE)
 }
 \value{
 dataframe

@@ -49,7 +49,10 @@ make_treatment_table <- function( df, matches, caliper ) {
 #' Conduct (adaptive) radius matching with optional synthetic step on
 #' the resulting sets of controls.
 #'
-#' @param df The data frame to be matched
+#'
+#' @param df The data frame to be matched.  Option id column to
+#'   uniquely identify units.  If missing, will make a new ID column
+#'   (with name `id`).
 #' @param metric A string specifying the distance metric
 #' @param caliper A numeric specifying the caliper size
 #' @param rad_method adaptive caliper, fixed caliper, only 1nn caliper
@@ -59,7 +62,8 @@ make_treatment_table <- function( df, matches, caliper ) {
 #'   also be a single row matrix).
 #' @param warn A logical indicating whether to warn about dropped
 #'   units.
-#'
+#' @param id_name Name of column to look for ID values.  If that
+#'   column not found, make canonical `id`.
 #' @return df with a bunch of attributes.
 #' @export
 get_cal_matches <- function( df,
@@ -71,12 +75,17 @@ get_cal_matches <- function( df,
                              est_method = c("scm", "scm_extrap", "average"),
                              return = c("sc_units", "agg_co_units", "all"),
                              scaling = default_scaling(df,covs),
+                             id_name = "id",
                              warn = TRUE ) {
   metric <- match.arg(metric)
   rad_method <- match.arg(rad_method)
   est_method <- match.arg(est_method)
   return <- match.arg(return)
-  df$id <- paste0( "U", 1:nrow(df) )
+  if ( !( id_name %in% colnames(df) ) ) {
+    df$id <- paste0( "U", 1:nrow(df) )
+  } else {
+    df$id = as.character(df[[id_name]])
+  }
 
   ### use rad_method: generate matches
   # get caliper matches
