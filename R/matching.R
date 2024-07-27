@@ -40,11 +40,19 @@ get_matched_co_from_dm_trimmed <- function(df, dm_trimmed, treatment) {
   ntx <- nrow(dm_trimmed)
   df_trt <- df %>%
     filter(.data[[treatment]] == 1)
-  for (x in 1:ntx){
-    matched_obs <- which(!is.na(dm_trimmed[x,]))
+
+  # Add ID on the fly if needed, but try and use the one in the dataset.
+  IDs <- paste0( "tx", 1:nrow(df_trt) )
+  if ( "id" %in% colnames(df_trt) ) {
+    IDs <- df_trt$id
   }
 
-  map(1:ntx, function(x) {
+  # Unneeded I think
+  #for (x in 1:ntx){
+  #  matched_obs <- which(!is.na(dm_trimmed[x,]))
+  #}
+
+  map( 1:ntx, function(x) {
     # Step 1: get which co units are matched to each tx unit
     matched_obs <- which(!is.na(dm_trimmed[x,]))
     # if no matches, drop treated unit
@@ -69,9 +77,12 @@ get_matched_co_from_dm_trimmed <- function(df, dm_trimmed, treatment) {
       rbind(matched_rows)
 
     df_tmp %>%
-      mutate(subclass = x)
+      mutate(subclass = IDs[[x]] )
   })
 }
+
+
+
 
 set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
   ntx <- nrow(dm_uncapped)

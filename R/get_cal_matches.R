@@ -34,7 +34,8 @@ make_treatment_table <- function( df, matches, caliper ) {
   rs <- left_join( rs, adacalipers_df, by = "id" ) %>%
     mutate( nc = ifelse( is.na(nc), 0, nc ),
             feasible = ifelse( !is.na(adacal) & adacal <= caliper, 1, 0 ),
-            matched = ifelse( nc > 0, 1, 0 ) )
+            matched = ifelse( nc > 0, 1, 0 ),
+            id = as.character( id ) )
 
   rs
 }
@@ -58,7 +59,6 @@ make_treatment_table <- function( df, matches, caliper ) {
 #'   also be a single row matrix).
 #' @param warn A logical indicating whether to warn about dropped
 #'   units.
-#' @param ... Additional arguments
 #'
 #' @return df with a bunch of attributes.
 #' @export
@@ -71,14 +71,12 @@ get_cal_matches <- function( df,
                              est_method = c("scm", "scm_extrap", "average"),
                              return = c("sc_units", "agg_co_units", "all"),
                              scaling = default_scaling(df,covs),
-                             warn = TRUE,
-                             ...) {
+                             warn = TRUE ) {
   metric <- match.arg(metric)
   rad_method <- match.arg(rad_method)
   est_method <- match.arg(est_method)
   return <- match.arg(return)
-  args <- list(...)
-  df$id <- 1:nrow(df)
+  df$id <- paste0( "U", 1:nrow(df) )
 
   ### use rad_method: generate matches
   # get caliper matches
@@ -89,8 +87,7 @@ get_cal_matches <- function( df,
       scaling = scaling,
       metric = metric,
       caliper = caliper,
-      rad_method = rad_method,
-      ...)
+      rad_method = rad_method )
 
   # scmatches$matches is a list of length ntx.
   #   Each element is a data frame of matched controls

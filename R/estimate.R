@@ -24,6 +24,9 @@ get_est_att_from_wt <- function(df,
 #'
 #' @export
 get_att_ests <- function(matched_df) {
+  if ( is.csm_matches(matched_df) ) {
+    matched_df <- matched_df$result
+  }
   matched_df %>%
     group_by(Z) %>%
     summarize(mn = sum(Y*weights) / sum(weights)) %>%

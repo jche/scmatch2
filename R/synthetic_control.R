@@ -82,8 +82,9 @@ gen_sc_weights <- function(d,
 
   # Make V matrix out of scaling
   if ( is.data.frame(scaling) ) {
+    stopifnot( ncol( scaling ) == ncol( d_cov ) )
     V = scaling %>%
-      select(all_of(match_cols)) %>%
+      #select(all_of(match_cols)) %>%
       as.numeric() %>%
       diag()
   } else {

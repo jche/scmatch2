@@ -1,3 +1,4 @@
+
 gen_uniform<- function(n = 500,
                        p_trt = 0.5,
                       xlim = c(0, 2.25),
@@ -20,4 +21,11 @@ gen_uniform<- function(n = 500,
                                             mean = MU,
                                             sigma = SIG)  )
   return(uniform_df)
+}
+
+if ( FALSE ) {
+  dat <- gen_uniform(n=100, p_trt=0.5)
+  ggplot(dat, aes(x=X1, y=X2, color=Z)) +
+    geom_point() +
+    theme_minimal()
 }

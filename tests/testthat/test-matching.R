@@ -22,7 +22,7 @@ test_that("gen_matches returns correct matches
                 Z = c(1, 0, 0),
                 X = c(0, 0.5, 0.8),
                 dist = c(0, 0.5, 0.8),
-                subclass = c(1, 1, 1)
+                subclass = c("tx1", "tx1", "tx1")
               )
             rownames(expected_matched_pair_1) <- c('1','2','3')
             expect_equal(res_matched_pair_1,
@@ -34,7 +34,7 @@ test_that("gen_matches returns correct matches
                 Z = c(1, 0),
                 X = c(1.6, 0.8),
                 dist = c(0, 0.8),
-                subclass = c(2, 2)
+                subclass = c("tx2", "tx2")
               )
             rownames(expected_matched_pair_2) <- c('1','3')
             expect_equal(res_matched_pair_2,
@@ -44,6 +44,7 @@ test_that("gen_matches returns correct matches
 
 
 test_that("gen_matches did well in different scaling",{
+
   test_df <-
     data.frame(Z=c(1,0,0),
                X=c(0,0.5,0.8))
@@ -59,7 +60,7 @@ test_that("gen_matches did well in different scaling",{
       Z = c(1, 0),
       X = c(0, 0.5), # X retains in the original scale
       dist = c(0, 0.75), # but distance is computed in scaled X
-      subclass = c(1, 1)
+      subclass = c("tx1", "tx1")
     )
   rownames(expected_matched_pair_1) <- c('1','2')
   expect_equal(res_matched_pair_1,
@@ -78,7 +79,7 @@ test_that("gen_matches did well in different scaling",{
       Z = c(1, 0),
       X = c(0, 0.5),
       dist = c(0, 0.5), # distance is retained in original scale, but the last unit got unmatched
-      subclass = c(1, 1)
+      subclass = c("tx1", "tx1")
     )
   rownames(expected_matched_pair_1) <- c('1','2')
   expect_equal(res_matched_pair_1,
@@ -163,7 +164,7 @@ test_that("gen_matches do the correct thing with non-uniform scaling", {
 
 
   # Scaling and caliper gives same thing?
-  res2 <- get_cal_matches(df=test_df,
+  retx2 <- get_cal_matches(df=test_df,
                           covs = c( "X1", "X2" ),
                           treatment = "Z",
                           scaling = c(4, 1),
@@ -172,8 +173,8 @@ test_that("gen_matches do the correct thing with non-uniform scaling", {
                           caliper = 1/0.25)
 
 
-  expect_equal( res$result$weights, res2$result$weights )
-  expect_equal( res$result$ID, res2$result$ID )
+  expect_equal( res$result$weights, retx2$result$weights )
+  expect_equal( res$result$ID, retx2$result$ID )
 })
 
 
@@ -236,7 +237,7 @@ test_that("get_matched_co_from_dm should get the correct output",{
       Z = c(1, 0, 0),
       X = c(0, 0.5, 0.8),
       dist = c(0, 0.5, 0.8),
-      subclass = c(1, 1, 1)
+      subclass = c("tx1", "tx1", "tx1")
     )
   rownames(expected_res) <- c('1','2','3')
   expect_equal(res_values, as.matrix(expected_res))

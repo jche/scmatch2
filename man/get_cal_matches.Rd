@@ -14,8 +14,7 @@ get_cal_matches(
   est_method = c("scm", "scm_extrap", "average"),
   return = c("sc_units", "agg_co_units", "all"),
   scaling = default_scaling(df, covs),
-  warn = TRUE,
-  ...
+  warn = TRUE
 )
 }
 \arguments{
@@ -36,8 +35,6 @@ also be a single row matrix).}
 
 \item{warn}{A logical indicating whether to warn about dropped
 units.}
-
-\item{...}{Additional arguments}
 }
 \value{
 df with a bunch of attributes.

@@ -220,8 +220,7 @@ get_att_csm <- function(d,
     scaling = scaling,
     rad_method = rad_method,
     est_method = est_method,
-    return = "sc_units",
-    knn = 25)
+    return = "sc_units" )
 
   if (F) {
     # when return = "all":
@@ -393,11 +392,7 @@ get_att_1nn <- function(d, scaling) {
     rad_method = "1nn",
     est_method = "average",
     scaling = scaling,
-    return = "sc_units",
-    cem_tx_units = d %>%
-      filter(Z==1) %>%
-      pull(id)
-  )
+    return = "sc_units" )
 
   # get ATT estimate:
   get_att_diff( preds_1nn$result )

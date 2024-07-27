@@ -74,15 +74,15 @@ sum( lalonde_df_renamed$Z )
 sum( lalonde_df_renamed$Z ) * 2
 
 # run matching
-# TODO / NOTE: I reduced caliper to 1 from 2000.  Why was it 2000?
+# TODO/NOTE: LWM reduced caliper to 1 from 2000.  Why was it 2000?
 calada_scm <- lalonde_df_renamed %>%
-  get_cal_matches(caliper = 1,
+  get_cal_matches(caliper = 0.5,
                   metric = METRIC,
                   cal_method = CAL_METHOD,
                   dist_scaling = DIST_SCALING,
                   est_method = "scm",
                   return = "sc_units",
-                  knn = 10,
+                  #knn = 10,
                   num_bins = 5,
                   wider = FALSE)
 calada_scm
@@ -93,17 +93,19 @@ get_att_ests(calada_scm)
 calada_scm$hat_mu_0 <- 0
 
 calada_scm_filtered <-
-  calada_scm %>%
+  calada_scm$result %>%
   filter(Z==F) %>%
   group_by(subclass) %>%
   filter(n() >= 2) %>%
   ungroup()
 
-sd_est = get_se_AE(calada_scm)
+if ( FALSE ) {
+  # Old bootstrap code--no longer in package
+  sd_est = get_se_AE(calada_scm)
 CI_lower[i] = mean_tilde_tau -1.96 *  sd_boot[i]
 CI_upper[i] = mean_tilde_tau + 1.96 * sd_boot[i]
 write_csv(boot_naive_res, file="sim_canonical_results/boot_naive_res.csv")
-
+}
 
 # Love plot vs. # co units added
 set.seed(2)
@@ -115,6 +117,9 @@ love_plot(calada_scm,
   scale_x_continuous(breaks = c(174, 177, 180, 183))
 ggsave("writeup/figures/lalonde_love.png", height=3, width=4)
 
+
+if ( FALSE ) {
+  # TODO: Add and export love_plot2 from package?  How is it different?
 
 love_labs <- c("Age", "Years of Education", "Earnings (1974)", "Earnings (1975)")
 names(love_labs) <- paste0("X", 5:8)
@@ -128,14 +133,11 @@ love_plot2(calada_scm, covs = paste0("X", 5:8)) +
              labeller = labeller(name = love_labs))
 ggsave("writeup/figures/lalonde_love2.png", height=3, width=6)
 
-
+}
 
 # FSATT results -----------------------------------------------------------
 
-feasible <-
-  attr(calada_scm, "scweights") %>%
-  bind_rows() %>%
-  filter(subclass %in% attr(calada_scm, "feasible_subclasses"))
+feasible <- full_unit_table( calada_scm, feasible_only = TRUE )
 get_att_ests(feasible)
 
 
