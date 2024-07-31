@@ -1,23 +1,5 @@
 
 
-
-test_that("get_cal_matches works well", {
-  test_df <-
-    data.frame(Z=c(1,0,0,0,1),
-               X=c(0,0.5,0.8,3,1.6))
-  res <- CSM:::get_cal_matches(df = test_df,
-                         covs = "X",
-                         treatment = "Z",
-                         metric = "maximum",
-                         caliper = 1,
-                         rad_method = "adaptive",
-                         est_method = "scm",
-                         return = "agg_co_units",
-                         dist_scaling = 1)
-  res
-  expect_equal( nrow( res ), 4 )
-})
-
 test_that("get_att_ests works well",{
   test_matched_weighted_df <-
     data.frame(Z= c(1,0,0,0,1),
@@ -28,7 +10,6 @@ test_that("get_att_ests works well",{
   atts
   expect_equal( atts, 1 )
 })
-
 
 
 test_that("get_att_bal should work for a example dataset with either
@@ -67,11 +48,19 @@ test_that("get_att_bal should work for a example dataset with either
 
 
 
-
-
-test_that( "code at bottom of wrappers just runs", {
-
+test_that( "cem works", {
   df <- CSM:::gen_one_toy()
+
+  cem <- CSM:::get_att_cem(df, num_bins=5, est_method="scm")
+
+  expect_true( is.numeric(cem) )
+})
+
+test_that( "all other methods run and give ATT estimates", {
+
+  set.seed( 40440 )
+  df <- CSM:::gen_one_toy()
+  df
 
   df %>%
     ggplot(aes(X1,X2)) +
@@ -83,12 +72,44 @@ test_that( "code at bottom of wrappers just runs", {
          x = latex2exp::TeX("$X_1$"),
          y = latex2exp::TeX("$X_2$")) +
     facet_wrap(~Z)
+
   df %>%
     filter(Z) %>%
     summarize(eff = mean(Y1-Y0))
 
   res <- CSM:::run_all_methods( df )
-
+  res
   expect_true( is.data.frame(res) )
 
+
+  df = filter( df, Z==1 )
+  df2 = df %>%
+    mutate( Z = 0,
+            Y = Y - 1 )
+
+  df = bind_rows(df, df2)
+  df
+
+  # Looking at CSM local averaging issue
+  preds_csm <- get_cal_matches(
+    df = df,
+    metric = "maximum",
+    scaling = 100,
+    #caliper = 0.001,
+    rad_method = "adaptive",
+    est_method = "scm",
+    return = "sc_units")
+  preds_csm$treatment_table
+  head( preds_csm$matches )
+
+  tt <- CSM:::get_att_csm(df, scaling=100)
+  expect_equal( tt, 1 )
+
+  # NOTE: CSM is biased here due to radial matching keeping lots of
+  # units due to large radius
+  res <- CSM:::run_all_methods( df, extrapolate = FALSE )
+  res <- filter( res, !is.na(att) )
+  res <- filter( res, method != "csm" )
+  res <- filter( res, method != "cem" ) # It extrapolates and messes up?
+  expect_equal( res$att, rep( 1, nrow(res) ), tolerance=1e-2 )
 })

@@ -1,3 +1,7 @@
+
+# Script to generate figure of local mathing and residuals, for
+# motivating inference strategy
+
 # Define the function f(x)
 f <- function(x) {
   0.1 * x^2

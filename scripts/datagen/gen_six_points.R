@@ -41,3 +41,7 @@ gen_six_points <- function(x1 = 0.75, x2 = 2.25,
   return(six_points_df)
 }
 
+if ( FALSE ) {
+  ggplot( gen_six_points(), aes( X1, X2 ) ) +
+    geom_point(aes(color=Z), size=5)
+}

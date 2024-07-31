@@ -20,16 +20,16 @@ create_toy_df_plot <- function(toy_df) {
 
 # SCM evaluation plot -----------------------------------------------------
 
-dist_density_plot <- function(d, dist_scaling, metric) {
+dist_density_plot <- function(d, scaling, metric) {
   # check distances bw each tx/sc pair
   sc_dists <- d %>%
     agg_sc_units() %>%
-    gen_dm(scaling = dist_scaling,
+    gen_dm(scaling = scaling,
            metric = metric) %>%
     diag()
   avg_dists <- d %>%
     agg_avg_units() %>%
-    gen_dm(scaling = dist_scaling,
+    gen_dm(scaling = scaling,
            metric = metric) %>%
     diag()
 
@@ -40,7 +40,7 @@ dist_density_plot <- function(d, dist_scaling, metric) {
     mutate(weights = 1) %>%
     ungroup() %>%
     agg_avg_units() %>%
-    gen_dm(scaling = dist_scaling,
+    gen_dm(scaling = scaling,
            metric = metric) %>%
     diag()
 
@@ -65,16 +65,16 @@ dist_density_plot <- function(d, dist_scaling, metric) {
          color = "Method")
 }
 
-scm_vs_avg_plot <- function(d, dist_scaling, metric) {
+scm_vs_avg_plot <- function(d, scaling, metric) {
   # check distances bw each tx/sc pair
   sc_dists <- d %>%
     agg_sc_units() %>%
-    gen_dm(scaling = dist_scaling,
+    gen_dm(scaling = scaling,
            metric = metric) %>%
     diag()
   avg_dists <- d %>%
     agg_avg_units() %>%
-    gen_dm(scaling = dist_scaling,
+    gen_dm(scaling = scaling,
            metric = metric) %>%
     diag()
 
@@ -120,9 +120,12 @@ scm_vs_avg_plot <- function(d, dist_scaling, metric) {
 
 # ESS plot ----------------------------------------------------------------
 
+#' Effective sample size (ESS) plot
+#'
+#' @export
 ess_plot <- function(d) {
   df_sc <- d %>%
-    filter(Z==F)
+    filter(Z==FALSE)
 
   df_avg <- d %>%
     filter(Z==F) %>%
@@ -468,8 +471,10 @@ satt_plot4 <- function(res, B=NA) {
 # love plot ---------------------------------------------------------------
 
 get_diff_scm_co_and_tx <- function(res,covs){
-  ada = attr(res, "adacalipers")
-  df_diff_scm_co_and_tx <- res %>%
+  ada = res$treatment_table %>%
+    select(id, adacal) %>%
+    mutate( id = as.character(id) )
+  df_diff_scm_co_and_tx <- res$result %>%
     left_join(ada,
               by="id") %>%
     group_by(subclass) %>%
@@ -480,9 +485,8 @@ get_diff_scm_co_and_tx <- function(res,covs){
 }
 
 create_love_plot_df <- function(res, covs){
-  feasible_subclasses <-
-    attr(res, "feasible_subclasses")
-  n_feasible <- length(feasible_subclasses)
+  feasible_subclasses <- feasible_units(res)
+  n_feasible <- nrow(feasible_subclasses)
 
   df_step_1<-
     get_diff_scm_co_and_tx(res,covs)
@@ -500,8 +504,13 @@ create_love_plot_df <- function(res, covs){
   return(love_plot_df)
 }
 
-love_plot <-
-  function(res, covs, B=NA) {
+
+#' Love plot of covariate balance
+#'
+#' Make a ggplot love plot of covariate balance for each covariate
+#' passed.
+#' @export
+love_plot <- function(res, covs, B=NA) {
   love_steps <- create_love_plot_df(res, covs)
   p <- love_steps %>%
     ggplot(aes(x=order, color=name)) +

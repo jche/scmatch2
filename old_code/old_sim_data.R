@@ -251,47 +251,6 @@ generate_one_otsu <- function(){
 
 
 
-get_df_scaling_from_dgp_name <-
-  function(dgp_name,
-           kang_true = F,
-           toy_ctr_dist=0.5){
-    if (dgp_name == "toy"){
-      df_dgp <- gen_one_toy(ctr_dist=toy_ctr_dist)
-      # Edit 4 Mar 2024:
-      dist_scaling <- 8
-      # dist_scaling <- df_dgp %>%
-      #   summarize(across(starts_with("X"),
-      #                    function(x) {
-      #                      if (is.numeric(x)) 6 / (max(x) - min(x))
-      #                      else 1000
-      #                    }))
-    }else if(dgp_name=="kang"){
-      df_dgp <- gen_df_kang(n = 1000)
-      if (kang_true){ # Replace X1 to X4 by V1 to V4
-        df_dgp[, paste0("X",1:4)] <-
-          df_dgp %>% select(starts_with("V"))
-      }
-      dist_scaling <- df_dgp %>%
-        summarize(across(starts_with("X"),
-                         function(x) {
-                           if (is.numeric(x)) 5 / (max(x) - min(x))
-                           else 1000
-                         }))
-    }else if (dgp_name == "otsu"){
-      df_dgp <- generate_one_otsu()
-      dist_scaling <- df_dgp %>%
-        summarize(across(starts_with("X"),
-                         function(x) {
-                           if (is.numeric(x)) 6 / (max(x) - min(x))
-                           else 1000
-                         }))
-    } else {
-      stop("dgp_name must be toy or kang or otsu")
-    }
-    return(list(df_dgp=df_dgp,
-                dist_scaling=dist_scaling))
-  }
-
 # gen_df_ps <- function(n, eps_sd = 0.1,
 #                       ps = function(x,y) {invlogit(2*x+2*y - 5)},
 #                       tx_effect = function(X1, X2) {(X1-0.5)^2+(X2-0.5)^2},

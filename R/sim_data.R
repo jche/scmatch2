@@ -284,11 +284,20 @@ if (F) {
 
 
 
-
-gen_one_toy <- function(ctr_dist = 0.5){
+#' Generate a toy dataset with a single treatment effect
+#'
+#' @param ctr_dist Distance between the two control clusters
+#'
+#' @return A tibble with the toy dataset
+#' @export
+#'
+gen_one_toy <- function( nc = 500, nt = 100, ctr_dist = 0.5){
+  if ( nc < 5 ) {
+    warning( "Very small control group in gen_one_toy!" )
+  }
   gen_df_adv(
-    nc=500,
-    nt=100,
+    nc=nc,
+    nt=nt,
     f0_sd = 0.5,
     tx_effect_fun = function(X1, X2) {3*X1+3*X2},
     f0_fun = function(x,y) {

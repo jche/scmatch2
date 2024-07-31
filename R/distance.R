@@ -77,6 +77,8 @@ scale_covs <- function(covs, scaling){
 #' Default is c("maximum", "euclidean", "manhattan")
 #'
 #' @return (#tx) by (#co) distance matrix
+#'
+#' @export
 gen_dm <- function(df,
                    covs = get_x_vars(df),
                    treatment = "Z",
