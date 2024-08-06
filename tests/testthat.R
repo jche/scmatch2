@@ -9,10 +9,12 @@
 # TODO / Luke Note
 # Load packages in advance to reduce clutter in testing output -- does
 # this work?
+# Xiang response: seems no because
 library( tidyverse )
 library( glmnet )
 library( Matrix )
 library( tmle )
+
 
 library(testthat)
 library(CSM)

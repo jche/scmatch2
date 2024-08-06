@@ -1,6 +1,3 @@
-
-
-
 library(tidyverse)
 require(mvtnorm)
 
@@ -18,14 +15,6 @@ save_res_to_csv<-
   } # save_res_to_csv
 
 
-I = 1000; B=40;
-BOOT_MTD = "A-E"
-# BOOT_MTD = "regression_debiased"
-# BOOT_MTD = "regression"
-# BOOT_MTD = "cluster"
-# BOOT_MTD = "naive"
-FNAME =
-  here::here( paste0("data/outputs/bootstrap_toy_rad_new/",BOOT_MTD,"_toy_low_mid_high.csv") )
 
 
 sample_dat <- get_df_scaling_from_dgp_name(dgp_name="toy",
@@ -57,6 +46,68 @@ if ( FALSE ) {
 }
 
 # Run the simulation for inference ----
+## With the sim_inference_CSM_A_E code, where
+#   the inference is run on
+run_sim_inference_A_E <- function(R = 10){
+  FNAME =
+    here::here(
+      paste0("data/outputs/bootstrap_toy_rad_new/",
+             "test_",
+             "A_E_toy_low_mid_high.csv")
+    )
+  # R <- 100; source( "scripts/analysis/boot_CSM_simulation_code.R" )
+  toy_naive_low <-
+    sim_inference_CSM_A_E(
+      dgp_name="toy",
+      att0=F,
+      R=R,
+      toy_ctr_dist=0.5
+    )
+  toy_naive_low$deg_overlap <- "low"
+  save_res_to_csv(toy_naive_low,
+                  FNAME = FNAME)
+
+
+  toy_naive_mid<-
+    sim_inference_CSM_A_E(
+      dgp_name="toy",
+      att0=F,
+      R=R,
+      toy_ctr_dist=0.3
+    )
+  toy_naive_mid$deg_overlap <- "mid"
+  save_res_to_csv(toy_naive_mid,
+                  FNAME = FNAME)
+
+
+  toy_naive_high<-
+    sim_inference_CSM_A_E(
+      dgp_name="toy",
+      att0=F,
+      R=R,
+      toy_ctr_dist=0.1
+    )
+  toy_naive_high$deg_overlap <- "high"
+  save_res_to_csv(toy_naive_high,
+                  FNAME = FNAME)
+
+}
+tictoc::tic()
+run_sim_inference_A_E(R = 1000)
+tictoc::toc()
+
+## With the boot_CSM code, where there is option
+I = 1000; B=40;
+BOOT_MTD = "A-E"
+# BOOT_MTD = "regression_debiased"
+# BOOT_MTD = "regression"
+# BOOT_MTD = "cluster"
+# BOOT_MTD = "naive"
+FNAME =
+  here::here(
+    paste0("data/outputs/bootstrap_toy_rad_new/",
+           BOOT_MTD,"_toy_low_mid_high.csv")
+  )
 
 toy_naive_low<-
   boot_CSM(dgp_name="toy",
