@@ -5,13 +5,13 @@ library(latex2exp)
 create_toy_df_plot <- function(toy_df) {
   toy_df_plot <- toy_df %>%
     mutate(Z = factor(Z, levels = c(FALSE, TRUE), labels = c("Control", "Treatment"))) %>%
-    ggplot(aes(x = X1, y = X2, color = Y)) +
-    geom_point(aes(pch = Z)) +
-    scale_color_continuous(low = "blue", high = "orange") +
+    ggplot(aes(x = X1, y = X2, col=as.factor(Z))) +
+    geom_point() +
+    # scale_color_continuous(low = "blue", high = "orange") +
     theme_classic() +
     labs(x = TeX("$X_1$"),
          y = TeX("$X_2$"),
-         shape = "Group")
+         color = "Group")
   return(toy_df_plot)
 }
 

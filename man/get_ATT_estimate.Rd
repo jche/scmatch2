@@ -4,8 +4,9 @@
 \alias{get_ATT_estimate}
 \title{Estimate ATT}
 \usage{
-get_ATT_estimate(scmatch)
+get_ATT_estimate(scmatch, outcome = "Y")
 }
 \description{
-Calculate ATT and associated standard error using the weighting method from paper with locally estimated residual variation.
+Calculate ATT and associated standard error using the weighting
+method from paper with locally estimated residual variation.
 }

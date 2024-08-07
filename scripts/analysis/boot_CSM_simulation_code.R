@@ -860,7 +860,6 @@ boot_CSM <- function(dgp_name,
 #' @param dgp_name Name of the DGP
 #' @param att0 True ATT
 #' @param R Number of MC runs
-#' @param B Number of bootstrap samples per MC run
 #' @param toy_ctr_dist distance between centers in the to
 #'
 #' @return
@@ -870,24 +869,24 @@ boot_CSM <- function(dgp_name,
 sim_inference_CSM_A_E <- function(dgp_name,
                      att0,
                      R=100,
-                     B=250,
                      toy_ctr_dist=0.5,
+                     prop_nc_unif = 1/3,
                      seed = NULL){
+  ### Example run inputs
   # R <- 10; toy_ctr_dist=0.5; dgp_name <- "toy"; att0<-F
   covered <- CI_lower <- CI_upper <-
+    covered_with_true_SE <- CI_lower_with_true_SE <- CI_upper_with_true_SE <-
     att_true <- att_est <- att_debiased <-
-    se_AE <-
-    time_on_matching <-
-    time_on_bootstrap <-
-    error <-
-    bias <-
-    N_T <- N_C <- numeric(R)
+    se_AE <- true_SE <-
+    error <- bias <-
+    N_T <- N_C_tilde <- numeric(R)
   if ( is.null(seed) ) {
     set.seed(123)
   }
   ### Generate one dataset
   df_dgp <-
-    gen_one_toy(ctr_dist=toy_ctr_dist) %>%
+    gen_one_toy(ctr_dist=toy_ctr_dist,
+                prop_nc_unif=prop_nc_unif) %>%
     mutate(Y0_denoised = Y0 - noise,
            Y1_denoised = Y1 - noise,
            Y_denoised = Y - noise)
@@ -896,9 +895,10 @@ sim_inference_CSM_A_E <- function(dgp_name,
     # i <- 1
     print(i)
 
-    ## Replace
+    ## Re-generate the noises
+    true_sigma <- 0.5
     df_dgp_i <- df_dgp %>%
-      mutate(noise = rnorm(n(), mean=0, sd=0.5)) %>%
+      mutate(noise = rnorm(n(), mean=0, sd=true_sigma)) %>%
       mutate(Y0 = Y0_denoised + noise,
              Y1 = Y1_denoised + noise,
              Y = Y_denoised + noise)
@@ -912,14 +912,21 @@ sim_inference_CSM_A_E <- function(dgp_name,
       est_method = "scm"
     )
 
-
-
     ### Perform inference using the A-E method
     ATT_estimate <- get_ATT_estimate( mtch )
     att_est[i] <- ATT_estimate$ATE
     se_AE[i] = ATT_estimate$SE
     CI_lower[i] = att_est[i] -1.96 *  se_AE[i]
     CI_upper[i] = att_est[i] + 1.96 * se_AE[i]
+
+    N_T[i] <- ATT_estimate$N_T
+    N_C_tilde[i] <- ATT_estimate$N_C_tilde
+    true_SE[i] = true_sigma *
+      sqrt(1 / N_T[i] +1 / N_C_tilde[i])
+    CI_lower_with_true_SE[i] =
+      att_est[i] - 1.96 * true_SE[i]
+    CI_upper_with_true_SE[i] =
+      att_est[i] + 1.96 * true_SE[i]
 
     treatment_table <- mtch$treatment_table
 
@@ -937,6 +944,9 @@ sim_inference_CSM_A_E <- function(dgp_name,
     }
 
     covered[i] = (CI_lower[i] < att) & (att < CI_upper[i])
+    covered_with_true_SE[i] =
+      (CI_lower_with_true_SE[i] < att) &
+      (att < CI_upper_with_true_SE[i])
 
     # Get error and bias
     full_units <- full_unit_table(mtch, nonzero_weight_only = TRUE )
@@ -970,7 +980,13 @@ sim_inference_CSM_A_E <- function(dgp_name,
            covered=covered,
            se_AE=se_AE,
            error=error,
-           bias=bias)
+           bias=bias,
+           true_SE = true_SE,
+           lower_with_true_SE=CI_lower_with_true_SE,
+           upper_with_true_SE=CI_upper_with_true_SE,
+           covered_with_true_SE=covered_with_true_SE,
+           N_T = N_T,
+           N_C_tilde = N_C_tilde)
   return(res_save_bayesian_boot)
 }
 
