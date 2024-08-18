@@ -63,63 +63,125 @@ ess <- function( weights ) {
   sum( weights )^2  / sum( weights^2 )
 }
 
-get_se_AE <- function(preds_csm, outcome = "Y"){
-  # 1. Get debiased units; Get the subclasses
+#' Calculate the variance for each subclass
+#'
+#' @param matches_filtered The filtered matched object
+#' @param outcome Name of the outcome variable (default "Y")
+#' @return A data frame with subclass variances
+calculate_subclass_variances <-
+  function(matches_filtered, outcome = "Y") {
+  matches_filtered %>%
+    group_by(subclass) %>%
+    summarise(
+      nj = n(),
+      w_nj = ess(weights),
+      var_cluster = var(!!sym(outcome)),
+      .groups = "drop"
+    )
+}
 
-  # TODO: Fix this.  where is hat_mu_0 set?
-  #preds_csm <- preds_csm$result %>%
-  #  mutate(Y_bias_corrected = Y - hat_mu_0)
+#' Calculate the weighted average variance
+#' NOTE: Could weight by nj, w_nj, or 1.  w_nj takes into account how
+# much uncertainty is in each group, and thus might perform better
+# with heteroskedasticity?
+#'
+#' @param cluster_var_df Data frame. Each row is a subclass and
+#'  its variances, its weight
+#' @param var_weight_type
+#' @return Weighted average of subclass variances
+calculate_weighted_variance <-
+  function(cluster_var_df,
+           var_weight_type = "num_units") {
+  if (var_weight_type == "num_units"){ # number of units in the subclass
+    weight = cluster_var_df$nj
+  }else if (var_weight_type == "ess_units"){ # effective size of units in the subclass
+    weight = cluster_var_df$w_nj
+  }else if (var_weight_type == "uniform"){
+    weight = rep(1, nrow(cluster_var_df))
+  }else {
+    stop("var_weight_type must be one of num_units, ess_units,
+         uniform")
+  }
+    var_cluster <- cluster_var_df$var_cluster
+    weighted_var = weighted.mean(var_cluster, w = weight)
+  return( weighted_var )
+}
 
-  # 2. Filter the controls
-  #     and the subclasses with n_controls >= 2
-  preds_csm_filtered <-
-    full_unit_table(preds_csm) %>%
-    filter(Z == 0) %>%
+#' Calculate the standard error estimate
+#'
+#' @param N_T number of treated
+#' @param ESS_C effective size of controls
+#' @param sigma_hat The estimated error standard deviation
+#' @return The plug-in standard error estimate of the matching estimator
+get_plug_in_SE <- function(N_T, ESS_C, sigma_hat) {
+  sqrt((1 / N_T + 1 / ESS_C)) * sigma_hat
+}
+
+#' Main function: Estimate the variance from the plug-in estimator
+#'
+#' @param matches_table The data frame of the matched table
+#' @param outcome Name of the outcome variable (default "Y")
+#' @param treatment Name of the treatment variable (default "Z")
+#' @return A tibble with SE, sigma_hat, N_T, and N_C_tilde
+#' @export
+get_se_AE_table <- function(
+    matches_table,
+    outcome = "Y",
+    treatment = "Z",
+    var_weight_type = "ess_units") {
+
+  # Step 1: Filter the matched data to retain only control units with at least 2 in subclass
+  matches_filtered <-
+    matches_table %>%
+    filter(!!sym(treatment) == 0) %>%
     group_by(subclass) %>%
     filter(n() >= 2) %>%
     ungroup()
 
-  # 3. For each filtered subclass,
-  #   calculate the cluster residual s_j^2 = se(debiased_units)
-  weighted_var <- function(x, wt) {
-    n <- length(x)
-    wm <- weighted.mean(x, wt)
-    sum(wt * (x - wm)^2) * n / (n-1)
-  }
-
-  weighted_se <- function(x, wt) {
-    sqrt(weighted_var(x, wt) / length(x))
-  }
-
+  # Step 2: Calculate the variance for each subclass
   cluster_var_df <-
-    preds_csm_filtered %>%
-    group_by(subclass) %>%
-    summarise(nj = n(),
-              w_nj = ess(weights),
-              var_cluster = var(Y), .groups="drop")
-  # var_cluster = weighted_var(Y_bias_corrected, weights))
+    calculate_subclass_variances(
+      matches_filtered = matches_filtered,
+      outcome = outcome
+    )
 
-  # 4. Get the weighted average of s_j^2, weighted by n_j, number of
-  # units in the subclass
-  #
-  # NOTE: Could weight by nj or w_nj.  w_nj takes into account how
-  # much uncertainty is in each group, and thus might perform better
-  # with heteroskedasticity?
-  weighted_var_df <- cluster_var_df %>%
-    summarise(weighted_var = weighted.mean(var_cluster, w = w_nj), .groups="drop")
-  sigma_hat <- sqrt(weighted_var_df$weighted_var)
+  # Step 3: Calculate the weighted average variance
+  weighted_var <-
+    calculate_weighted_variance(
+      cluster_var_df = cluster_var_df,
+      var_weight_type = var_weight_type
+    )
+  sigma_hat <- sqrt(weighted_var)
 
-  # 5. calculate N_T and N_C
-  Ns <- calc_N_T_N_C(preds_csm)
+  # Step 4: Calculate N_T and effective size of controls (N_C_tilde)
+  Ns <- calc_N_T_N_C(matches_table)
 
-  # 6. Calculate the variance of the estimator
-  res <- sqrt((1/Ns$N_T + 1/Ns$N_C_tilde)) * sigma_hat
-  return( tibble( SE = res,
-                  sigma_hat = sigma_hat,
-                  N_T = Ns$N_T,
-                  N_C_tilde = Ns$N_C_tilde) )
+  # Step 5: Calculate the plug-in standard error
+  SE <- get_plug_in_SE(
+    N_T = Ns$N_T,
+    ESS_C = Ns$N_C_tilde,
+    sigma_hat = sigma_hat
+    )
+
+  return(tibble(
+    SE = SE,
+    sigma_hat = sigma_hat,
+    N_T = Ns$N_T,
+    N_C_tilde = Ns$N_C_tilde
+  ))
 }
 
+get_se_AE <- function(matches, outcome = "Y", treatment = "Z"){
+  if ( is.csm_matches( matches ) ) {
+    matches <- full_unit_table(matches)
+  }
+
+  get_se_AE_table(
+    matches_table = matches,
+    outcome = "Y",
+    treatment = "Z"
+  )
+}
 
 #' Estimate ATT
 #'
