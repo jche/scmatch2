@@ -58,6 +58,8 @@ if ( FALSE ) {
 
 # Run the simulation for inference ----
 
+run_full_simulation <- function( dgp_name ) {
+
 toy_naive_low<-
   boot_CSM(dgp_name="toy",
            att0=F,
@@ -102,7 +104,11 @@ save_res_to_csv(toy_naive_high,
                 FNAME = FNAME)
 
 
+}
 
+
+run_full_simulation( "toy" )
+run_full_simulation( "kang" )
 
 
 ####
