@@ -1,0 +1,54 @@
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+\multicolumn{4}{|c|}{AE SE} \\
+\hline
+& High Overlap & Mid Overlap & Low Overlap\\
+\hline
+N\_T = 5 & 0.0016 & -0.077 & -0.079\\
+N\_T = 10 & 0.018 & 0.039 & 0.12\\
+N\_T = 25 & -0.015 & 0.0067 & 0.023\\
+N\_T = 50 & -0.009 & 0.00075 & 0.012\\
+\hline
+\multicolumn{4}{|c|}{Boot SE (Sign, Uniform Weight)} \\
+\hline
+& High Overlap & Mid Overlap & Low Overlap\\
+\hline
+N\_T = 5 & 2.7 & 0.5 & 1.2\\
+N\_T = 10 & 3.9 & 2.3 & 3\\
+N\_T = 25 & 4.6 & 6.1 & 5.9\\
+N\_T = 50 & 7 & 6.6 & 6.9\\
+\hline
+\multicolumn{4}{|c|}{Boot SE (Sign, SCM Weight)} \\
+\hline
+& High Overlap & Mid Overlap & Low Overlap\\
+\hline
+N\_T = 5 & 3.2 & 0.47 & 1.5\\
+N\_T = 10 & 4.6 & 2 & 3\\
+N\_T = 25 & 6.4 & 6.9 & 5.6\\
+N\_T = 50 & 8.4 & 8 & 7.5\\
+\hline
+\multicolumn{4}{|c|}{Boot SE (Wild, Uniform Weight)} \\
+\hline
+& High Overlap & Mid Overlap & Low Overlap\\
+\hline
+N\_T = 5 & 0.08 & -0.35 & -0.21\\
+N\_T = 10 & 0.018 & -0.15 & -0.29\\
+N\_T = 25 & -0.077 & -0.073 & -0.4\\
+N\_T = 50 & -0.054 & -0.11 & -0.32\\
+\hline
+\multicolumn{4}{|c|}{Boot SE (Wild, SCM Weight)} \\
+\hline
+& High Overlap & Mid Overlap & Low Overlap\\
+\hline
+N\_T = 5 & 0.18 & -0.38 & -0.16\\
+N\_T = 10 & 0.081 & -0.17 & -0.29\\
+N\_T = 25 & -0.03 & -0.048 & -0.4\\
+N\_T = 50 & -0.04 & -0.078 & -0.32\\
+\hline
+\end{tabular}
+\caption{Bias Matrix for Different Estimators}
+\end{table}
+
+

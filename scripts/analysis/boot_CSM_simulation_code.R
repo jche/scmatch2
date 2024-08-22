@@ -361,24 +361,7 @@ boot_wild <- function(dgp_name,
            n_split=n_split)
 }
 
-boot_by_resids <- function(resids, B,boot_mtd, seed_addition){
-  T_star <- numeric(B)
-  for (b in 1:B){
-    set.seed(123 + seed_addition + b*13)
-    n1 <- length(resids)
-    # The implemented W is W(in the paper) / sqrt(n)
-    if (boot_mtd=="Bayesian"){
-      W = gtools::rdirichlet(1, alpha=rep(1,n1))
-    }else if (boot_mtd=="wild"){
-      W = sample(
-        c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
-        prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
-        replace = T, size = n1) / n1
-    }
-    T_star[b] = sum(resids * W)
-  }
-  return(T_star)
-}
+
 
 boot_naive <- function( df_dgp,
                         B,

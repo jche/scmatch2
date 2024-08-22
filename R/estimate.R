@@ -87,7 +87,10 @@ calculate_subclass_variances <-
 #'
 #' @param cluster_var_df Data frame. Each row is a subclass and
 #'  its variances, its weight
-#' @param var_weight_type
+#' @param var_weight_type The way that cluster variances are averaged
+#' "num_units": weight by number of units in the subclass
+#' "ess_units": weight effective size of units in the subclass
+#' "uniform: weight each cluster equally
 #' @return Weighted average of subclass variances
 calculate_weighted_variance <-
   function(cluster_var_df,
@@ -122,6 +125,10 @@ get_plug_in_SE <- function(N_T, ESS_C, sigma_hat) {
 #' @param matches_table The data frame of the matched table
 #' @param outcome Name of the outcome variable (default "Y")
 #' @param treatment Name of the treatment variable (default "Z")
+#' @param var_weight_type The way that cluster variances are averaged
+#' "num_units": weight by number of units in the subclass
+#' "ess_units": weight effective size of units in the subclass
+#' "uniform: weight each cluster equally
 #' @return A tibble with SE, sigma_hat, N_T, and N_C_tilde
 #' @export
 get_se_AE_table <- function(
@@ -171,15 +178,33 @@ get_se_AE_table <- function(
   ))
 }
 
-get_se_AE <- function(matches, outcome = "Y", treatment = "Z"){
+#' Title
+#'
+#' @param matches The CSM match object, an R S3 object
+#' @param outcome Name of the outcome variable (default "Y")
+#' @param treatment Name of the treatment variable (default "Z")
+#' @param var_weight_type The way that cluster variances are averaged
+#' "num_units": weight by number of units in the subclass
+#' "ess_units": weight effective size of units in the subclass
+#' "uniform: weight each cluster equally
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_se_AE <- function(matches,
+                      outcome = "Y",
+                      treatment = "Z",
+                      var_weight_type = "ess_units"){
   if ( is.csm_matches( matches ) ) {
     matches <- full_unit_table(matches)
   }
 
   get_se_AE_table(
     matches_table = matches,
-    outcome = "Y",
-    treatment = "Z"
+    outcome = outcome,
+    treatment = treatment,
+    var_weight_type = var_weight_type
   )
 }
 
