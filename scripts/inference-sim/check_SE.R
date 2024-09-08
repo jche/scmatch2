@@ -81,34 +81,3 @@ saveRDS(
   se_estimates,
   here::here("data/outputs/inference-sim",
              "se_estimates_check_SE.rds"))
-se_estimates <-
-  readRDS(here::here("data/outputs/inference-sim",
-                     "se_estimates_check_SE.rds"))
-
-adjusted_se_estimates <- se_estimates
-for (i in seq_along(n_t_values)) {
-  for (j in seq_along(beta_c_values)) {
-    n_t <- n_t_values[i]
-
-    # Adjust SE estimates for Boot SE (Sign, Uniform Weight) and Boot SE (Sign, SCM Weight)
-    for (k in c(3, 4)) {
-      adjusted_se_estimates[i, j, , k] <- se_estimates[i, j, , k] / sqrt(n_t)
-    }
-  }
-}
-
-
-for (i in seq_along(n_t_values)) {
-  for (j in seq_along(beta_c_values)) {
-    for (k in 1:6) {
-      # Calculate the bias for each SE estimate
-      bias_matrix[i, j, k] <- mean(adjusted_se_estimates[i, j, , k] - se_estimates[i, j, , 1])
-    }
-  }
-}
-
-# Print the bias matrix
-print(signif(bias_matrix, 2))
-saveRDS(bias_matrix,
-        here::here("data/outputs/inference-sim",
-                   "bias_matrix_check_SE.rds"))

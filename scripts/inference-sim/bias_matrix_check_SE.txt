@@ -1,6 +1,15 @@
-\begin{table}[H]
+\begin{table}[h]
 \centering
 \begin{tabular}{|c|c|c|c|}
+\hline
+\multicolumn{4}{|c|}{True CMSE} \\
+\hline
+& High Overlap & Mid Overlap & Low Overlap\\
+\hline
+N\_T = 5 & 0.58 & 0.57 & 0.57\\
+N\_T = 10 & 0.39 & 0.41 & 0.63\\
+N\_T = 25 & 0.27 & 0.29 & 0.64\\
+N\_T = 50 & 0.2 & 0.25 & 0.47\\
 \hline
 \multicolumn{4}{|c|}{AE SE} \\
 \hline
