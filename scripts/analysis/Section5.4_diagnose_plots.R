@@ -4,6 +4,8 @@ require(mvtnorm)
 library( CSM )
 source("./R/diagnostic_plots.R")
 
+
+
 produce_histogram_w_j <- function(prop_nc_unif, xlim_range, ylim_range) {
   set.seed(123)
   df_dgp <-
