@@ -21,6 +21,7 @@ table_section_5_4 <- res %>%
   summarise(
     SE_est = mean(se_AE),
     SE_True = true_SE[1], # Note: N_C_tilde is fixed for all runs, so is true_SE
+    MCSE = sd(att_est),
     N_C_tilde = N_C_tilde[1],
     mean_bias = mean(bias),
     coverage = mean(covered),
