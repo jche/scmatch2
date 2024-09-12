@@ -42,7 +42,7 @@ combined_plot <- cowplot::plot_grid(
   rel_widths = c(1, 1, 1.4)
 )
 print(combined_plot)
-ggsave("./writeup/figures/sim_toy_3_overlaps.png",
+ggsave("./figures/sim_toy_3_overlaps.png",
        combined_plot,
        height = 5,
        width = 12)

@@ -61,7 +61,7 @@ plot_dm_all <- gridExtra::grid.arrange(
 )
 
 ggsave(
-  filename= here::here( "writeup/figures/hist-top-k-distances.png" ),
+  filename= here::here( "figures/hist-top-k-distances.png" ),
   plot=plot_dm_all,
   width=5.3,
   height=3.7

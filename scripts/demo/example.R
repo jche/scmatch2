@@ -115,7 +115,7 @@ love_plot(calada_scm,
     values = wesanderson::wes_palette("Zissou1", 5)[c(5,3,2,1)]) +
   guides(color=F) +
   scale_x_continuous(breaks = c(174, 177, 180, 183))
-ggsave("writeup/figures/lalonde_love.png", height=3, width=4)
+ggsave("figures/lalonde_love.png", height=3, width=4)
 
 
 if ( FALSE ) {
@@ -131,7 +131,7 @@ love_plot2(calada_scm, covs = paste0("X", 5:8)) +
   facet_wrap(~name,
              scales="free",
              labeller = labeller(name = love_labs))
-ggsave("writeup/figures/lalonde_love2.png", height=3, width=6)
+ggsave("figures/lalonde_love2.png", height=3, width=6)
 
 }
 
@@ -145,11 +145,11 @@ get_att_ests(feasible)
 # scm_vs_avg_plot(feasible, DIST_SCALING, METRIC)
 dist_density_plot(feasible, DIST_SCALING, METRIC) +
   theme(legend.position = "bottom")
-ggsave("writeup/figures/lalonde_dist.png", height=3, width=4)
+ggsave("figures/lalonde_dist.png", height=3, width=4)
 
 # compare ESS
 ess_plot(feasible)
-ggsave("writeup/figures/lalonde_ess.png", height=3, width=4)
+ggsave("figures/lalonde_ess.png", height=3, width=4)
 
 
 
@@ -168,7 +168,7 @@ tibble(d = as.numeric(as.matrix(dist_to_plot))) %>%
   theme_classic() +
   labs(y = "Count",
        x = TeX("$d(X_t, X_j)$"))
-ggsave("writeup/figures/lalonde_calselect_top_3.png", height=2.5, width=5)
+ggsave("figures/lalonde_calselect_top_3.png", height=2.5, width=5)
 
 
 
@@ -207,7 +207,7 @@ foo +
        x = "Total number of treated units used",
        color = "Maximum \ncaliper \nsize used    ")+
   ylim(c(0,2500))
-ggsave("writeup/figures/lalonde_att.png", height=3, width=6)
+ggsave("figures/lalonde_att.png", height=3, width=6)
 # [1] "FSATT: (339.098, 2851.353)"
 # [1] "SATT: (76.115, 2612.28)"
 

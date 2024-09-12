@@ -79,7 +79,7 @@ ggplot(dat, aes(x1,x2)) +
        x = TeX("$X_1$"),
        pch = TeX(" $Z$"))
 
-ggsave("writeup/figures/show_cem_calipers.png",
+ggsave("figures/show_cem_calipers.png",
        width=6,
        height=6)
 
@@ -137,7 +137,7 @@ ggplot(dat, aes(x1,x2)) +
        x = TeX("$X_1$"),
        pch = TeX(" $Z$"))
 
-ggsave("writeup/figures/show_cem_calipers_nocsm.png", width=6, height=3.5)
+ggsave("figures/show_cem_calipers_nocsm.png", width=6, height=3.5)
 
 
 

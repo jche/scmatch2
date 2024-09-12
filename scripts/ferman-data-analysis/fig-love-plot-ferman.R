@@ -39,7 +39,7 @@ love_plot(
   ylim(c(-0.0065, 0.006))
 
 ggsave(
-  filename="writeup/figures/love-plot-ferman.png",
+  filename="figures/love-plot-ferman.png",
   width=8.76,
   height=5.33
 )

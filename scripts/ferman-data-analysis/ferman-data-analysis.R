@@ -143,7 +143,7 @@ p <- grid.arrange(
   ncol=2
 )
 ggsave(
-  here::here( "writeup/figures/hist-n-co.png" ),
+  here::here( "figures/hist-n-co.png" ),
   plot=p,
   width=8.1,
   height=5.3
@@ -304,7 +304,7 @@ plot_all <- grid.arrange(
 )
 
 ggsave(
-  filename="writeup/figures/fsatt-ferman.png",
+  filename="figures/fsatt-ferman.png",
   plot=plot_all,
   width=9.7,
   height=4.5
