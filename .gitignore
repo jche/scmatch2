@@ -35,3 +35,8 @@ vignettes/*.pdf
 .Renviron
 .Rproj.user
 .DS_Store
+
+# Research paper results
+/tables
+/data
+/figures
