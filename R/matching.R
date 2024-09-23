@@ -25,6 +25,13 @@ get_radius_size <- function(dm,
     }
   } else if (rad_method == "1nn") {
     radius_sizes <- apply(dm, 1, min)
+  } else if (rad_method == "adaptive-5nn"){
+    for (i in 1:ntx) {
+      temp <- dm[i,]
+      temp_sorted <- sort(temp)
+      adacal <- max(caliper, temp_sorted[1])
+      radius_sizes[i] <- min(adacal, temp_sorted[5])
+    }
   } else {
     radius_sizes <- rep(caliper, nrow(dm))
   }
@@ -145,7 +152,7 @@ gen_matches <- function(df,
                         scaling=1,
                         metric="maximum",
                         caliper=1,
-                        rad_method = c("adaptive", "1nn", "fixed"),
+                        rad_method = c("adaptive", "1nn", "fixed","adaptive-5nn"),
                         ...) {
 
   ### Step -1: set up some constants

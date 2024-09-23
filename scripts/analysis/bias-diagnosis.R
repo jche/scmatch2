@@ -5,30 +5,45 @@ library(latex2exp)
 
 
 
-# Define subclass values and degree of overlap values
-subclass_values <- 1:10
-prop_nc_unif_values <- setdiff(seq(0, 1, length.out = 10), 0) #exclude 0
+n_subclass <- 6
+subclass_values <- 1:n_subclass
 
-# Create directories to store plots and tables if they don't exist
-dir.create("figures/bias-diagnosis", recursive = TRUE, showWarnings = FALSE)
+n_deg_overlap <- 5
+prop_nc_unif_values <-
+  setdiff(seq(0, 1, length.out = n_deg_overlap + 1), 0) #exclude 0
+  # seq(0, 1, length.out = n_subclass)
 
-# Initialize an empty list to store bias results for all subclasses and overlap values
+
+dir.create("figures/bias-diagnosis",
+           recursive = TRUE,
+           showWarnings = FALSE)
+
 bias_results <- list()
 
 
-# Create directories to store the matching tables
-dir.create(here::here("data/bias-diagnosis"), recursive = TRUE, showWarnings = FALSE)
+dir.create(here::here("data/bias-diagnosis"),
+           recursive = TRUE,
+           showWarnings = FALSE)
 
-# Step 1: Loop over prop_nc_unif and save mtch_table
 for (prop_nc_unif in prop_nc_unif_values) {
   # Set seed to make sure treated is the same set of units
+  # prop_nc_unif <- 1
   set.seed(123)
 
-  # Generate data for current prop_nc_unif
-  dat <- gen_one_toy(ctr_dist = 0.5, prop_nc_unif = prop_nc_unif)
+  dat <-
+    gen_one_toy(
+      ctr_dist = 0.5,
+      prop_nc_unif = prop_nc_unif)
 
   # Perform matching
-  mtch <- get_cal_matches(dat, metric = "maximum", scaling = 8, caliper = 1, rad_method = "adaptive", est_method = "scm")
+  mtch <- get_cal_matches(
+    dat,
+    metric = "maximum",
+    scaling = 8,
+    caliper = 1,
+    # caliper = 1 - 0.75 * prop_nc_unif + 0.05, # rate of decreasing the caliper
+    rad_method = "adaptive-5nn",
+    est_method = "scm")
   mtch_table <- full_unit_table(mtch, nonzero_weight_only = F)
 
   # Save the matching table for this prop_nc_unif
@@ -40,7 +55,7 @@ bias_results <- list()
 
 
 plot_subclass_weights <- function(mtch_table, subclass) {
-  # Filter for the specific subclass
+
   filtered_mtch <- mtch_table %>%
     filter(subclass == !!subclass)
 
@@ -195,7 +210,8 @@ generate_bias_tables <- function(prop_nc_unif_values, subclass_values) {
 }
 
 # Call the function to generate the bias table
-bias_table <- generate_bias_tables(prop_nc_unif_values, subclass_values)
+bias_table <-
+  generate_bias_tables(prop_nc_unif_values, subclass_values)
 
 
 # Save bias table to CSV
