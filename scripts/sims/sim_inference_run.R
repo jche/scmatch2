@@ -5,12 +5,14 @@ source( "scripts/sims/sim_inference_helper.R" )
 
 # Test run
 if ( FALSE ){
+  R = 2
   toy_naive_low <-
     sim_inference_CSM_A_E(
       dgp_name="toy",
       att0=F,
-      R=2,
-      prop_nc_unif = 1/3
+      R=R,
+      prop_nc_unif = 1/3,
+      seed = c(123 + 1:R * 2)
     )
   # att_true is the SATT without noise
   # att_est is the SATT plus noise
@@ -18,15 +20,21 @@ if ( FALSE ){
 
 
 run_sim_inference_A_E <- function(R = 10) {
-  prop_nc_unif_values <- c(1/3, 2/3, 3/3)
-  deg_overlap_labels <- c("low", "mid", "high")
+  ### 3 degrees of freedoms
+  # prop_nc_unif_values <- c(1/3, 2/3, 3/3)
+  # deg_overlap_labels <- c("low", "mid", "high")
+
+  ### 5 degrees of freedoms
+  prop_nc_unif_values <- seq(0.2, 1, by = 0.2)
+  deg_overlap_labels <- c("very_low", "low", "mid", "high", "very_high")
 
   for (i in seq_along(prop_nc_unif_values)) {
     sim_result <- sim_inference_CSM_A_E(
       dgp_name = "toy",
       att0 = FALSE,
       R = R,
-      prop_nc_unif = prop_nc_unif_values[i]
+      prop_nc_unif = prop_nc_unif_values[i],
+      seed = c(123 + 1:R * 2)
     )
 
     sim_result$deg_overlap <- deg_overlap_labels[i]
@@ -38,7 +46,7 @@ run_sim_inference_A_E <- function(R = 10) {
 
 {
   tictoc::tic()
-  R = 1000
+  R = 500
   FNAME =
     here::here(
       paste0("data/outputs/A-E-overlap-by-prop-unif/",

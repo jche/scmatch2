@@ -36,18 +36,29 @@ sim_inference_CSM_A_E <- function(dgp_name,
     N_T <- N_C_tilde <- numeric(R)
   if ( is.null(seed) ) {
     set.seed(123)
+    ### Generate one dataset
+    df_dgp <-
+      gen_one_toy(ctr_dist=toy_ctr_dist,
+                  prop_nc_unif=prop_nc_unif) %>%
+      mutate(Y0_denoised = Y0 - noise,
+             Y1_denoised = Y1 - noise,
+             Y_denoised = Y - noise)
   }
-  ### Generate one dataset
-  df_dgp <-
-    gen_one_toy(ctr_dist=toy_ctr_dist,
-                prop_nc_unif=prop_nc_unif) %>%
-    mutate(Y0_denoised = Y0 - noise,
-           Y1_denoised = Y1 - noise,
-           Y_denoised = Y - noise)
   scaling <- 8
   for (i in 1:R){
     # i <- 1
     print(i)
+
+    if ( !is.null(seed) ) {
+      set.seed(seed[i])
+      ### Generate one dataset
+      df_dgp <-
+        gen_one_toy(ctr_dist=toy_ctr_dist,
+                    prop_nc_unif=prop_nc_unif) %>%
+        mutate(Y0_denoised = Y0 - noise,
+               Y1_denoised = Y1 - noise,
+               Y_denoised = Y - noise)
+    }
 
     ## Re-generate the noises
     true_sigma <- 0.5
@@ -62,7 +73,8 @@ sim_inference_CSM_A_E <- function(dgp_name,
       metric = "maximum",
       scaling = scaling,
       caliper = 1,
-      rad_method = "adaptive",
+      # rad_method = "adaptive",
+      rad_method = "adaptive-5nn",
       est_method = "scm"
     )
 
