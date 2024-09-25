@@ -24,12 +24,18 @@ table_section_5_4 <- res %>%
   group_by(deg_overlap) %>%
   summarise(
     SE_est = mean(se_AE),
-    MCSE_SE_est = sd(se_AE)/n(),
+    MCSE_SE_est = MCSE_bias(se_AE),
     SE_True = mean(true_SE),
-    MCSE_SE_True = sd(true_SE)/n(),
-    # MCSE = sd(att_est),
+    MCSE_SE_True = MCSE_bias(true_SE),
+    SE_True_alt = sd(error),
+    MCSE_SE_True_alt = MCSE_SE(error),
+    SE_samp_infl = sd(error + bias),
+    MCSE_SE_samp_infl = MCSE_SE(error + bias),
+    SE_pop = sd(att_est),
+    MCSE_SE_pop = MCSE_SE(att_est),
     N_C_tilde = N_C_tilde[1],
     mean_bias = mean(bias),
+    MCSE_mean_bias = MCSE_bias(bias),
     coverage = mean(covered),
     coverage_with_true_SE = mean(covered_with_true_SE)
   ) %>%
