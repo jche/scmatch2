@@ -10,7 +10,9 @@ FNAME =
     paste0("data/outputs/A-E-overlap-by-prop-unif/",
            "A_E_toy_low_mid_high_R=",R,".csv")
   )
-res <- read.csv(file =  FNAME)
+res <- read.csv(file =  FNAME) %>%
+  rename(noise = "error") %>%
+  mutate(error = noise + bias)
 
 table_section_5_4 <- res %>%
   mutate(
@@ -25,12 +27,12 @@ table_section_5_4 <- res %>%
   summarise(
     SE_est = mean(se_AE),
     MCSE_SE_est = MCSE_bias(se_AE),
-    SE_True = mean(true_SE),
-    MCSE_SE_True = MCSE_bias(true_SE),
-    SE_True_alt = sd(error),
-    MCSE_SE_True_alt = MCSE_SE(error),
-    SE_samp_infl = sd(error + bias),
-    MCSE_SE_samp_infl = MCSE_SE(error + bias),
+    # SE_True = mean(true_SE),
+    # MCSE_SE_True = MCSE_bias(true_SE),
+    SE_True = sd(noise),
+    MCSE_SE_True = MCSE_SE(noise),
+    # SE_samp_infl = sd(error + bias),
+    # MCSE_SE_samp_infl = MCSE_SE(error + bias),
     SE_pop = sd(att_est),
     MCSE_SE_pop = MCSE_SE(att_est),
     N_C_tilde = N_C_tilde[1],

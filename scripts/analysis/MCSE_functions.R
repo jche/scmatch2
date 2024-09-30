@@ -10,7 +10,7 @@ MCvar_SE <- function(x){
 }
 
 MCSE_SE <- function(x){
-  return(sqrt(MCvar_SEtrue(x)))
+  return(sqrt(MCvar_SE(x)))
 }
 
 MCSE_bias <- function(x){
