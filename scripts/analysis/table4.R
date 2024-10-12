@@ -1,7 +1,8 @@
-setwd("~/Dropbox (Harvard University)/Xiang_Luke/scmatch2")
+
+#setwd("~/Dropbox (Harvard University)/Xiang_Luke/scmatch2")
 library(tidyr)
 library(dplyr)
-source("scripts/analysis/MCSE_functions.R")
+source( here::here( "scripts/analysis/MCSE_functions.R") )
 
 # load data
 I = 100; B=40

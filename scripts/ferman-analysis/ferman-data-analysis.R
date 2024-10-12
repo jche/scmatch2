@@ -1,3 +1,4 @@
+
 library(haven)
 library(CSM)
 library(latex2exp)
@@ -7,7 +8,7 @@ options(list(dplyr.summarise.inform = FALSE))
 theme_set( theme_classic() )
 
 ferman_for_analysis <-
-  readRDS(here::here( "data/inputs/ferman_for_analysis.rds" ))
+  readRDS(here::here( "scripts/ferman-analysis/data/ferman_for_analysis.rds" ))
 
 c <- 0.35
 covariate_caliper <- c(rep(0.2, 3), 1/1000)

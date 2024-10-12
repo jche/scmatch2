@@ -1,6 +1,8 @@
+
 library(tidyverse)
+library( haven )
 data_ferman <- read_dta(
-  file = here::here( "data/inputs/Final.dta" )
+  file = here::here( "scripts/ferman-analysis/data/Final.dta" )
 )
 
 colnames(data_ferman)
@@ -22,7 +24,7 @@ ferman_for_analysis <-
 # UF == 33 means Rio
 
 saveRDS(ferman_for_analysis,
-        file = here::here( "data/inputs/ferman_for_analysis.rds" ))
+        file = here::here( "scripts/ferman-analysis/data/ferman_for_analysis.rds" ))
 
 # EDA
 if (FALSE){

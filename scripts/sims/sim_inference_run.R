@@ -1,7 +1,8 @@
+
 library(tidyverse)
 require(mvtnorm)
 library( CSM )
-source( "scripts/sims/sim_inference_helper.R" )
+source( here::here( "scripts/sims/sim_inference_helper.R" ) )
 
 # Test run
 if ( FALSE ){
@@ -43,8 +44,7 @@ run_sim_inference_A_E <- function(R = 10) {
   }
 }
 
-
-{
+if ( TRUE ) {
   tictoc::tic()
   R = 500
   FNAME =

@@ -1,10 +1,12 @@
+
 library(tidyverse)
 require(mvtnorm)
 
 library( CSM )
-source("./R/diagnostic_plots.R")
+# source( here::here( "R/diagnostic_plots.R") )
 
 
+toy_ctr_dist = 0.5
 
 produce_histogram_w_j <- function(prop_nc_unif, xlim_range, ylim_range) {
   set.seed(123)

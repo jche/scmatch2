@@ -1,3 +1,4 @@
+
 library(dplyr)
 library(ggplot2)
 library(here)
@@ -46,7 +47,7 @@ combined_plot <- cowplot::plot_grid(
 
 print(combined_plot)
 ggsave(
-  here("./scripts/inference-sim/figures",
+  here("scripts/inference-sim/figures",
        "plot_DGP.png"),
        combined_plot,
        height = 5,

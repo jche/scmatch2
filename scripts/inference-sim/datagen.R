@@ -1,3 +1,4 @@
+
 # Function to generate DGP
 generate_dgp <-
   function(n, beta_c, beta_0, sigma,
@@ -38,4 +39,13 @@ generate_dgp <-
   # Return a data frame with the generated data
   data <- data.frame(X = X_i, Z = W_i, Y = Y_jt)
   return(data)
+}
+
+# Testing / demo ----
+
+if ( FALSE ) {
+  dat = generate_dgp( 1000, 1, 1, 0.1 )
+  head( dat )
+  ggplot( dat, aes( X, Y, col=as.factor(Z) ) ) +
+    geom_point()
 }

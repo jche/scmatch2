@@ -11,14 +11,12 @@ FNAME =
     paste0("data/outputs/A-E-overlap-by-prop-unif/",
            "A_E_toy_low_mid_high_R=",R,".csv")
   )
-<<<<<<< HEAD
-res <- read.csv(file = FNAME)
-head( res )
-=======
+
+
 res <- read.csv(file =  FNAME) %>%
   rename(noise = "error") %>%
   mutate(error = noise + bias)
->>>>>>> 2d5c35c014983f579848ea864c575ec2742bbb0e
+
 
 table_section_5_4 <- res %>%
   mutate(
@@ -49,9 +47,8 @@ table_section_5_4 <- res %>%
   ) %>%
   arrange(deg_overlap)
 
-<<<<<<< HEAD
 table_section_5_4
-=======
+
 write.csv(table_section_5_4,
           file = "tables/table_section_5_4.csv")
->>>>>>> 2d5c35c014983f579848ea864c575ec2742bbb0e
+
