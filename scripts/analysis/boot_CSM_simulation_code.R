@@ -7,8 +7,8 @@
 
 
 get_df_scaling_from_dgp_name <- function(dgp_name,
-                                          kang_true = F,
-                                          toy_ctr_dist=0.5){
+                                         kang_true = F,
+                                         toy_ctr_dist=0.5){
   if (dgp_name == "toy"){
     df_dgp <- gen_one_toy(ctr_dist=toy_ctr_dist)
     # Edit 4 Mar 2024:
@@ -361,24 +361,7 @@ boot_wild <- function(dgp_name,
            n_split=n_split)
 }
 
-boot_by_resids <- function(resids, B,boot_mtd, seed_addition){
-  T_star <- numeric(B)
-  for (b in 1:B){
-    set.seed(123 + seed_addition + b*13)
-    n1 <- length(resids)
-    # The implemented W is W(in the paper) / sqrt(n)
-    if (boot_mtd=="Bayesian"){
-      W = gtools::rdirichlet(1, alpha=rep(1,n1))
-    }else if (boot_mtd=="wild"){
-      W = sample(
-        c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
-        prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
-        replace = T, size = n1) / n1
-    }
-    T_star[b] = sum(resids * W)
-  }
-  return(T_star)
-}
+
 
 boot_naive <- function( df_dgp,
                         B,
@@ -634,8 +617,8 @@ boot_cluster_for_otsu <- function(df_dgp,
 assign_group_label <- function(df_to_split, n_split) {
   df_to_split$group_label <-
     sample( df_to_split$id,
-           nrow(df_to_split),
-           replace = TRUE)
+            nrow(df_to_split),
+            replace = TRUE)
   return(df_to_split)
 }
 
@@ -851,9 +834,6 @@ boot_CSM <- function(dgp_name,
                                    N_C = N_C)
   return(res_save_bayesian_boot)
 }
-
-
-
 
 
 

@@ -1,6 +1,4 @@
 
-
-
 test_that("gen_toy_covar returns correct output",{
   n = 100
   X1_ctrs <- c(0.25, 0.75)

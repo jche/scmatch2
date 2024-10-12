@@ -4,11 +4,14 @@
 \alias{full_unit_table}
 \title{Get full raw table of all the units}
 \usage{
-full_unit_table(csm, feasible_only = FALSE)
+full_unit_table(csm, feasible_only = FALSE, nonzero_weight_only = FALSE)
 }
 \arguments{
 \item{feasible_only}{TRUE means only return units which were
 matched within the set caliper.}
+
+\item{nonzero_weight_only}{TRUE means drop any units with 0 weight
+(e.g., due to scm weighting).}
 }
 \value{
 dataframe

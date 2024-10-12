@@ -12,22 +12,50 @@ BOOT_MTD = "A-E"
 # BOOT_MTD = "naive"
 # FNAME =
 #   paste0("data/outputs/sim_toy_results/",BOOT_MTD,"_toy_low_mid_high.csv")
+# FNAME =
+#   paste0("data/outputs/bootstrap_toy_rad_new/",BOOT_MTD,"_toy_low_mid_high.csv")
+R = 100
+# FNAME =
+#   here::here(
+#     paste0("data/outputs/bootstrap_toy_rad_new/",
+#            "test_",
+#            "A_E_toy_low_mid_high_R=",R,".csv")
+#   )
 FNAME =
-  paste0("data/outputs/bootstrap_toy_rad_new/",BOOT_MTD,"_toy_low_mid_high.csv")
+  here::here(
+    paste0("data/outputs/A-E-overlap-by-prop-unif/",
+           "A_E_toy_low_mid_high_R=",R,".csv")
+  )
 res <- read.csv(file =  FNAME)
 
 table_4 <- res %>%
-  mutate(bias_and_var = (att_est - att_true)) %>%
+  mutate(
+    bias_and_var = (att_est - att_true),
+    deg_overlap = factor(deg_overlap, levels = c("low", "mid", "high"))
+  ) %>%
   group_by(deg_overlap) %>%
   summarise(
-    sd_att_true = sd(att_true),
-    true_se_full = sd(att_est),
-    true_se = sd(bias_and_var),
-    se_true_se = MCSE_SEtrue(bias_and_var),
-    coverage= mean(covered),
-    sd_bias_and_var = sd(bias_and_var),
-    mean_bias=mean(bias),
-    sd_bias = sd(bias-noise),
-    mean_noise = mean(noise),
-    sd_noise = sd(noise),
-    mean_se_boot = mean(sd_boot))
+    SE_est = mean(se_AE),
+    SE_True = true_SE[1],
+    N_C_tilde = N_C_tilde[1],
+    mean_bias = mean(bias),
+    coverage = mean(covered),
+    coverage_with_true_SE = mean(covered_with_true_SE)
+  ) %>%
+  arrange(deg_overlap)
+
+# let plot
+res_low <- res %>% filter(deg_overlap=="low")
+hist(res_low$att_est)
+abline(v=res_low$att_true[1],col="red")
+abline(v=mean(res_low$att_est),col="blue")
+
+mean_est = mean(res_low$att_est)
+mean_bias = res_low$att_true[1] -mean_est
+true_se = sd(res_low$error)
+se_est = mean(res_low$se_AE)
+
+pnorm(mean_est + 1.96 * true_se + mean_bias,
+      mean=mean_est, sd=true_se ) -
+  pnorm(mean_est - 1.96 * true_se + mean_bias,
+        mean=mean_est, sd=true_se)

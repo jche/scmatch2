@@ -4,7 +4,7 @@
 \alias{get_att_ests}
 \title{Estimate the ATT from a matched dataframe}
 \usage{
-get_att_ests(matched_df)
+get_att_ests(matched_df, outcome = "Y")
 }
 \arguments{
 \item{matched_df}{A matched dataset}

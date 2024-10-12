@@ -31,13 +31,28 @@ gen_toy_covar <- function(n, X1_ctrs, X2_ctrs, SD){
 }
 
 # generate data mostly in grid (0,1) x (0,1)
+#' Generate toy data
+#'
+#' @param nc (something)
+#' @param nt (something)
+#' @param f0_sd (something)
+#' @param f0_fun (something)
+#' @param tx_effect_fun (something)
+#' @param ctr_dist (something)
+#' @param prop_nc_unif (something)
+#'
+#' @return A tibble containing a toy dataset
+#' @export
+#'
 gen_df_adv <- function(nc, nt,
                        f0_sd = 0.1,   # homoskedastic noise
                        f0_fun = function(X1, X2) {1},
                        tx_effect_fun = function(X1, X2) {1},
-                       ctr_dist = 0.5 # from 0 to 1;
+                       ctr_dist = 0.5, # from 0 to 1;
                        #            lower means better overlap
-                       ) {
+                       prop_nc_unif = 1/3 # proportion of uniform controls
+                       #            lower means worse overlap
+) {
   require( tidyverse )
 
   SD <- 0.1
@@ -51,17 +66,22 @@ gen_df_adv <- function(nc, nt,
     gen_toy_covar(nt, X1_ctrs=c(c1,c2), X2_ctrs=c(c1,c2), SD)
   dat_txblobs$Z <- T
 
-  # (nc-nt) co units clustered at (0.75,0.25) and (0.25,0.75)
+  nc_unif <- ceiling(nc * prop_nc_unif)
+  # (nc-nc_unif) co units clustered at (0.75,0.25) and (0.25,0.75)
   #     which translates to X1_ctrs=(0.75,0.25) and X2_ctrs=(0.25,0.75)
   dat_coblobs <-
-    gen_toy_covar(nc-nt, X1_ctrs=c(c2,c1), X2_ctrs=c(c1,c2), SD)
+    gen_toy_covar(
+      nc-nc_unif,
+      X1_ctrs=c(c2,c1),
+      X2_ctrs=c(c1,c2),
+      SD)
   dat_coblobs$Z <- F
 
-  # nt co units uniformly scattered on (0,1) box to give some
+  # nc_unif co units uniformly scattered on (0,1) box to give some
   #   randomly good controls
   dat_conear <- tibble(
-    X1 = runif(nt),
-    X2 = runif(nt),
+    X1 = runif(nc_unif),
+    X2 = runif(nc_unif),
     Z  = F
   )
 
@@ -89,7 +109,7 @@ if (F) {
     f0_fun = function(x,y) {
       matrix(c(x,y), ncol=2) %>%
         mvtnorm::dmvnorm(mean = c(0.5,0.5),
-                sigma = matrix(c(1,0.8,0.8,1), nrow=2))}) %>%
+                         sigma = matrix(c(1,0.8,0.8,1), nrow=2))}) %>%
     mutate(X3 = X1*X2)
   df %>%
     ggplot(aes(X1,X2)) +
@@ -278,7 +298,7 @@ if (F) {
         model.rsp="linear",
         alignment=0.75,
         te.hetero="none"),
-        random.seed=1)
+      random.seed=1)
 }
 
 
@@ -291,21 +311,24 @@ if (F) {
 #' @return A tibble with the toy dataset
 #' @export
 #'
-gen_one_toy <- function( nc = 500, nt = 100, ctr_dist = 0.5){
+gen_one_toy <- function( nc = 500, nt = 100,
+                         ctr_dist = 0.5,
+                         prop_nc_unif = 1/3,
+                         f0_sd = 0.5 ){
   if ( nc < 5 ) {
     warning( "Very small control group in gen_one_toy!" )
   }
   gen_df_adv(
     nc=nc,
     nt=nt,
-    f0_sd = 0.5,
+    f0_sd = f0_sd,
     tx_effect_fun = function(X1, X2) {3*X1+3*X2},
     f0_fun = function(x,y) {
       matrix(c(x,y), ncol=2) %>%
-        mvtnorm::dmvnorm(mean = c(0.5,0.5),
-                         sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
+        mvtnorm::dmvnorm( mean = c(0.5,0.5),
+                          sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
     },
-    ctr_dist = ctr_dist)
+    ctr_dist = ctr_dist,
+    prop_nc_unif = prop_nc_unif
+  )
 }
-
-

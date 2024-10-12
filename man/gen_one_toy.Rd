@@ -4,7 +4,7 @@
 \alias{gen_one_toy}
 \title{Generate a toy dataset with a single treatment effect}
 \usage{
-gen_one_toy(nc = 500, nt = 100, ctr_dist = 0.5)
+gen_one_toy(nc = 500, nt = 100, ctr_dist = 0.5, prop_nc_unif = 1/3)
 }
 \arguments{
 \item{ctr_dist}{Distance between the two control clusters}
