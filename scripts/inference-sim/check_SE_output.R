@@ -1,8 +1,45 @@
+n_t_values <- c(5, 10, 25, 50)
+beta_c_values <- c(0, 2, 4)
+se_estimates <-
+  readRDS(here::here("data/outputs/inference-sim",
+                     "se_estimates_check_SE.rds"))
+
+adjusted_se_estimates <- se_estimates
+for (i in seq_along(n_t_values)) {
+  for (j in seq_along(beta_c_values)) {
+    n_t <- n_t_values[i]
+
+    # Adjust SE estimates for Boot SE (Sign, Uniform Weight) and Boot SE (Sign, SCM Weight)
+    for (k in c(3, 4)) {
+      adjusted_se_estimates[i, j, , k] <- se_estimates[i, j, , k] / sqrt(n_t)
+    }
+  }
+}
+
+
+for (i in seq_along(n_t_values)) {
+  for (j in seq_along(beta_c_values)) {
+    for (k in 1:6) {
+      if (k == 1){
+        bias_matrix[i, j, k] <- mean(se_estimates[i, j, , 1])
+      }else{
+        bias_matrix[i, j, k] <- mean(adjusted_se_estimates[i, j, , k] - se_estimates[i, j, , 1])
+      }
+
+    }
+  }
+}
+
+saveRDS(bias_matrix,
+        here::here("data/outputs/inference-sim",
+                   "bias_matrix_check_SE.rds"))
+
 bias_matrix <-
   readRDS(here::here("data/outputs/inference-sim",
                      "bias_matrix_check_SE.rds"))
-# Define the estimator names, excluding "True CMSE"
+
 estimator_names <- c(
+  "True CMSE",
   "AE SE",
   "Boot SE (Sign, Uniform Weight)",
   "Boot SE (Sign, SCM Weight)",
@@ -22,8 +59,8 @@ generate_combined_latex_table <- function(bias_matrix, estimator_names, n_t_valu
   latex_content <- paste0(latex_content, "\\begin{tabular}{|c|", paste(rep("c", length(beta_c_values)), collapse = "|"), "|}\n")
   latex_content <- paste0(latex_content, "\\hline\n")
 
-  for (k in 2:6) {  # Skip the first estimator ("True CMSE") by starting at 2
-    estimator_name <- estimator_names[k - 1]  # Adjust index since we start at 2
+  for (k in 1:6) {  # Skip the first estimator ("True CMSE") by starting at 2
+    estimator_name <- estimator_names[k]  # Adjust index since we start at 2
     bias_matrix_est <- bias_matrix[, , k]
 
     latex_content <- paste0(latex_content, "\\multicolumn{", length(beta_c_values) + 1, "}{|c|}{", estimator_name, "} \\\\\n")

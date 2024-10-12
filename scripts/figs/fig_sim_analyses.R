@@ -39,7 +39,7 @@ plot_org_df(org_df_toy_total,
           legend.position=c(0.75, 0.25))
 
 # check rmse stuff --------------------------------------------------------
-ggsave("writeup/figures/sim_toy_results.png",
+ggsave("figures/sim_toy_results.png",
        width=3.5, height=3.5)
 
 
@@ -67,7 +67,7 @@ acic_plot("kang", title="Kang & Schafer",
           legend.position=c(0.75, 0.25)) +
   acic_plot("hain",ylab="Value", title="Hainmueller") +
   acic_plot("acic", title="ACIC 2016")
-ggsave("writeup/figures/sim_results.png", width=8, height=3.5, units="in")
+ggsave("figures/sim_results.png", width=8, height=3.5, units="in")
 
 
 # check dropped units -----------------------------------------------------

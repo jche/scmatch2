@@ -198,4 +198,7 @@ Thing we want:
 - sim_inference: The simulation and analysis code for the simulations
   evaluating inference.
 - datagen: Move this folder to old code, unless it is used by something
-  else?
+
+TODO:Improve functions in aggregation.R
+- agg_sc_units should not take X, Y, Z
+- agg_co_units should not set things to NA?

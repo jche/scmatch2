@@ -48,7 +48,7 @@ source("scripts/analysis/plot_toy.R")
 toy_example_four_points_plot <-
   create_toy_example_four_points_plot(
     background_plot, four_points_df)
-ggsave("writeup/figures/toyexample1.png", width=3, height=3)
+ggsave("figures/toyexample1.png", width=3, height=3)
 
 
 # toy example 2 -----------------------------------------------------------
@@ -65,7 +65,7 @@ toy_example_six_points_plot <-
   create_toy_example_six_points_plot(
     background_plot, six_points_df,draw_circle=T)
 
-ggsave("writeup/figures/toyexample2.png", width=3, height=3)
+ggsave("figures/toyexample2.png", width=3, height=3)
 
 toy_example_six_points_plot <-
   create_toy_example_six_points_plot(
@@ -125,7 +125,7 @@ df <- gen_df_adv(
 
 create_toy_df_plot(df)
 
-ggsave("writeup/figures/sim_toy_ex.png", width=4, height=3)
+ggsave("figures/sim_toy_ex.png", width=4, height=3)
 
 
 # conditional expectation function ----------------------------------------

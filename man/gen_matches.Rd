@@ -11,7 +11,7 @@ gen_matches(
   scaling = 1,
   metric = "maximum",
   caliper = 1,
-  rad_method = c("adaptive", "1nn", "fixed"),
+  rad_method = c("adaptive", "1nn", "fixed", "adaptive-5nn"),
   ...
 )
 }
