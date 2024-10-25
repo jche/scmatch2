@@ -49,9 +49,12 @@ sigma2_estimates <- replicate(1000, {
 })
 
 df <- data.frame(estimate = sigma2_estimates)
+
 ggplot(df, aes(x = estimate)) +
   geom_histogram(binwidth = 0.05, fill = "blue", alpha = 0.7) +
-  geom_vline(aes(xintercept = sigma^2), color = "red", linetype = "dashed", size = 1) +
-  labs(title = "Distribution of sigma^2 Estimates", x = "Estimate", y = "Frequency") +
+  geom_vline(aes(xintercept = sigma^2), color = "red",
+             linetype = "dashed", size = 1) +
+  labs(title = "Distribution of sigma^2 Estimates",
+       x = "Estimate", y = "Frequency") +
   theme_minimal()
 

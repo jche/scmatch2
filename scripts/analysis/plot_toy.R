@@ -1,7 +1,11 @@
+
 # plot_toy.R
-# Collection of plotting function
+# Collection of plotting functions
+
+
 library(ggplot2)
 require(latex2exp)
+
 create_background_plot <- function(background_df){
   background_plot <-
     ggplot(background_df,aes(x1,x2)) +

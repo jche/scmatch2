@@ -1,3 +1,8 @@
+
+# Utility functions called by "table_Section5.4.R" to calculate monte
+# carlo standard errors.
+
+
 kurtosis <- function(x){
   S_T = sd(x)
   kurt = mean( (x - mean(x))^4 ) / S_T^4

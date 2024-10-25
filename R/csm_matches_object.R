@@ -101,7 +101,7 @@ print.csm_matches <- function(x, ...) {
   nshow = min( ntx, 5 )
 
   settings <- attr(x,"settings")
-  adas <- paste( x$adacalipers[1:nshow], collapse = ", " )
+  adas <- paste( round( x$adacalipers[1:nshow], 3 ), collapse = ", " )
   if ( nshow < ntx ) {
     adas = paste0( adas, ", ..." )
   }

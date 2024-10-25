@@ -1,3 +1,10 @@
+
+
+# This script is used to make diagnostic plots to see if bias goes
+# down as we increase the overlap of donor units.
+
+
+
 library(CSM)
 library(tidyverse)
 library(ggplot2)
@@ -8,6 +15,8 @@ library(latex2exp)
 n_subclass <- 6
 subclass_values <- 1:n_subclass
 
+# This varys the number of controls uniformly spread across the space.
+# As it goes up, overlap increases and bias SHOULD go down in theory.
 n_deg_overlap <- 5
 prop_nc_unif_values <-
   setdiff(seq(0, 1, length.out = n_deg_overlap + 1), 0) #exclude 0

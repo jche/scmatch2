@@ -1,3 +1,6 @@
+
+
+#' Save results to file, possibly appending them if file exists.
 save_res_to_csv<-
   function(curr_res,
            FNAME){
@@ -7,6 +10,8 @@ save_res_to_csv<-
       write_csv(curr_res, FNAME)
     }
   } # save_res_to_csv
+
+
 
 #' Run a simulation to check inference on the
 #' A-E inference method
@@ -25,7 +30,137 @@ sim_inference_CSM_A_E <- function(dgp_name,
                                   R=100,
                                   toy_ctr_dist=0.5,
                                   prop_nc_unif = 1/3,
-                                  seed = NULL){
+                                  seed = NULL, parallel = FALSE ) {
+  ### Example run inputs
+  # R <- 10; toy_ctr_dist=0.5; dgp_name <- "toy"; att0<-F
+
+  if ( att0 != FALSE ) {
+    stop( "unused parameter is being set.  This param should be removed or explained" )
+  }
+
+  scaling <- 8
+  true_sigma <- 0.5
+
+  if ( is.null(seed) ) {
+    set.seed(123)
+  }
+
+  one_iteration <- function( i ) {
+    # i <- 1
+    if( !parallel ) {
+      if ( i %% 10 == 1 || (i == R) ) {
+        cat("iteration", i, "\n" )
+      }
+    }
+
+    ### Make the data
+    df_dgp <-
+      gen_one_toy(ctr_dist=toy_ctr_dist,
+                  prop_nc_unif=prop_nc_unif) %>%
+      mutate(Y0_denoised = Y0 - noise,
+             Y1_denoised = Y1 - noise,
+             Y_denoised = Y - noise)
+
+    ## Add in the noise to set variation
+    df_dgp_i <- df_dgp %>%
+      mutate(noise = rnorm(n(), mean=0, sd=true_sigma)) %>%
+      mutate(Y0 = Y0_denoised + noise,
+             Y1 = Y1_denoised + noise,
+             Y = Y_denoised + noise)
+
+
+    ### Perform matching
+    mtch <- get_cal_matches(
+      df_dgp_i,
+      metric = "maximum",
+      scaling = scaling,
+      caliper = 1,
+      # rad_method = "adaptive",
+      rad_method = "adaptive-5nn",
+      est_method = "scm"
+    )
+
+    ### Perform inference using the A-E method
+    ATT_estimate <- get_ATT_estimate( mtch )
+
+
+    rs = tibble(
+      runID = i,
+      att_est = ATT_estimate$ATT,
+      se_AE = ATT_estimate$SE,
+      CI_lower = att_est -1.96 *  se_AE,
+      CI_upper = att_est + 1.96 * se_AE,
+      N_T = ATT_estimate$N_T,
+      N_C_tilde = ATT_estimate$N_C_tilde,
+      true_SE = true_sigma * sqrt(1 / N_T + 1 / N_C_tilde),
+      CI_lower_with_true_SE = att_est - 1.96 * true_SE,
+      CI_upper_with_true_SE = att_est + 1.96 * true_SE
+    )
+
+    # Get true ATT
+    rs$att_true <-
+      df_dgp_i %>%
+      filter(Z ==1) %>%
+      summarize(att = mean(Y1-Y0)) %>%
+      pull(att)
+
+    # Get error and bias
+    full_units <- full_unit_table(mtch, nonzero_weight_only = TRUE )
+    rs$bias <- full_units %>%
+      group_by(Z) %>%
+      summarize(mn = sum(Y0_denoised*weights) / sum(weights)) %>%
+      summarize(est = last(mn) - first(mn)) %>%
+      pull(est)
+
+    rs
+
+  }
+
+  if ( parallel ) {
+    library( furrr )
+    library( future )
+    plan(multisession, workers = parallel::detectCores() - 1 )
+    results = future_map_dfr( 1:R,
+                              .f = one_iteration,
+                              .options = furrr_options(seed = NULL),
+                              .progress = TRUE )
+  } else {
+    results <- map_df( 1:R, one_iteration )
+  }
+
+  results <- results %>%
+    mutate( covered = CI_lower <= att_true & att_true <= CI_upper,
+            covered_with_true_SE =
+              CI_lower_with_true_SE <= att_true & att_true <= CI_upper_with_true_SE,
+            error = att_est - att_true - bias )
+
+  return(results)
+}
+
+
+
+
+# OLD VERSION ----
+
+
+#' Run a simulation to check inference on the
+#' A-E inference method
+#'
+#' @param dgp_name Name of the DGP
+#' @param att0 True ATT
+#' @param R Number of MC runs
+#' @param toy_ctr_dist distance between centers in the to
+#'
+#' @return
+#' @export
+#'
+#' @examples
+sim_inference_CSM_A_E_OLD <- function(dgp_name,
+                                      att0,
+                                      R=100,
+                                      toy_ctr_dist=0.5,
+                                      prop_nc_unif = 1/3,
+                                      seed = NULL) {
   ### Example run inputs
   # R <- 10; toy_ctr_dist=0.5; dgp_name <- "toy"; att0<-F
   covered <- CI_lower <- CI_upper <-
@@ -34,6 +169,7 @@ sim_inference_CSM_A_E <- function(dgp_name,
     se_AE <- true_SE <-
     error <- bias <-
     N_T <- N_C_tilde <- numeric(R)
+
   if ( is.null(seed) ) {
     set.seed(123)
     ### Generate one dataset
@@ -45,6 +181,7 @@ sim_inference_CSM_A_E <- function(dgp_name,
              Y_denoised = Y - noise)
   }
   scaling <- 8
+
   for (i in 1:R){
     # i <- 1
     print(i)
@@ -67,6 +204,7 @@ sim_inference_CSM_A_E <- function(dgp_name,
       mutate(Y0 = Y0_denoised + noise,
              Y1 = Y1_denoised + noise,
              Y = Y_denoised + noise)
+
     ### Perform matching
     mtch <- get_cal_matches(
       df_dgp_i,
@@ -80,7 +218,7 @@ sim_inference_CSM_A_E <- function(dgp_name,
 
     ### Perform inference using the A-E method
     ATT_estimate <- get_ATT_estimate( mtch )
-    att_est[i] <- ATT_estimate$ATE
+    att_est[i] <- ATT_estimate$ATT
     se_AE[i] = ATT_estimate$SE
     CI_lower[i] = att_est[i] -1.96 *  se_AE[i]
     CI_upper[i] = att_est[i] + 1.96 * se_AE[i]
@@ -156,3 +294,21 @@ sim_inference_CSM_A_E <- function(dgp_name,
   return(res_save_bayesian_boot)
 }
 
+
+
+
+# Testing ----
+
+if ( FALSE ) {
+
+  R = 3
+  toy_naive_low <-
+    sim_inference_CSM_A_E(
+      dgp_name="toy",
+      att0=F,
+      R=R,
+      prop_nc_unif = 1/3,
+      seed = c(123 + 1:R * 2)
+    )
+
+}

@@ -22,6 +22,7 @@ R = 100
 #            "test_",
 #            "A_E_toy_low_mid_high_R=",R,".csv")
 #   )
+R = 500
 FNAME =
   here::here(
     paste0("data/outputs/A-E-overlap-by-prop-unif/",
@@ -44,6 +45,8 @@ table_4 <- res %>%
     coverage_with_true_SE = mean(covered_with_true_SE)
   ) %>%
   arrange(deg_overlap)
+
+table_4
 
 # let plot
 res_low <- res %>% filter(deg_overlap=="low")

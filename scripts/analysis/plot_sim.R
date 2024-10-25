@@ -1,3 +1,7 @@
+
+# Analyze results for the main simulations on performance of all the
+# various matching approaches.
+
 METHODS <- c("diff", "onenn", "csm_scm", "cem_avg", "bal1", "bal2",
              "or_lm", "ps_lm",
              "or_bart", "ps_bart",

@@ -1,4 +1,6 @@
 
+# Generates table that shows how well inference works in the main
+# paper.
 
 library(tidyr)
 library(dplyr)
