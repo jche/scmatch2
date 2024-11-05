@@ -212,6 +212,11 @@ unmatched_units <- function( csm ) {
 #' Get table of aggregated results, with rows for synthetic units if
 #' that was asked for
 #'
+#' @param return Possible values: NULL, "sc_units", "agg_co_units", or "all".
+#'   How to aggregate units, if at all, in making the result table.
+#' @param feasible_only TRUE means only return units which were given
+#'   non-zero weight.
+#'
 #' @return dataframe
 #' @export
 #'

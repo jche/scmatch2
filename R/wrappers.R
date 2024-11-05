@@ -3,7 +3,7 @@
 # wide-use basic functions for convenience
 #
 # This includes a set of functions that simply estimates and returns
-# the att as a single number, useful for the simulaton studies.
+# the att as a single number, useful for the simulation studies.
 
 
 

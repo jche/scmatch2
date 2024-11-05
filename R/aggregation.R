@@ -55,6 +55,10 @@ agg_sc_units <- function(scweights) {
 
 
 #' @rdname AggregationMethods
+#'
+#'
+#' @param scweights scm_matches object or list of sc weights (tibbles
+#'
 #' @export
 agg_co_units <- function(scweights) {
 

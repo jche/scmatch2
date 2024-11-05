@@ -9,18 +9,26 @@ if ( FALSE ){
   R = 2
   toy_naive_low <-
     sim_inference_CSM_A_E(
-      dgp_name="toy",
-      att0=F,
       R=R,
       prop_nc_unif = 1/3,
       seed = c(123 + 1:R * 2)
     )
   # att_true is the SATT without noise
   # att_est is the SATT plus noise
+
+  toy_naive_low
 }
 
 
-run_sim_inference_A_E <- function(R = 10, FNAME) {
+
+#' Run suite of simulations, for range of overlaps, for given number
+#' of replicates and save results to given filename
+run_sim_inference_A_E <- function(R = 10, FNAME,
+                                  toy_ctr_dist=0.5,
+                                  scaling = 8,
+                                  true_sigma = 0.5,
+                                  nc = 500,
+                                  parallel = TRUE ) {
   ### 3 degrees of freedoms
   # prop_nc_unif_values <- c(1/3, 2/3, 3/3)
   # deg_overlap_labels <- c("low", "mid", "high")
@@ -32,12 +40,14 @@ run_sim_inference_A_E <- function(R = 10, FNAME) {
   for (i in seq_along(prop_nc_unif_values)) {
     cat( "Simulation", i, "\n" )
     sim_result <- sim_inference_CSM_A_E(
-      dgp_name = "toy",
-      att0 = FALSE,
       R = R,
       prop_nc_unif = prop_nc_unif_values[i],
+      scaling = scaling,
+      toy_ctr_dist=toy_ctr_dist,
+      true_sigma = true_sigma,
+      nc = nc,
       seed = c(123 + i*2),
-      parallel = TRUE
+      parallel = parallel
     )
 
     sim_result$deg_overlap <- deg_overlap_labels[i]
@@ -46,12 +56,15 @@ run_sim_inference_A_E <- function(R = 10, FNAME) {
   }
 
   cat( "Simulation complete\n" )
+
+  invisible( 0 )
 }
 
 
 
+# Run the simulation ----
+
 if ( TRUE ) {
-  tictoc::tic()
   R = 500
   FNAME =
     here::here(
@@ -59,9 +72,15 @@ if ( TRUE ) {
              "A_E_toy_low_mid_high_R=",R,".csv")
     )
   file.remove( FNAME )
-  run_sim_inference_A_E(R=R, FNAME = FNAME)
+
+  # Run simulation
+  tictoc::tic()
+  run_sim_inference_A_E(R=R, FNAME = FNAME,
+                        scaling = 8, true_sigma = 0.5,
+                        nc = 500 )
   tictoc::toc()
 
+  # Check saved file
   rs = read_csv( FNAME )
   skimr::skim( rs )
 

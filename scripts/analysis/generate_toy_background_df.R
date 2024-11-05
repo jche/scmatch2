@@ -1,4 +1,5 @@
 
+# Make and save a fake dataset for illustrative purposes.
 
 require(mvtnorm)
 library( tidyverse )
