@@ -2,7 +2,7 @@
 library(tidyverse)
 require(mvtnorm)
 library( CSM )
-source( here::here( "scripts/sims/sim_inference_helper.R" ) )
+source( here::here( "scripts/scripts/0_sim_inference_utils.R" ) )
 
 # Test run
 if ( FALSE ){

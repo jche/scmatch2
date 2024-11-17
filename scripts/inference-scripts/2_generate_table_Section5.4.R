@@ -7,7 +7,7 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 library(tidyr)
 library(dplyr)
-source( here::here( "scripts/analysis/MCSE_functions.R") )
+source( here::here( "scripts/inference-scripts/0_sim_inference_utils.R") )
 
 # load data
 R = 500
