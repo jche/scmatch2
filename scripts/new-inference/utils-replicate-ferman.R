@@ -36,7 +36,7 @@ generate_dgp <- function(N1, N0, panel = "A") {
 }
 
 # # Function to implement Ferman's Sign-changes algorithm
-# ferman_sign_change_test <- function(dgp_data, M, tau_0, alpha = 0.05, max_permutations = 1000) {
+# ferman_sign_change_test_non_adjusted <- function(dgp_data, M, tau_0, alpha = 0.05, max_permutations = 1000) {
 #   treated <- dgp_data$treated
 #   control <- dgp_data$control
 #
@@ -210,42 +210,6 @@ compute_rejection_rate <- function(N1, N0, M, tau_0, alpha, num_replicates, max_
 }
 
 
-# # Function to compute rejection rates for all combinations
-# generate_full_table <- function(N0, N1_values, M_values, panels, tau_0, alpha, num_replicates, max_permutations) {
-#   results <- list()
-#   time_results <- list()
-#
-#   for (panel in panels) {
-#     for (N1 in N1_values) {
-#       for (M in M_values) {
-#         cat("Running Panel", panel, "N1 =", N1, "M =", M, "\n")
-#
-#         # Timing start
-#         tstart <- proc.time()
-#
-#         # Compute rejection rate
-#         rejection_rate <- replicate(num_replicates, {
-#           dgp_data <- generate_dgp(N1, N0, panel)
-#           ferman_sign_change_test(dgp_data, M, tau_0, alpha, max_permutations)
-#         })
-#
-#         # Timing end
-#         tend <- proc.time()
-#
-#         # Store results
-#         results[[paste(panel, N1, M, sep = "_")]] <- mean(rejection_rate)
-#         time_results[[paste(panel, N1, M, sep = "_")]] <- tend["elapsed"] - tstart["elapsed"]
-#       }
-#     }
-#   }
-#
-#   # Save results
-#   saveRDS(results, here("scripts/new-inference/outputs/rejection_rates.rds") )
-#   saveRDS(time_results, here("scripts/new-inference/outputs/time_results.rds") )
-#
-#   list(rejection_rates = results, time_results = time_results)
-# }
-
 # Example of full table generation
 generate_full_table <- function(
     N0, N1_values, M_values, panels, tau_0, alpha, num_replicates, max_permutations,
@@ -268,7 +232,7 @@ generate_full_table <- function(
 }
 
 
-
+#
 # Function to load and parse results
 load_results <- function(results_path, table_type) {
   results <- readRDS(results_path)
@@ -290,60 +254,123 @@ load_results <- function(results_path, table_type) {
   return(list(data = data, results = results))
 }
 
-# Function to reshape results into a table format
-reshape_results <- function(data, results) {
+# # Function to reshape results into a table format
+# reshape_results <- function(data, results) {
+#   panels <- unique(sapply(names(results), function(name) strsplit(name, "_")[[1]][1]))
+#   n1_values <- unique(sapply(names(results), function(name) strsplit(name, "_")[[1]][2]))
+#   m_values <- unique(sapply(names(results), function(name) strsplit(name, "_")[[1]][3]))
+#
+#   table_data <- matrix(NA, nrow = length(n1_values), ncol = length(m_values) * length(panels))
+#   col_names <- vector()
+#
+#   col_idx <- 1
+#   for (panel in panels) {
+#     for (m in m_values) {
+#       col_names <- c(col_names, paste("Panel", panel, "M =", m))
+#       for (i in seq_along(n1_values)) {
+#         result_key <- paste(panel, n1_values[i], m, sep = "_")
+#         table_data[i, col_idx] <- ifelse(result_key %in% names(data), data[[result_key]], NA)
+#       }
+#       col_idx <- col_idx + 1
+#     }
+#   }
+#
+#   row_names <- paste("N1 =", n1_values)
+#   table_data <- as.data.frame(table_data)
+#   names(table_data) <- col_names
+#   rownames(table_data) <- row_names
+#
+#   return(table_data)
+# }
+#
+# # Function to generate LaTeX table
+# generate_latex_code <- function(table_data, caption, label) {
+#   latex_code <- paste0("\\begin{table}[H]\n",
+#                        "\\centering\n",
+#                        "\\caption{", caption, "}\n",
+#                        "\\label{", label, "}\n",
+#                        "\\begin{tabular}{l", paste(rep("c", ncol(table_data)), collapse = ""), "}\n",
+#                        "\\hline\n",
+#                        " & ", paste(names(table_data), collapse = " & "), " \\\\\n",
+#                        "\\hline\n")
+#
+#   for (i in seq_len(nrow(table_data))) {
+#     latex_code <- paste0(latex_code, rownames(table_data)[i], " & ",
+#                          paste(round(table_data[i, ], 3), collapse = " & "), " \\\\\n")
+#   }
+#
+#   latex_code <- paste0(latex_code, "\\hline\n\\end{tabular}\n\\end{table}")
+#   return(latex_code)
+# }
+#
+# # Master function to create LaTeX table
+# create_latex_table <- function(results_path, table_type, caption, label) {
+#   parsed_results <- load_results(results_path, table_type)
+#   table_data <- reshape_results(parsed_results$data, parsed_results$results)
+#   latex_code <- generate_latex_code(table_data, caption, label)
+#   return(latex_code)
+# }
+#
+
+# Function to reshape results into table format with panels and N1 rows
+reshape_results_hierarchical <- function(data, results) {
   panels <- unique(sapply(names(results), function(name) strsplit(name, "_")[[1]][1]))
   n1_values <- unique(sapply(names(results), function(name) strsplit(name, "_")[[1]][2]))
   m_values <- unique(sapply(names(results), function(name) strsplit(name, "_")[[1]][3]))
 
-  table_data <- matrix(NA, nrow = length(n1_values), ncol = length(m_values) * length(panels))
-  col_names <- vector()
+  # Create a hierarchical structure
+  table_data <- list()
 
-  col_idx <- 1
   for (panel in panels) {
-    for (m in m_values) {
-      col_names <- c(col_names, paste("Panel", panel, "M =", m))
-      for (i in seq_along(n1_values)) {
-        result_key <- paste(panel, n1_values[i], m, sep = "_")
-        table_data[i, col_idx] <- ifelse(result_key %in% names(data), data[[result_key]], NA)
-      }
-      col_idx <- col_idx + 1
-    }
-  }
+    panel_data <- matrix(NA, nrow = length(n1_values), ncol = length(m_values))
+    colnames(panel_data) <- paste("M =", m_values)
+    rownames(panel_data) <- paste("N1 =", n1_values)
 
-  row_names <- paste("N1 =", n1_values)
-  table_data <- as.data.frame(table_data)
-  names(table_data) <- col_names
-  rownames(table_data) <- row_names
+    for (i in seq_along(n1_values)) {
+      for (j in seq_along(m_values)) {
+        result_key <- paste(panel, n1_values[i], m_values[j], sep = "_")
+        if (result_key %in% names(data)) {
+          panel_data[i, j] <- data[[result_key]]
+        }
+      }
+    }
+    table_data[[panel]] <- panel_data
+  }
 
   return(table_data)
 }
 
-# Function to generate LaTeX table
-generate_latex_code <- function(table_data, caption, label) {
+# Function to generate LaTeX code with super rows for panels
+generate_latex_code_hierarchical <- function(table_data, caption, label) {
   latex_code <- paste0("\\begin{table}[H]\n",
                        "\\centering\n",
                        "\\caption{", caption, "}\n",
                        "\\label{", label, "}\n",
-                       "\\begin{tabular}{l", paste(rep("c", ncol(table_data)), collapse = ""), "}\n",
-                       "\\hline\n",
-                       " & ", paste(names(table_data), collapse = " & "), " \\\\\n",
-                       "\\hline\n")
+                       "\\begin{tabular}{l", paste(rep("c", ncol(table_data[[1]])), collapse = ""), "}\n",
+                       "\\toprule\n")
 
-  for (i in seq_len(nrow(table_data))) {
-    latex_code <- paste0(latex_code, rownames(table_data)[i], " & ",
-                         paste(round(table_data[i, ], 3), collapse = " & "), " \\\\\n")
+  # Header row for M values
+  latex_code <- paste0(latex_code, " & ", paste(colnames(table_data[[1]]), collapse = " & "), " \\\\\n", "\\midrule\n")
+
+  # Add data for each panel
+  for (panel_name in names(table_data)) {
+    panel_matrix <- table_data[[panel_name]]
+    latex_code <- paste0(latex_code, "\\multicolumn{", ncol(panel_matrix) + 1, "}{l}{\\textit{", panel_name, "}} \\\\\n")
+    for (i in 1:nrow(panel_matrix)) {
+      latex_code <- paste0(latex_code, rownames(panel_matrix)[i], " & ",
+                           paste(round(panel_matrix[i, ], 3), collapse = " & "), " \\\\\n")
+    }
+    latex_code <- paste0(latex_code, "\\midrule\n")
   }
 
-  latex_code <- paste0(latex_code, "\\hline\n\\end{tabular}\n\\end{table}")
+  latex_code <- paste0(latex_code, "\\bottomrule\n\\end{tabular}\n\\end{table}")
   return(latex_code)
 }
 
-# Master function to create LaTeX table
-create_latex_table <- function(results_path, table_type, caption, label) {
+# Updated Master function for LaTeX table
+create_latex_table_hierarchical <- function(results_path, table_type, caption, label) {
   parsed_results <- load_results(results_path, table_type)
-  table_data <- reshape_results(parsed_results$data, parsed_results$results)
-  latex_code <- generate_latex_code(table_data, caption, label)
+  table_data <- reshape_results_hierarchical(parsed_results$data, parsed_results$results)
+  latex_code <- generate_latex_code_hierarchical(table_data, caption, label)
   return(latex_code)
 }
-

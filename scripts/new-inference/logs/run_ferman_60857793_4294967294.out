@@ -1,0 +1,93 @@
+here() starts at /n/holylabs/LABS/pillai_lab/Users/xmeng1/scmatch2
+
+Attaching package: ‘dplyr’
+
+The following object is masked from ‘package:MASS’:
+
+    select
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+Running Panel A N1 = 5 M = 1 
+Running Panel A N1 = 5 M = 4 
+Running Panel A N1 = 5 M = 10 
+Running Panel A N1 = 10 M = 1 
+Running Panel A N1 = 10 M = 4 
+Running Panel A N1 = 10 M = 10 
+Running Panel A N1 = 25 M = 1 
+Running Panel A N1 = 25 M = 4 
+Running Panel A N1 = 25 M = 10 
+Running Panel A N1 = 50 M = 1 
+Running Panel A N1 = 50 M = 4 
+Running Panel A N1 = 50 M = 10 
+Running Panel B N1 = 5 M = 1 
+Running Panel B N1 = 5 M = 4 
+Running Panel B N1 = 5 M = 10 
+Running Panel B N1 = 10 M = 1 
+Running Panel B N1 = 10 M = 4 
+Running Panel B N1 = 10 M = 10 
+Running Panel B N1 = 25 M = 1 
+Running Panel B N1 = 25 M = 4 
+Running Panel B N1 = 25 M = 10 
+Running Panel B N1 = 50 M = 1 
+Running Panel B N1 = 50 M = 4 
+Running Panel B N1 = 50 M = 10 
+Running Panel C N1 = 5 M = 1 
+Running Panel C N1 = 5 M = 4 
+Running Panel C N1 = 5 M = 10 
+Running Panel C N1 = 10 M = 1 
+Running Panel C N1 = 10 M = 4 
+Running Panel C N1 = 10 M = 10 
+Running Panel C N1 = 25 M = 1 
+Running Panel C N1 = 25 M = 4 
+Running Panel C N1 = 25 M = 10 
+Running Panel C N1 = 50 M = 1 
+Running Panel C N1 = 50 M = 4 
+Running Panel C N1 = 50 M = 10 
+Running Panel D N1 = 5 M = 1 
+Running Panel D N1 = 5 M = 4 
+Running Panel D N1 = 5 M = 10 
+Running Panel D N1 = 10 M = 1 
+Running Panel D N1 = 10 M = 4 
+Running Panel D N1 = 10 M = 10 
+Running Panel D N1 = 25 M = 1 
+Running Panel D N1 = 25 M = 4 
+Running Panel D N1 = 25 M = 10 
+Running Panel D N1 = 50 M = 1 
+Running Panel D N1 = 50 M = 4 
+Running Panel D N1 = 50 M = 10 
+Running Panel E N1 = 5 M = 1 
+Running Panel E N1 = 5 M = 4 
+Running Panel E N1 = 5 M = 10 
+Running Panel E N1 = 10 M = 1 
+Running Panel E N1 = 10 M = 4 
+Running Panel E N1 = 10 M = 10 
+Running Panel E N1 = 25 M = 1 
+Running Panel E N1 = 25 M = 4 
+Running Panel E N1 = 25 M = 10 
+Running Panel E N1 = 50 M = 1 
+Running Panel E N1 = 50 M = 4 
+Running Panel E N1 = 50 M = 10 
+Results saved to 'results_table.rds'.
+\begin{table}[H]
+\centering
+\caption{Rejection Rates by Panel and M}
+\label{tab:rejection_rates}
+\begin{tabular}{lccccccccccccccc}
+\hline
+ & Panel A M = 1 & Panel A M = 4 & Panel A M = 10 & Panel B M = 1 & Panel B M = 4 & Panel B M = 10 & Panel C M = 1 & Panel C M = 4 & Panel C M = 10 & Panel D M = 1 & Panel D M = 4 & Panel D M = 10 & Panel E M = 1 & Panel E M = 4 & Panel E M = 10 \\
+\hline
+N1 = 5 & 0.001 & 0.001 & 0 & 0.003 & 0.002 & 0.005 & 0.007 & 0.004 & 0.001 & 0.005 & 0.005 & 0.004 & 0.004 & 0.004 & 0.004 \\
+N1 = 10 & 0.038 & 0.049 & 0.05 & 0.05 & 0.063 & 0.043 & 0.05 & 0.038 & 0.037 & 0.056 & 0.087 & 0.082 & 0.087 & 0.092 & 0.102 \\
+N1 = 25 & 0.049 & 0.042 & 0.036 & 0.059 & 0.038 & 0.034 & 0.045 & 0.047 & 0.041 & 0.053 & 0.069 & 0.06 & 0.073 & 0.067 & 0.073 \\
+N1 = 50 & 0.061 & 0.026 & 0.017 & 0.046 & 0.032 & 0.018 & 0.06 & 0.034 & 0.032 & 0.049 & 0.061 & 0.043 & 0.072 & 0.054 & 0.044 \\
+\hline
+\end{tabular}
+\end{table}
+
