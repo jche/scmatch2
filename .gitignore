@@ -39,4 +39,5 @@ vignettes/*.pdf
 # Research paper results
 /tables
 /data
+/scripts/new-inference/data
 /figures
