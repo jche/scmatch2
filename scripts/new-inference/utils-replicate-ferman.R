@@ -74,11 +74,7 @@ generate_full_matched_table <- function(dat,
 
 }
 
-function(dat,
-         file_name = "one-full-table.rds"){
-  full_matched_table <- readRDS(file = here("scripts/new-inference/data/",file_name))
-  # Create the same
-}
+
 
 ## The below function took into the original DGP code
 ## Original DGP format: (unmatched )
@@ -148,8 +144,6 @@ compute_shared_neighbors <- function(matched_matrix) {
 
 ferman_sign_change_test <-
   function(full_matched_table,
-    # matched_pairs, # a list, where
-    #        treated, # a list,
            tau_0 = 0,
            alpha = 0.05,
            max_permutations = 1000) {
@@ -249,6 +243,14 @@ compute_overlap_statistics <- function(shared_neighbors) {
 #   )
 # }
 
+generate_file_name <- function(
+    N1 = 5,
+    M = 10,
+    i = 1,
+    panel = "A"){
+  file_name <- paste0("1d_DGP-", panel, "_M-", M, "_N1-", N1, "_i-", i, ".rds")
+  return(file_name)
+}
 
 generate_one_dgp_and_matched_table <- function(N1 = 5,
                                         N0 = 1000,
@@ -265,7 +267,8 @@ generate_one_dgp_and_matched_table <- function(N1 = 5,
       cat(sprintf("Generating DGP for replicate %d (Panel %s, M = %d, N1 = %d)...\n", i, panel, M, N1))
     }
     dgp_data <- generate_dgp(N1, N0, panel)
-    file_name <- paste0("1d_DGP-", panel, "_M-", M, "_N1-", N1, "_i-", i, ".rds")
+    file_name <- generate_file_name(N1 = N1,M = M,i = i,panel = panel)
+    # file_name <- paste0("1d_DGP-", panel, "_M-", M, "_N1-", N1, "_i-", i, ".rds")
     if (verbose >= 2) {
       cat(sprintf("Saving matched table to %s\n", file_name))
     }
@@ -274,6 +277,14 @@ generate_one_dgp_and_matched_table <- function(N1 = 5,
                                 file_name = file_name)
 }
 
+read_one_matched_table <- function(N1 = 5,
+                                   M = 10,
+                                   i = 1,
+                                   panel = "A"){
+  file_name <- generate_file_name(N1 = N1,M = M,i = i,panel = panel)
+  full_matched_table <- readRDS(file = here("scripts/new-inference/data/",file_name))
+  return(full_matched_table)
+}
 
 generate_all_dgp_and_matched_table <- function(
     N0 = 1000,
@@ -305,8 +316,12 @@ compute_rejection_rate <- function(N1, N0, M, tau_0, alpha, num_replicates, max_
   overlap_stats <- list()
 
   for (i in 1:num_replicates) {
-    dgp_data <- generate_dgp(N1, N0, panel)
-    matched_pairs <- match_controls(dgp_data$treated, dgp_data$control, M)
+    # dgp_data <- generate_dgp(N1, N0, panel)
+    # matched_pairs <- match_controls(dgp_data$treated, dgp_data$control, M)
+   full_matched_table <- read_one_matched_table(N1 = N1,
+                                       M = M,
+                                       i = i,
+                                       panel = panel)
     rejection_rates[i] <- ferman_sign_change_test(matched_pairs, dgp_data$treated, tau_0, alpha, max_permutations)
     overlap_stats[[i]] <- compute_overlap_statistics(matched_pairs)
   }
@@ -331,7 +346,6 @@ compute_rejection_rate <- function(N1, N0, M, tau_0, alpha, num_replicates, max_
 }
 
 
-# Read and summarize one data, then average over all
 generate_full_table <- function(
     N0,
     N1_values,
