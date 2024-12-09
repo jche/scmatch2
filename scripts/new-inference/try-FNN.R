@@ -1,34 +1,50 @@
 library(FNN)
+library(CSM)
 library(dplyr)
+library(here)
+source(here("scripts/new-inference/utils-replicate-ferman.R"))
 
 set.seed(4044440)
 
-# Generate toy data
-dat <- tibble::tibble(
-  id = 1:503,
-  X1 = runif(503),
-  X2 = runif(503),
-  Z = c(rep(TRUE, 5), rep(FALSE, 503 - 5)), # Treated: first 5 rows
-  noise = rnorm(503),
-  Y0 = 3 + 2 * X1 + noise,
-  Y1 = 3 + 2 * X1 + 4 * X2 + noise,
-  Y = ifelse(Z, Y1, Y0)
+dat <- generate_dgp(N1 = 5, N0 = 1000, panel = "A")
+
+### Using CSM::get_cal_matches
+k = 4
+# devtools::load_all()
+mtch <- get_cal_matches(
+  dat,
+  covs = "X",
+  treatment = "Z",
+  scaling = 1,
+  metric = "euclidean",
+  rad_method = "knn",
+  k = k
 )
 
+full_table <- full_unit_table(mtch,
+                              nonzero_weight_only = F )
+saveRDS(mtch, file = here("scripts/new-inference/data/one-full-table.rds"))
+
+
+
+
+### Using FNN to do the matching
 # Separate treated and control groups
 treated <- dat %>% filter(Z == TRUE)
 control <- dat %>% filter(Z == FALSE)
 
 # Covariates for matching
-treated_cov <- treated %>% select(X1, X2)
-control_cov <- control %>% select(X1, X2)
+treated_cov <- treated %>% dplyr::select(X)
+control_cov <- control %>% dplyr::select(X)
 
 # Perform KNN matching
 k <- 4
-knn_result <- get.knnx(data = control_cov, query = treated_cov, k = k)
+knn_result <- get.knnx(data = control_cov,
+                       query = treated_cov,
+                       k = k)
 
 # Extract indices of matches and compute matched control outcomes
-matched_indices <- knn_result$nn.index
+matched_indices <- knn_result$nn.index # so this is not id, but the row number of the control data
 matched_control_outcomes <- control$Y0[matched_indices]
 
 # Create a result data frame

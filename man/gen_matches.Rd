@@ -12,6 +12,7 @@ gen_matches(
   metric = "maximum",
   caliper = 1,
   rad_method = c("adaptive", "1nn", "fixed", "adaptive-5nn"),
+  k = 5,
   ...
 )
 }

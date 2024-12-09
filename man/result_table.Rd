@@ -7,6 +7,13 @@ that was asked for}
 \usage{
 result_table(csm, return = NULL, feasible_only = FALSE)
 }
+\arguments{
+\item{return}{Possible values: NULL, "sc_units", "agg_co_units", or "all".
+How to aggregate units, if at all, in making the result table.}
+
+\item{feasible_only}{TRUE means only return units which were given
+non-zero weight.}
+}
 \value{
 dataframe
 }

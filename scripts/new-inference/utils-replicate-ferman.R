@@ -1,14 +1,14 @@
 library(MASS) # For mvrnorm
 library(dplyr) # For data manipulation
 library(here)
+library(CSM)
 
-# Function to generate DGP based on the panel
 generate_dgp <- function(N1, N0, panel = "A") {
-  # Generate covariates
-  X_treated <- rnorm(N1, mean = 0, sd = 1)
-  X_control <- rnorm(N0, mean = 0, sd = 1)
+  X <- c(rnorm(N1, mean = 0, sd = 1),
+         rnorm(N0, mean = 0, sd = 1))
 
-  # Generate outcomes based on the panel
+  Z <- c(rep(1, N1), rep(0, N0))
+
   if (panel == "A") {
     mu_1 <- function(x) x
     epsilon_1 <- function() rnorm(1, mean = 0, sd = 1)
@@ -24,61 +24,73 @@ generate_dgp <- function(N1, N0, panel = "A") {
   } else if (panel == "E") {
     mu_1 <- function(x) (qchisq(pnorm(x), df = 1) - 1) / sqrt(2)
     epsilon_1 <- function() 2 * (rchisq(1, df = 1) - 1) / sqrt(2)
+  } else {
+    stop("Invalid panel specified. Choose from 'A', 'B', 'C', 'D', or 'E'.")
   }
 
-  Y_treated <- sapply(X_treated, function(x) mu_1(x) + epsilon_1())
-  Y_control <- rnorm(N0, mean = 0, sd = 1)
+  epsilon_1_values <- sapply(1:(N1 + N0), function(i) epsilon_1())
+  epsilon_0_values <- rnorm(N1 + N0, mean = 0, sd = 1)
 
-  list(
-    treated = data.frame(ID = 1:N1, X = X_treated, Y = Y_treated),
-    control = data.frame(ID = 1:N0, X = X_control, Y = Y_control)
+  Y1 <- mu_1(X) + epsilon_1_values
+  Y0 <- epsilon_0_values
+
+  Y <- ifelse(Z == 1, Y1, Y0)
+
+  data <- data.frame(
+    ID = 1:(N1 + N0),
+    X = X,
+    Z = Z,
+    Y0 = Y0,
+    Y1 = Y1,
+    Y = Y,
+    noise_0 = epsilon_0_values,
+    noise_1 = epsilon_1_values
   )
+
+  return(data)
 }
 
-# # Function to implement Ferman's Sign-changes algorithm
-# ferman_sign_change_test_non_adjusted <- function(dgp_data, M, tau_0, alpha = 0.05, max_permutations = 1000) {
-#   treated <- dgp_data$treated
-#   control <- dgp_data$control
-#
-#   # Step 1: Match M nearest neighbors
-#   treated <- treated %>%
-#     rowwise() %>%
-#     mutate(
-#       matched_controls = list(
-#         control %>%
-#           arrange(abs(X - X[ID])) %>%
-#           slice_head(n = M) %>%
-#           pull(Y)
-#       )
-#     )
-#
-#   # Step 2: Compute individual treatment effects
-#   treated <- treated %>%
-#     mutate(
-#       tau_hat = Y - mean(unlist(matched_controls)) - tau_0
-#     )
-#
-#   tau_hat_S <- mean(treated$tau_hat)
-#
-#   # Step 3: Compute test statistic
-#   T_obs <- abs(tau_hat_S) / sd(treated$tau_hat)
-#
-#   # Step 4: Null distribution
-#   S <- treated$tau_hat
-#   G <- replicate(max_permutations, sample(c(-1, 1), length(S), replace = TRUE))
-#   T_null <- apply(G, 2, function(g) {
-#     gS <- g * S
-#     mean_gS <- mean(gS)
-#     abs(mean_gS) / sqrt(sum((gS - mean_gS)^2) / (length(S) - 1))
-#   })
-#
-#   # Step 5: Decision rule
-#   critical_value <- quantile(T_null, probs = 1 - alpha)
-#   reject <- as.numeric(T_obs > critical_value)
-#
-#   reject
-# }
 
+## Next: implement KNN method in get_cal_matches function
+
+generate_full_matched_table <- function(dat,
+         M,
+         file_name = "one-full-table.rds"){
+  # devtools::load_all()
+  mtch <- get_cal_matches(
+    dat,
+    covs = "X",
+    treatment = "Z",
+    scaling = 1,
+    metric = "euclidean",
+    rad_method = "knn",
+    k = M
+  )
+
+  full_matched_table <- full_unit_table(mtch,
+                                nonzero_weight_only = F )
+  saveRDS(full_matched_table,
+          file = here("scripts/new-inference/data/",file_name))
+
+}
+
+function(dat,
+         file_name = "one-full-table.rds"){
+  full_matched_table <- readRDS(file = here("scripts/new-inference/data/",file_name))
+  # Create the same
+}
+
+## The below function took into the original DGP code
+## Original DGP format: (unmatched )
+##    treated = data.frame(ID = 1:N1, X = X_treated, Y = Y_treated),
+#     control = data.frame(ID = 1:N0, X = X_control, Y = Y_control)
+## Current data format: name is full_table
+##  it is a matched dataset where each row is just one data entry
+##  variable Z is used to tell treated or control
+## variable "subclass" is the identifier of the treated and the matched controls
+## so the matched controls will have the same subclass value of the treated
+## i want the function to take into full_table and output the same
+## matched_pairs variable
 match_controls <- function(treated, control, M) {
   matched_pairs <- lapply(1:nrow(treated), function(i) {
     distances <- abs(control$X - treated$X[i])
@@ -92,29 +104,71 @@ match_controls <- function(treated, control, M) {
 }
 
 
-ferman_sign_change_test <- function(matched_pairs, treated, tau_0, alpha = 0.05, max_permutations = 1000) {
-  N1 <- nrow(treated)
+get_matched_control_ids <- function(full_matched_table) {
 
-  # Calculate individual treatment effects
-  tau_i <- sapply(1:N1, function(i) {
-    treated$Y[i] - mean(matched_pairs[[i]]$controls) - tau_0
-  })
+  subclasses <- unique(full_matched_table$subclass)
+
+  matched_control_ids <- list()
+
+  for (subclass in subclasses) {
+    data_in_subclass <- full_table[full_table$subclass == subclass, ]
+
+    treated_units <- data_in_subclass[data_in_subclass$Z == 1, ]
+    control_units <- data_in_subclass[data_in_subclass$Z == 0, ]
+
+    for (treated_id in treated_units$ID) {
+      matched_control_ids[[as.character(treated_id)]] <- control_units$ID
+    }
+  }
+
+  max_controls <- max(sapply(matched_control_ids, length))
+  matched_matrix <- do.call(rbind, lapply(matched_control_ids, function(ids) {
+    c(ids, rep(NA, max_controls - length(ids)))
+  }))
+
+  rownames(matched_matrix) <- names(matched_control_ids)
+
+  return(matched_matrix)
+}
+
+compute_shared_neighbors <- function(matched_matrix) {
+  N1 <- nrow(matched_matrix)
+
+  shared_neighbors <- matrix(FALSE, nrow = N1, ncol = N1)
+
+  for (i in 1:(N1 - 1)) {
+    for (j in (i + 1):N1) {
+      shared <- intersect(matched_matrix[i, ], matched_matrix[j, ])
+      shared_neighbors[i, j] <- shared_neighbors[j, i] <- length(shared)
+    }
+  }
+
+  return(shared_neighbors)
+}
+
+ferman_sign_change_test <-
+  function(full_matched_table,
+    # matched_pairs, # a list, where
+    #        treated, # a list,
+           tau_0 = 0,
+           alpha = 0.05,
+           max_permutations = 1000) {
+
+  N1 <- length(unique(full_matched_table$subclass))
+  tau_i <- full_matched_table %>%
+      group_by(Z, subclass) %>%
+      summarize(avg_Y = sum(Y*weights) / sum(weights)) %>%
+      group_by(subclass) %>%
+      summarize(est = last(avg_Y) - first(avg_Y)) %>%
+      pull(est) - tau_0
 
   tau_bar <- mean(tau_i)
 
   # Test statistic
   T_obs <- abs(tau_bar) / sqrt(sum((tau_i - tau_bar)^2) / (N1 - 1))
 
-  # Generate sign changes respecting shared neighbors
-  shared_neighbors <- matrix(FALSE, N1, N1)
-  for (i in 1:N1) {
-    for (j in 1:N1) {
-      if (i < j) {
-        shared <- intersect(matched_pairs[[i]]$control_indices, matched_pairs[[j]]$control_indices)
-        shared_neighbors[i, j] <- shared_neighbors[j, i] <- length(shared) > 0
-      }
-    }
-  }
+  matched_matrix <- get_matched_control_ids(full_matched_table = full_matched_table)
+  shared_neighbors <- compute_shared_neighbors(matched_matrix)
 
   # Generate valid sign changes
   T_null <- replicate(max_permutations, {
@@ -137,47 +191,114 @@ ferman_sign_change_test <- function(matched_pairs, treated, tau_0, alpha = 0.05,
   reject
 }
 
+compute_overlap_statistics <- function(shared_neighbors) {
+  N1 <- nrow(shared_neighbors)
 
-# Compute overlap-related statistics
-compute_overlap_statistics <- function(matched_pairs) {
-  N1 <- length(matched_pairs)
+  shared_neighbors_binary <- shared_neighbors > 0
+  n_shared_treated_vec <- rowSums(shared_neighbors_binary)
+  n_shared_controls_vec <- rowSums(shared_neighbors)
 
-  shared_controls <- numeric(N1) # Initialize a vector to store shared control counts
-  shared_treated <- numeric(N1)  # Initialize a vector to store shared treated counts
+  list(
+    avg_shared_controls = median(n_shared_controls_vec),
+    p75_shared_controls = quantile(n_shared_controls_vec, probs = 0.75),
+    max_shared_controls = max(n_shared_controls_vec),
+    avg_shared_treated = median(n_shared_treated_vec),
+    p75_shared_treated = quantile(n_shared_treated_vec, probs = 0.75),
+    max_shared_treated = max(n_shared_treated_vec)
+  )
+}
 
-  for (i in 1:N1) {
-    # Initialize lists to store intersections and shared treated counts for treated unit `i`
-    intersected_controls <- list()
-    treated_with_shared_controls <- 0
 
-    for (j in 1:N1) {
-      if (i != j) {
-        # Find the shared controls between treated unit `i` and treated unit `j`
-        shared <- intersect(matched_pairs[[i]]$control_indices, matched_pairs[[j]]$control_indices)
-        intersected_controls[[j]] <- shared
+# compute_overlap_statistics_old <- function(matched_pairs) {
+#   N1 <- length(matched_pairs)
+#
+#   shared_controls <- numeric(N1) # Initialize a vector to store shared control counts
+#   shared_treated <- numeric(N1)  # Initialize a vector to store shared treated counts
+#
+#   for (i in 1:N1) {
+#     # Initialize lists to store intersections and shared treated counts for treated unit `i`
+#     intersected_controls <- list()
+#     treated_with_shared_controls <- 0
+#
+#     for (j in 1:N1) {
+#       if (i != j) {
+#         # Find the shared controls between treated unit `i` and treated unit `j`
+#         shared <- intersect(matched_pairs[[i]]$control_indices, matched_pairs[[j]]$control_indices)
+#         intersected_controls[[j]] <- shared
+#
+#         # Count if there are any shared controls with treated unit `j`
+#         if (length(shared) > 0) {
+#           treated_with_shared_controls <- treated_with_shared_controls + 1
+#         }
+#       }
+#     }
+#
+#     # Flatten the list of intersected controls and count unique values
+#     unique_shared_controls <- unique(unlist(intersected_controls))
+#     shared_controls[i] <- length(unique_shared_controls) # Store the count
+#
+#     # Store the number of treated units sharing controls with treated unit `i`
+#     shared_treated[i] <- treated_with_shared_controls
+#   }
+#
+#   list(
+#     avg_shared_controls = mean(shared_controls),
+#     p75_shared_controls = quantile(shared_controls, probs = 0.75),
+#     avg_shared_treated = mean(shared_treated),
+#     p75_shared_treated = quantile(shared_treated, probs = 0.75)
+#   )
+# }
 
-        # Count if there are any shared controls with treated unit `j`
-        if (length(shared) > 0) {
-          treated_with_shared_controls <- treated_with_shared_controls + 1
+
+generate_one_dgp_and_matched_table <- function(N1 = 5,
+                                        N0 = 1000,
+                                        M = 10,
+                                        i = 1,
+                                        panel = "A",
+                                        seed = NA,
+                                        verbose = 0) {
+  if (is.na(seed)){
+    set.seed(123 + 12 * i)
+  }
+
+    if (verbose >= 1) {
+      cat(sprintf("Generating DGP for replicate %d (Panel %s, M = %d, N1 = %d)...\n", i, panel, M, N1))
+    }
+    dgp_data <- generate_dgp(N1, N0, panel)
+    file_name <- paste0("1d_DGP-", panel, "_M-", M, "_N1-", N1, "_i-", i, ".rds")
+    if (verbose >= 2) {
+      cat(sprintf("Saving matched table to %s\n", file_name))
+    }
+    generate_full_matched_table(dat = dgp_data,
+                                M = M,
+                                file_name = file_name)
+}
+
+
+generate_all_dgp_and_matched_table <- function(
+    N0 = 1000,
+    N1_values = c(5,10),
+    M_values = c(1,4,10),
+    panels = c("A","B"),
+    num_replicates = 1000,
+    verbose = 0){
+  for (panel in panels) {
+    for (N1 in N1_values) {
+      for (M in M_values) {
+        for (i in 1:num_replicates) {
+          generate_one_dgp_and_matched_table(
+            N1 = N1,
+            N0 = N0,
+            M = M,
+            i = i,
+            panel = panel,
+            verbose = verbose)
         }
       }
     }
-
-    # Flatten the list of intersected controls and count unique values
-    unique_shared_controls <- unique(unlist(intersected_controls))
-    shared_controls[i] <- length(unique_shared_controls) # Store the count
-
-    # Store the number of treated units sharing controls with treated unit `i`
-    shared_treated[i] <- treated_with_shared_controls
   }
-
-  list(
-    avg_shared_controls = mean(shared_controls),
-    p75_shared_controls = quantile(shared_controls, probs = 0.75),
-    avg_shared_treated = mean(shared_treated),
-    p75_shared_treated = quantile(shared_treated, probs = 0.75)
-  )
 }
+
 
 compute_rejection_rate <- function(N1, N0, M, tau_0, alpha, num_replicates, max_permutations, panel) {
   rejection_rates <- numeric(num_replicates)
@@ -210,18 +331,25 @@ compute_rejection_rate <- function(N1, N0, M, tau_0, alpha, num_replicates, max_
 }
 
 
-# Example of full table generation
+# Read and summarize one data, then average over all
 generate_full_table <- function(
-    N0, N1_values, M_values, panels, tau_0, alpha, num_replicates, max_permutations,
+    N0,
+    N1_values,
+    M_values,
+    panels,
+    tau_0,
+    alpha,
+    num_replicates,
+    max_permutations,
     result_path = here("scripts/new-inference/outputs/results_table.rds")) {
   results <- list()
 
   for (panel in panels) {
     for (N1 in N1_values) {
       for (M in M_values) {
-        cat("Running Panel", panel, "N1 =", N1, "M =", M, "\n")
-        result <- compute_rejection_rate(N1, N0, M, tau_0, alpha, num_replicates, max_permutations, panel)
-        results[[paste(panel, N1, M, sep = "_")]] <- result
+          cat("Running Panel", panel, "N1 =", N1, "M =", M, "\n")
+          result <- compute_rejection_rate(N1, N0, M, tau_0, alpha, num_replicates, max_permutations, panel)
+          results[[paste(panel, N1, M, sep = "_")]] <- result
       }
     }
   }
@@ -235,6 +363,7 @@ generate_full_table <- function(
 #
 # Function to load and parse results
 load_results <- function(results_path, table_type) {
+  # results_path <- here("scripts/new-inference/outputs/results_table-8-Dec.rds")
   results <- readRDS(results_path)
 
   # Extract relevant data based on the table type
@@ -254,63 +383,6 @@ load_results <- function(results_path, table_type) {
   return(list(data = data, results = results))
 }
 
-# # Function to reshape results into a table format
-# reshape_results <- function(data, results) {
-#   panels <- unique(sapply(names(results), function(name) strsplit(name, "_")[[1]][1]))
-#   n1_values <- unique(sapply(names(results), function(name) strsplit(name, "_")[[1]][2]))
-#   m_values <- unique(sapply(names(results), function(name) strsplit(name, "_")[[1]][3]))
-#
-#   table_data <- matrix(NA, nrow = length(n1_values), ncol = length(m_values) * length(panels))
-#   col_names <- vector()
-#
-#   col_idx <- 1
-#   for (panel in panels) {
-#     for (m in m_values) {
-#       col_names <- c(col_names, paste("Panel", panel, "M =", m))
-#       for (i in seq_along(n1_values)) {
-#         result_key <- paste(panel, n1_values[i], m, sep = "_")
-#         table_data[i, col_idx] <- ifelse(result_key %in% names(data), data[[result_key]], NA)
-#       }
-#       col_idx <- col_idx + 1
-#     }
-#   }
-#
-#   row_names <- paste("N1 =", n1_values)
-#   table_data <- as.data.frame(table_data)
-#   names(table_data) <- col_names
-#   rownames(table_data) <- row_names
-#
-#   return(table_data)
-# }
-#
-# # Function to generate LaTeX table
-# generate_latex_code <- function(table_data, caption, label) {
-#   latex_code <- paste0("\\begin{table}[H]\n",
-#                        "\\centering\n",
-#                        "\\caption{", caption, "}\n",
-#                        "\\label{", label, "}\n",
-#                        "\\begin{tabular}{l", paste(rep("c", ncol(table_data)), collapse = ""), "}\n",
-#                        "\\hline\n",
-#                        " & ", paste(names(table_data), collapse = " & "), " \\\\\n",
-#                        "\\hline\n")
-#
-#   for (i in seq_len(nrow(table_data))) {
-#     latex_code <- paste0(latex_code, rownames(table_data)[i], " & ",
-#                          paste(round(table_data[i, ], 3), collapse = " & "), " \\\\\n")
-#   }
-#
-#   latex_code <- paste0(latex_code, "\\hline\n\\end{tabular}\n\\end{table}")
-#   return(latex_code)
-# }
-#
-# # Master function to create LaTeX table
-# create_latex_table <- function(results_path, table_type, caption, label) {
-#   parsed_results <- load_results(results_path, table_type)
-#   table_data <- reshape_results(parsed_results$data, parsed_results$results)
-#   latex_code <- generate_latex_code(table_data, caption, label)
-#   return(latex_code)
-# }
-#
 
 # Function to reshape results into table format with panels and N1 rows
 reshape_results_hierarchical <- function(data, results) {
@@ -374,3 +446,48 @@ create_latex_table_hierarchical <- function(results_path, table_type, caption, l
   latex_code <- generate_latex_code_hierarchical(table_data, caption, label)
   return(latex_code)
 }
+
+
+# # Function to implement Ferman's Sign-changes algorithm
+# ferman_sign_change_test_non_adjusted <- function(dgp_data, M, tau_0, alpha = 0.05, max_permutations = 1000) {
+#   treated <- dgp_data$treated
+#   control <- dgp_data$control
+#
+#   # Step 1: Match M nearest neighbors
+#   treated <- treated %>%
+#     rowwise() %>%
+#     mutate(
+#       matched_controls = list(
+#         control %>%
+#           arrange(abs(X - X[ID])) %>%
+#           slice_head(n = M) %>%
+#           pull(Y)
+#       )
+#     )
+#
+#   # Step 2: Compute individual treatment effects
+#   treated <- treated %>%
+#     mutate(
+#       tau_hat = Y - mean(unlist(matched_controls)) - tau_0
+#     )
+#
+#   tau_hat_S <- mean(treated$tau_hat)
+#
+#   # Step 3: Compute test statistic
+#   T_obs <- abs(tau_hat_S) / sd(treated$tau_hat)
+#
+#   # Step 4: Null distribution
+#   S <- treated$tau_hat
+#   G <- replicate(max_permutations, sample(c(-1, 1), length(S), replace = TRUE))
+#   T_null <- apply(G, 2, function(g) {
+#     gS <- g * S
+#     mean_gS <- mean(gS)
+#     abs(mean_gS) / sqrt(sum((gS - mean_gS)^2) / (length(S) - 1))
+#   })
+#
+#   # Step 5: Decision rule
+#   critical_value <- quantile(T_null, probs = 1 - alpha)
+#   reject <- as.numeric(T_obs > critical_value)
+#
+#   reject
+# }

@@ -16,8 +16,7 @@ agg_co_units(scweights)
 agg_avg_units(scweights)
 }
 \arguments{
-\item{scweights}{scm_matches object or list of sc weights (tibbles
-with tx unit in first row).}
+\item{scweights}{scm_matches object or list of sc weights (tibbles}
 }
 \value{
 data.frame with tx and corresponding control units.

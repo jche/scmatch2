@@ -10,12 +10,13 @@ get_cal_matches(
   treatment = "Z",
   metric = c("maximum", "euclidean", "manhattan"),
   caliper = 1,
-  rad_method = c("adaptive", "fixed", "1nn", "adaptive-5nn"),
+  rad_method = c("adaptive", "fixed", "1nn", "adaptive-5nn", "knn"),
   est_method = c("scm", "scm_extrap", "average"),
   return = c("sc_units", "agg_co_units", "all"),
   scaling = default_scaling(df, covs),
   id_name = "id",
-  warn = TRUE
+  warn = TRUE,
+  k = 5
 )
 }
 \arguments{

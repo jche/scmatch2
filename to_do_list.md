@@ -41,3 +41,6 @@ evaluating inference.
 TODO:Improve functions in aggregation.R
 - agg_sc_units should not take X, Y, Z
 - agg_co_units should not set things to NA?
+
+Improve function in get_cal_matches.R
+- get_cal_matches takes one-dim covariates no scaling makes scaling variable not integer but $X value 1
