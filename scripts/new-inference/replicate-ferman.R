@@ -8,7 +8,7 @@ M_values <- c(1, 4, 10)
 panels <- c("A", "B", "C", "D", "E")
 tau_0 <- 0
 alpha <- 0.05
-num_replicates <- 2
+num_replicates <- 1000
 max_permutations <- 1000
 
 set.seed(123)
@@ -19,7 +19,7 @@ generate_all_dgp_and_matched_table(
     M_values = M_values,
     panels = panels,
     num_replicates = num_replicates,
-    verbose = 0)
+    verbose = 2)
 
 results <-
   generate_full_table(

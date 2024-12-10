@@ -297,13 +297,22 @@ generate_all_dgp_and_matched_table <- function(
     for (N1 in N1_values) {
       for (M in M_values) {
         for (i in 1:num_replicates) {
-          generate_one_dgp_and_matched_table(
-            N1 = N1,
-            N0 = N0,
-            M = M,
-            i = i,
-            panel = panel,
-            verbose = verbose)
+          file_name <- generate_file_name(N1 = N1, M = M, i = i, panel = panel)
+          if (file.exists(file = here("scripts/new-inference/data/",file_name))) {
+            if (verbose == 2) {
+              cat(sprintf("File '%s' exists, skipping.\n", file_name))
+            }
+          } else {
+            generate_one_dgp_and_matched_table(
+              N1 = N1,
+              N0 = N0,
+              M = M,
+              i = i,
+              panel = panel,
+              verbose = verbose
+            )
+          }
+
         }
       }
     }
