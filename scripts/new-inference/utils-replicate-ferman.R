@@ -76,29 +76,29 @@ generate_full_matched_table <- function(dat,
 
 
 
-## The below function took into the original DGP code
-## Original DGP format: (unmatched )
-##    treated = data.frame(ID = 1:N1, X = X_treated, Y = Y_treated),
-#     control = data.frame(ID = 1:N0, X = X_control, Y = Y_control)
-## Current data format: name is full_table
-##  it is a matched dataset where each row is just one data entry
-##  variable Z is used to tell treated or control
-## variable "subclass" is the identifier of the treated and the matched controls
-## so the matched controls will have the same subclass value of the treated
-## i want the function to take into full_table and output the same
-## matched_pairs variable
-match_controls <- function(treated, control, M) {
-  matched_pairs <- lapply(1:nrow(treated), function(i) {
-    distances <- abs(control$X - treated$X[i])
-    matched_indices <- order(distances)[1:M]
-    list(
-      controls = control$Y[matched_indices],
-      control_indices = matched_indices
-    )
-  })
-  return(matched_pairs)
-}
-
+# ## The below function took into the original DGP code
+# ## Original DGP format: (unmatched )
+# ##    treated = data.frame(ID = 1:N1, X = X_treated, Y = Y_treated),
+# #     control = data.frame(ID = 1:N0, X = X_control, Y = Y_control)
+# ## Current data format: name is full_table
+# ##  it is a matched dataset where each row is just one data entry
+# ##  variable Z is used to tell treated or control
+# ## variable "subclass" is the identifier of the treated and the matched controls
+# ## so the matched controls will have the same subclass value of the treated
+# ## i want the function to take into full_table and output the same
+# ## matched_pairs variable
+# match_controls <- function(treated, control, M) {
+#   matched_pairs <- lapply(1:nrow(treated), function(i) {
+#     distances <- abs(control$X - treated$X[i])
+#     matched_indices <- order(distances)[1:M]
+#     list(
+#       controls = control$Y[matched_indices],
+#       control_indices = matched_indices
+#     )
+#   })
+#   return(matched_pairs)
+# }
+#
 
 get_matched_control_ids <- function(full_matched_table) {
 
@@ -107,7 +107,7 @@ get_matched_control_ids <- function(full_matched_table) {
   matched_control_ids <- list()
 
   for (subclass in subclasses) {
-    data_in_subclass <- full_table[full_table$subclass == subclass, ]
+    data_in_subclass <- full_matched_table[full_matched_table$subclass == subclass, ]
 
     treated_units <- data_in_subclass[data_in_subclass$Z == 1, ]
     control_units <- data_in_subclass[data_in_subclass$Z == 0, ]
@@ -142,48 +142,85 @@ compute_shared_neighbors <- function(matched_matrix) {
   return(shared_neighbors)
 }
 
+
+compute_tau_i <- function(full_matched_table,
+                          tau_0 = 0){
+  N1 <- length(unique(full_matched_table$subclass))
+  tau_i <- full_matched_table %>%
+    group_by(Z, subclass) %>%
+    summarize(avg_Y = sum(Y*weights) / sum(weights)) %>%
+    group_by(subclass) %>%
+    summarize(est = last(avg_Y) - first(avg_Y)) %>%
+    pull(est) - tau_0
+  return(tau_i)
+}
+
+compute_t_stat <- function(S){
+  # N1 <- length(S)
+  # S_bar <- mean(S)
+  # t_stat <- abs(S_bar) / sqrt(sum((S - tau_bar)^2) / (N1 - 1))
+  t_stat <- abs(mean(S)) / sd(S)
+  return( t_stat )
+}
+
+ferman_sign_change_null_dist <-
+  function(full_matched_table,
+           tau_0 = 0,
+           max_permutations = 1000,
+           overlap_adj = T){
+    N1 <- length(unique(full_matched_table$subclass))
+    tau_i <- compute_tau_i(full_matched_table,
+                           tau_0)
+
+    matched_matrix <- get_matched_control_ids(full_matched_table = full_matched_table)
+    shared_neighbors <- compute_shared_neighbors(matched_matrix)
+    shared_neighbors_binary <- shared_neighbors > 0
+
+    # Generate valid sign changes
+    T_null <- replicate(max_permutations, {
+      signs <- numeric(N1)
+      if (overlap_adj){
+        signs[1] <- sample(c(-1, 1), 1)
+        for (i in 2:N1) {
+          connected <- which(shared_neighbors_binary[i, 1:(i - 1)])
+
+          if (length(connected) > 0) {
+            signs[i] <- signs[connected[1]]
+          } else {
+            signs[i] <- sample(c(-1, 1), 1)
+          }
+        }
+      }else{
+        signs <- sample(c(-1, 1), N1, replace=T)
+      }
+      gS <- signs * tau_i
+      # gS_bar <- mean(gS)
+      # abs(gS_bar) / sqrt(sum((gS - gS_bar)^2) / (N1 - 1))
+      compute_t_stat(gS)
+    })
+    return(T_null)
+  }
+
 ferman_sign_change_test <-
   function(full_matched_table,
            tau_0 = 0,
            alpha = 0.05,
-           max_permutations = 1000) {
-
-  N1 <- length(unique(full_matched_table$subclass))
-  tau_i <- full_matched_table %>%
-      group_by(Z, subclass) %>%
-      summarize(avg_Y = sum(Y*weights) / sum(weights)) %>%
-      group_by(subclass) %>%
-      summarize(est = last(avg_Y) - first(avg_Y)) %>%
-      pull(est) - tau_0
-
-  tau_bar <- mean(tau_i)
-
-  # Test statistic
-  T_obs <- abs(tau_bar) / sqrt(sum((tau_i - tau_bar)^2) / (N1 - 1))
-
-  matched_matrix <- get_matched_control_ids(full_matched_table = full_matched_table)
-  shared_neighbors <- compute_shared_neighbors(matched_matrix)
-
-  # Generate valid sign changes
-  T_null <- replicate(max_permutations, {
-    signs <- sample(c(-1, 1), 1)
-    for (i in 2:N1) {
-      connected <- which(shared_neighbors[i, 1:(i - 1)])
-      if (length(connected) > 0) {
-        signs[i] <- signs[connected[1]]
-      } else {
-        signs[i] <- sample(c(-1, 1), 1)
-      }
-    }
-    gS <- signs * tau_i
-    gS_bar <- mean(gS)
-    abs(gS_bar) / sqrt(sum((gS - gS_bar)^2) / (N1 - 1))
-  })
-
-  critical_value <- quantile(T_null, probs = 1 - alpha)
-  reject <- as.numeric(T_obs > critical_value)
-  reject
-}
+           max_permutations = 1000,
+           overlap_adj = T) {
+    tau_i <- compute_tau_i(full_matched_table,
+                           tau_0)
+    T_obs <- compute_t_stat(tau_i)
+    T_null <- ferman_sign_change_null_dist(
+      full_matched_table = full_matched_table,
+      tau_0 = tau_0,
+      max_permutations = max_permutations,
+      overlap_adj = overlap_adj)
+    critical_value <-
+      quantile(T_null, probs = 1 - alpha)
+    reject <-
+      as.numeric(T_obs > critical_value)
+    reject
+  }
 
 compute_overlap_statistics <- function(shared_neighbors) {
   N1 <- nrow(shared_neighbors)
@@ -320,7 +357,10 @@ generate_all_dgp_and_matched_table <- function(
 }
 
 
-compute_rejection_rate <- function(N1, N0, M, tau_0, alpha, num_replicates, max_permutations, panel) {
+compute_rejection_rate <-
+  function(N1, N0, M, tau_0, alpha,
+           num_replicates, max_permutations,
+           panel) {
   rejection_rates <- numeric(num_replicates)
   overlap_stats <- list()
 
@@ -331,8 +371,18 @@ compute_rejection_rate <- function(N1, N0, M, tau_0, alpha, num_replicates, max_
                                        M = M,
                                        i = i,
                                        panel = panel)
-    rejection_rates[i] <- ferman_sign_change_test(matched_pairs, dgp_data$treated, tau_0, alpha, max_permutations)
-    overlap_stats[[i]] <- compute_overlap_statistics(matched_pairs)
+   rejection_rates[i] <-
+     ferman_sign_change_test(full_matched_table = full_matched_table,
+                             tau_0 = tau_0,
+                             alpha = alpha,
+                             max_permutations = max_permutations)
+
+   matched_matrix <- get_matched_control_ids(full_matched_table)
+   shared_neighbors <- compute_shared_neighbors(matched_matrix)
+   overlap_stats[[i]] <-
+     compute_overlap_statistics(shared_neighbors)
+   # rejection_rates[i] <- ferman_sign_change_test(matched_pairs, dgp_data$treated, tau_0, alpha, max_permutations)
+    # overlap_stats[[i]] <- compute_overlap_statistics(matched_pairs)
   }
 
   avg_rejection_rate <- mean(rejection_rates)
