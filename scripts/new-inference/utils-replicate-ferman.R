@@ -365,8 +365,6 @@ compute_rejection_rate <-
   overlap_stats <- list()
 
   for (i in 1:num_replicates) {
-    # dgp_data <- generate_dgp(N1, N0, panel)
-    # matched_pairs <- match_controls(dgp_data$treated, dgp_data$control, M)
    full_matched_table <- read_one_matched_table(N1 = N1,
                                        M = M,
                                        i = i,
