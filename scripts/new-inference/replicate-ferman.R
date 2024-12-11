@@ -32,6 +32,20 @@ results <-
   )
 
 
+## Develop the new testing
+# Read one dataset
+full_matched_table <- read_one_matched_table(N1 = 10,
+                                             M = 4,
+                                             i = 1,
+                                             panel = "A")
+# Get the
+AE_res <- CSM:::get_se_AE(
+  full_matched_table,
+  outcome = "Y",
+  treatment = "Z",
+  var_weight_type = "uniform"
+)
+AE_res$SE
 
 
 results_path <- here("scripts/new-inference/outputs/results_table.rds")
