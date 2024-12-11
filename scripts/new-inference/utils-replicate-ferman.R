@@ -377,8 +377,10 @@ compute_rejection_rate <-
                              alpha = alpha,
                              max_permutations = max_permutations)
 
-   matched_matrix <- get_matched_control_ids(full_matched_table)
-   shared_neighbors <- compute_shared_neighbors(matched_matrix)
+   matched_matrix <-
+     get_matched_control_ids(full_matched_table)
+   shared_neighbors <-
+     compute_shared_neighbors(matched_matrix)
    overlap_stats[[i]] <-
      compute_overlap_statistics(shared_neighbors)
    # rejection_rates[i] <- ferman_sign_change_test(matched_pairs, dgp_data$treated, tau_0, alpha, max_permutations)

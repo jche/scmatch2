@@ -26,7 +26,7 @@ results <-
   generate_full_table(
     N0, N1_values, M_values,
     panels, tau_0, alpha,
-    num_replicates,
+    num_replicates = 100,
     max_permutations,
     result_path = here("scripts/new-inference/outputs/results_table.rds")
   )
@@ -34,10 +34,9 @@ results <-
 
 
 
-results_path <- here("scripts/new-inference/outputs/results_table-8-Dec.rds")
+results_path <- here("scripts/new-inference/outputs/results_table.rds")
 
 source(here("scripts/new-inference/utils-replicate-ferman.R"))
-results_path <- "scripts/new-inference/outputs/results_table.rds"
 
 # Generate LaTeX for hierarchical rejection rate table
 latex_rejection_rate <- create_latex_table_hierarchical(
