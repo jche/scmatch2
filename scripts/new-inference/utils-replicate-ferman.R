@@ -155,11 +155,42 @@ compute_tau_i <- function(full_matched_table,
   return(tau_i)
 }
 
-compute_t_stat <- function(S){
-  # N1 <- length(S)
-  # S_bar <- mean(S)
-  # t_stat <- abs(S_bar) / sqrt(sum((S - tau_bar)^2) / (N1 - 1))
-  t_stat <- abs(mean(S)) / sd(S)
+compute_t_stat <- function(S, sd_method = "usual",
+                           signs = NULL,
+                           full_matched_table = NULL){
+  if (sd_method == "usual"){
+    sd_S = sd(S)
+  }else if (sd_method == "pooled") {
+    weighted_var <- get_pooled_variance(
+      matches_table = full_matched_table,
+      outcome = "Y",
+      treatment = "Z",
+      var_weight_type = "uniform"
+    )
+    sigma_hat <- sqrt(weighted_var)
+
+    unique_subclasses <- full_matched_table %>%
+      filter(Z == TRUE) %>%
+      distinct(subclass) %>%
+      arrange(subclass) %>% # Ensure a stable ordering
+      mutate(sign = signs)
+
+    full_matched_table_signed <- full_matched_table %>%
+      left_join(unique_subclasses, by = "subclass") %>%
+      mutate(weights = weights * sign) %>%
+      select(-sign)
+
+    Ns_signed <- calc_N_T_N_C(full_matched_table_signed)
+
+    sd_S <- get_plug_in_SE(
+      N_T = Ns_signed$N_T,
+      ESS_C = Ns_signed$N_C_tilde,
+      sigma_hat = sigma_hat
+    )
+  }else{
+    cat("sd_method in compute_t_stat should be either `usual` or `pooled`" )
+  }
+  t_stat <- abs(mean(S)) / sd_S
   return( t_stat )
 }
 
@@ -167,17 +198,16 @@ ferman_sign_change_null_dist <-
   function(full_matched_table,
            tau_0 = 0,
            max_permutations = 1000,
-           overlap_adj = T){
+           overlap_adj = T,
+           sd_method = "usual"){
     N1 <- length(unique(full_matched_table$subclass))
-    tau_i <- compute_tau_i(full_matched_table,
-                           tau_0)
 
     matched_matrix <- get_matched_control_ids(full_matched_table = full_matched_table)
     shared_neighbors <- compute_shared_neighbors(matched_matrix)
     shared_neighbors_binary <- shared_neighbors > 0
 
-    # Generate valid sign changes
-    T_null <- replicate(max_permutations, {
+
+    sample_signs <- function(N1, shared_neighbors_binary, overlap_adj){
       signs <- numeric(N1)
       if (overlap_adj){
         signs[1] <- sample(c(-1, 1), 1)
@@ -193,10 +223,21 @@ ferman_sign_change_null_dist <-
       }else{
         signs <- sample(c(-1, 1), N1, replace=T)
       }
+      return(signs)
+    }
+
+    T_null <- replicate(max_permutations, {
+      signs <- sample_signs(
+        N1=N1,
+        shared_neighbors_binary = shared_neighbors_binary,
+        overlap_adj = overlap_adj)
+      tau_i <- compute_tau_i(full_matched_table,
+                             tau_0)
       gS <- signs * tau_i
-      # gS_bar <- mean(gS)
-      # abs(gS_bar) / sqrt(sum((gS - gS_bar)^2) / (N1 - 1))
-      compute_t_stat(gS)
+      compute_t_stat(gS,
+                     sd_method,
+                     signs,
+                     full_matched_table)
     })
     return(T_null)
   }
@@ -206,7 +247,8 @@ ferman_sign_change_test <-
            tau_0 = 0,
            alpha = 0.05,
            max_permutations = 1000,
-           overlap_adj = T) {
+           overlap_adj = T,
+           sd_method = "usual") {
     tau_i <- compute_tau_i(full_matched_table,
                            tau_0)
     T_obs <- compute_t_stat(tau_i)
@@ -214,7 +256,8 @@ ferman_sign_change_test <-
       full_matched_table = full_matched_table,
       tau_0 = tau_0,
       max_permutations = max_permutations,
-      overlap_adj = overlap_adj)
+      overlap_adj = overlap_adj,
+      sd_method = sd_method)
     critical_value <-
       quantile(T_null, probs = 1 - alpha)
     reject <-
@@ -360,7 +403,9 @@ generate_all_dgp_and_matched_table <- function(
 compute_rejection_rate <-
   function(N1, N0, M, tau_0, alpha,
            num_replicates, max_permutations,
-           panel) {
+           panel,
+           overlap_adj = T,
+           sd_method = "usual") {
   rejection_rates <- numeric(num_replicates)
   overlap_stats <- list()
 
@@ -373,7 +418,9 @@ compute_rejection_rate <-
      ferman_sign_change_test(full_matched_table = full_matched_table,
                              tau_0 = tau_0,
                              alpha = alpha,
-                             max_permutations = max_permutations)
+                             max_permutations = max_permutations,
+                             overlap_adj = overlap_adj,
+                             sd_method = sd_method)
 
    matched_matrix <-
      get_matched_control_ids(full_matched_table)
@@ -500,7 +547,7 @@ generate_latex_code_hierarchical <- function(table_data, caption, label) {
   # Add data for each panel
   for (panel_name in names(table_data)) {
     panel_matrix <- table_data[[panel_name]]
-    latex_code <- paste0(latex_code, "\\multicolumn{", ncol(panel_matrix) + 1, "}{l}{\\textit{", panel_name, "}} \\\\\n")
+    latex_code <- paste0(latex_code, "\\multicolumn{", ncol(panel_matrix) + 1, "}{l}{\\textit{Panel ", panel_name, "}} \\\\\n")
     for (i in 1:nrow(panel_matrix)) {
       latex_code <- paste0(latex_code, rownames(panel_matrix)[i], " & ",
                            paste(round(panel_matrix[i, ], 3), collapse = " & "), " \\\\\n")
