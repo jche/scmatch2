@@ -4,7 +4,58 @@
 
 
 #### Helper functions ####
+### Generate Otsu and Rai DGP to debug the bootstrap
+m <- function(z) {
+  0.4 + 0.25 * sin(8 * z - 5) + 0.4 * exp(-16 * (4 * z - 2.5)^2)
+}
 
+gen_df_otsu <- function(N = 1000,K = 2){
+  # output: "id" "X1" "X2" "Z"  "Y0" "Y1" "Y"
+  # Right now we choose m to be the 6th specification
+  # K=2; N = 1000
+
+  # Generate data
+  xi <- runif(N, 0, 1)
+  zeta <- matrix(rnorm(N * K), ncol = K)
+  X <- xi * apply(abs(zeta), 1, function(x) x / sqrt(sum(x^2)))
+  norm_X <- sqrt(colSums(X^2))
+
+  # Parameters for P(X)
+  gamma1 <- 0.15
+  gamma2 <- 0.7
+  P_X <- gamma1 + gamma2 * norm_X
+
+  # Treatment assignment
+  vi <- runif(N)
+  Z <- as.numeric(P_X >= vi)
+
+  # Potential outcomes
+  epsilon <- rnorm(N, 0, 0.2)
+  Y0 <- m(norm_X) + epsilon
+  Y1 <- Y0 + 0  # tau is set to 0
+  Y <- (1 - Z) * Y0 + Z * Y1
+
+  # Create dataframe
+  df <- data.frame(id = 1:N,
+                   X1 = X[1, ],
+                   X2 = X[2, ],
+                   norm_X = norm_X,
+                   m_X = m(norm_X),
+                   Z = Z,
+                   Y0 = Y0,
+                   Y1 = Y1,
+                   Y = Y)
+  return(df)
+}
+
+# generate_one_otsu <- function(){
+#   # gen_df_otsu(N = 1000,K = 2)
+#   # Edit 26 Dec 2023: Realized sample size
+#   #   might affect the success of the s.e.
+#   # The paper has sample size 100. Thus change
+#   #     to it
+#   gen_df_otsu(N = 100,K = 2)
+# }
 
 get_df_scaling_from_dgp_name <- function(dgp_name,
                                          kang_true = F,
@@ -47,7 +98,6 @@ get_df_scaling_from_dgp_name <- function(dgp_name,
 }
 
 
-
 get_matches_and_debiased_residuals <-
   function(dgp_name,
            df_dgp,
@@ -55,27 +105,33 @@ get_matches_and_debiased_residuals <-
            mu_model,
            n_split=1){
 
-
     # TODO: What is the following for?  What is n_split for?  Not
     # following this code:
-
+    # Step 1: get matches
     preds_csm <- get_matches(dgp_name=dgp_name,
                              df_dgp=df_dgp,
                              scaling=scaling)
 
-    #Assign group_label to df_dgp
-    df_dgp_splitted <- assign_group_label(df_dgp,
-                                          n_split = n_split) %>%
+    # Step 2: Assign group_label to preds_csm for
+    #   cross-fitting the de-biasing model
+    df_dgp_splitted <-
+      assign_group_label(df_dgp,
+                         n_split = n_split) %>%
       mutate( id = as.character(id) )
+    # print("n_split")
+    # print(n_split)
+    # print(df_dgp_splitted$group_label) # this is not doing
 
     id_to_group_map <-
       df_dgp_splitted %>%
       select(id, group_label)
 
     # Append the same label to preds_csm through join
+    # print(preds_csm$result) # This is currently NULL. This
     preds_csm <-
-      left_join(preds_csm$result,
-                id_to_group_map %>% distinct(id, .keep_all=T),
+      dplyr::left_join(preds_csm,
+                id_to_group_map %>%
+                  distinct(id, .keep_all=T),
                 by="id")
 
 
@@ -84,8 +140,12 @@ get_matches_and_debiased_residuals <-
       get_pred_label_map(n=n_split)
 
     preds_csm <-
-      left_join(preds_csm, pred_label_map, by="group_label")
+      left_join(preds_csm,
+                pred_label_map,
+                by="group_label")
 
+
+    # Step 3: train and predict the bias part
     df_controls <-
       df_dgp_splitted %>% filter(Z==0)
 
@@ -112,6 +172,8 @@ get_matches_and_debiased_residuals <-
 
     # Model fitting using sample splitting
     # Nest data
+    # print(head(df_controls))
+    # print(df_controls$group_label)
     df_to_fit_nested <-
       df_controls %>%
       group_by(group_label) %>%
@@ -134,14 +196,17 @@ get_matches_and_debiased_residuals <-
                                 df_test=preds_csm,
                                 X_names=X_names)
     }
-
+    #
+    # print(head(preds_csm))
     # Finally, select the prediction
     preds_csm <- preds_csm %>%
       rowwise() %>%
-      mutate(hat_mu_0 = get(paste0("hat_mu_0_pred_", pred_label)))
+      mutate(hat_mu_0 =
+              get(paste0("hat_mu_0_pred_", pred_label)))
 
 
-    ## Construct residuals
+    ## Step 4: Construct residuals
+    # We could construct
     # First, construct each \tilde \tau_i
     tmp0 <- preds_csm %>%
       mutate(Y_bias_corrected = Y - hat_mu_0) %>%
@@ -167,6 +232,9 @@ get_matches <- function(dgp_name, df_dgp, scaling){
   # TODO: WHY should the type of dgp affect how to get matches?  E.g.,
   # why is otsu different?  It should be a flag for kind of matching,
   # instead.
+  # Answer: this is because we wanted
+  #     to do 8-NN matching in otsu but back then
+  #     kNN was not implemented in get_cal_matches
 
   if (dgp_name == "toy" || dgp_name == "kang") {
     df_dgp_with_matches <- get_cal_matches(
@@ -178,8 +246,18 @@ get_matches <- function(dgp_name, df_dgp, scaling){
       return = "all"
     )
   } else if (dgp_name == "otsu") {
-    df_dgp_with_matches <- get_NN_matches(df_dgp)
-
+    df_dgp_with_matches <- get_cal_matches(
+      df_dgp,
+      covs = starts_with("X"),
+      treatment = "Z",
+      scaling = 1,
+      metric = "euclidean",
+      rad_method = "knn",
+      k = 8
+    )
+    df_dgp_with_matches <- full_unit_table(df_dgp_with_matches,
+                                           nonzero_weight_only = F)
+    # df_dgp_with_matches <- get_NN_matches(df_dgp)
   } else {
     stop("dgp_name must be toy, kang, or otsu")
   }
@@ -616,7 +694,8 @@ boot_cluster_for_otsu <- function(df_dgp,
 
 assign_group_label <- function(df_to_split, n_split) {
   df_to_split$group_label <-
-    sample( df_to_split$id,
+    sample( 1:n_split,
+      # df_to_split$id,
             nrow(df_to_split),
             replace = TRUE)
   return(df_to_split)
@@ -652,6 +731,7 @@ boot_CSM <- function(dgp_name,
                      n_split=1,
                      kang_true=FALSE,
                      toy_ctr_dist=0.5,
+                     M = 8,
                      seed = NULL ){
 
   covered <- CI_lower <- CI_upper <-
@@ -676,6 +756,20 @@ boot_CSM <- function(dgp_name,
     list2env(dgp_obj,envir = environment())
 
     time_before_matching <- proc.time()
+    # input: DGP, scaling (scaling does not matter if we do M-NN matching)
+    # output: the matched object mtch
+    # We want to do a M-NN matching using M=8.
+    # Then we want to do the debiasing step
+    # I think we
+    # mtch <- get_cal_matches(
+    #   df_dgp,
+    #   covs = starts_with("X"),
+    #   treatment = "Z",
+    #   scaling = 1,
+    #   metric = "euclidean",
+    #   rad_method = "knn",
+    #   k = M
+    # )
     matches_and_debiased_residuals<-
       get_matches_and_debiased_residuals(
         dgp_name, df_dgp,
@@ -689,6 +783,8 @@ boot_CSM <- function(dgp_name,
     att_debiased[i] <- mean_tilde_tau
 
     # Perform bootstrap
+    # Input: tilde_tau_resids: a vector of length n of
+    # Output: a
     seed_addition = i * 11
     if (boot_mtd == "Bayesian" || boot_mtd == "wild"){
       T_star <-
@@ -835,9 +931,3 @@ boot_CSM <- function(dgp_name,
   return(res_save_bayesian_boot)
 }
 
-
-
-<<<<<<< HEAD
-=======
-
->>>>>>> 2d5c35c014983f579848ea864c575ec2742bbb0e
