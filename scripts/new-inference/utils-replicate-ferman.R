@@ -285,6 +285,29 @@ ferman_sign_change_test <-
     reject
   }
 
+#' Compute Overlap Statistics
+#'
+#' Computes summary statistics for the overlap of shared neighbors in a matrix.
+#' The function calculates the median, 75th percentile, and maximum for the number of shared treated
+#' and control neighbors across rows.
+#'
+#' @param shared_neighbors A numeric matrix of dimensions \eqn{N1 \times M}, where each entry represents
+#' the number of shared neighbors between treated and control units.
+#'
+#' @return A list containing the following components:
+#' \item{avg_shared_controls}{Median number of shared control neighbors across rows.}
+#' \item{p75_shared_controls}{75th percentile of the number of shared control neighbors across rows.}
+#' \item{max_shared_controls}{Maximum number of shared control neighbors across rows.}
+#' \item{avg_shared_treated}{Median number of shared treated neighbors across rows.}
+#' \item{p75_shared_treated}{75th percentile of the number of shared treated neighbors across rows.}
+#' \item{max_shared_treated}{Maximum number of shared treated neighbors across rows.}
+#'
+#' @examples
+#' # Example matrix with shared neighbors
+#' shared_neighbors <- matrix(c(0, 1, 2, 3, 0, 1, 4, 5, 2, 1), nrow = 5, byrow = TRUE)
+#' compute_overlap_statistics(shared_neighbors)
+#'
+#' @export
 compute_overlap_statistics <- function(shared_neighbors) {
   N1 <- nrow(shared_neighbors)
 

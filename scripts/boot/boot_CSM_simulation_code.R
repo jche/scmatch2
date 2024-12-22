@@ -9,10 +9,14 @@ m <- function(z) {
   0.4 + 0.25 * sin(8 * z - 5) + 0.4 * exp(-16 * (4 * z - 2.5)^2)
 }
 
-gen_df_otsu <- function(N = 1000,K = 2){
+gen_df_otsu <- function(N = 1000,K = 2,
+                        N1 = NULL,
+                        N0 = NULL){
   # output: "id" "X1" "X2" "Z"  "Y0" "Y1" "Y"
   # Right now we choose m to be the 6th specification
-  # K=2; N = 1000
+  if (!is.null(N1) & !is.null(N0)){
+    N <- N1 + N0
+  }
 
   # Generate data
   xi <- runif(N, 0, 1)
@@ -20,19 +24,25 @@ gen_df_otsu <- function(N = 1000,K = 2){
   X <- xi * apply(abs(zeta), 1, function(x) x / sqrt(sum(x^2)))
   norm_X <- sqrt(colSums(X^2))
 
-  # Parameters for P(X)
-  gamma1 <- 0.15
-  gamma2 <- 0.7
-  P_X <- gamma1 + gamma2 * norm_X
 
-  # Treatment assignment
-  vi <- runif(N)
-  Z <- as.numeric(P_X >= vi)
+
+  if (!is.null(N1) & !is.null(N0)){
+    Z <- c(rep(1, N1), rep(0, N0))
+  }else{
+    gamma1 <- 0.15
+    gamma2 <- 0.7
+    P_X <- gamma1 + gamma2 * norm_X
+
+    vi <- runif(N)
+    Z <- as.numeric(P_X >= vi)
+  }
+
 
   # Potential outcomes
   epsilon <- rnorm(N, 0, 0.2)
   Y0 <- m(norm_X) + epsilon
-  Y1 <- Y0 + 0  # tau is set to 0
+  tau <- 0  # tau is set to 0
+  Y1 <- Y0 + tau
   Y <- (1 - Z) * Y0 + Z * Y1
 
   # Create dataframe
@@ -59,7 +69,9 @@ gen_df_otsu <- function(N = 1000,K = 2){
 
 get_df_scaling_from_dgp_name <- function(dgp_name,
                                          kang_true = F,
-                                         toy_ctr_dist=0.5){
+                                         toy_ctr_dist=0.5,
+                                         N1 = NULL,
+                                         N0 = NULL){
   if (dgp_name == "toy"){
     df_dgp <- gen_one_toy(ctr_dist=toy_ctr_dist)
     # Edit 4 Mar 2024:
@@ -83,7 +95,15 @@ get_df_scaling_from_dgp_name <- function(dgp_name,
                          else 1000
                        }))
   }else if (dgp_name == "otsu"){
-    df_dgp <- generate_one_otsu()
+    # df_dgp <- generate_one_otsu()
+    if (is.null(N1) & is.null(N0)){
+      df_dgp <- gen_df_otsu(N = 100,K = 2)
+    }else{
+      df_dgp <- gen_df_otsu(N1 = N1,
+                            N0 = N0,
+                            K = 2)
+    }
+
     scaling <- df_dgp %>%
       summarize(across(starts_with("X"),
                        function(x) {
@@ -702,10 +722,142 @@ assign_group_label <- function(df_to_split, n_split) {
 }
 
 
+#' Get Matched Matrix
+#'
+#' Converts a full matched table into a matrix where each row corresponds to a treated unit
+#' and each column contains the IDs of matched control units. Missing values (if any) are filled with `NA`.
+#'
+#' @param full_matched_table A data frame containing the matched data. Must include the columns:
+#' \itemize{
+#'   \item{\code{ID}: Unique identifiers for each unit.}
+#'   \item{\code{Z}: Indicator for treated (\code{1}) or control (\code{0}) units.}
+#'   \item{\code{subclass}: Subclass assignments for matching.}
+#' }
+#'
+#' @return A matrix where:
+#' \item{Rows}{Represent treated units (indexed by their IDs).}
+#' \item{Columns}{Contain IDs of matched control units for each treated unit. Missing matches are filled with \code{NA}.}
+#'
+#' @examples
+#' # Example full matched table
+#' full_matched_table <- data.frame(
+#'   ID = 1:6,
+#'   Z = c(1, 0, 1, 0, 0, 1),
+#'   subclass = c(1, 1, 2, 2, 2, 3)
+#' )
+#' get_matched_matrix(full_matched_table)
+#'
+#' @export
+get_matched_matrix <- function(full_matched_table) {
+  subclasses <- unique(full_matched_table$subclass)
+
+  matched_control_ids <- list()
+
+  for (subclass in subclasses) {
+    data_in_subclass <- full_matched_table[full_matched_table$subclass == subclass, ]
+
+    treated_units <- data_in_subclass[data_in_subclass$Z == 1, ]
+    control_units <- data_in_subclass[data_in_subclass$Z == 0, ]
+    # print(head(treated_units) )
+    for (treated_id in treated_units$id) {
+      matched_control_ids[[as.character(treated_id)]] <- control_units$id
+    }
+  }
+
+  max_controls <- max(sapply(matched_control_ids, length))
+  matched_matrix <- do.call(rbind, lapply(matched_control_ids, function(ids) {
+    c(ids, rep(NA, max_controls - length(ids)))
+  }))
+
+  rownames(matched_matrix) <- names(matched_control_ids)
+
+  return(matched_matrix)
+}
+
+#' Compute Shared Neighbors
+#'
+#' Computes the number of shared control neighbors between each pair of treated units
+#' based on a given matched matrix.
+#'
+#' @param matched_matrix A matrix where:
+#' \item{Rows}{Represent treated units.}
+#' \item{Columns}{Contain IDs of matched control units. Missing values should be \code{NA}.}
+#'
+#' @return A symmetric matrix of dimensions \code{N1 x N1}, where \code{N1} is the number of treated units.
+#' Each entry \code{[i, j]} represents the count of shared control neighbors between treated units \code{i} and \code{j}.
+#'
+#' @examples
+#' # Example matched matrix
+#' matched_matrix <- matrix(
+#'   c(2, 3, NA, 3, 4, 5, NA, NA, 5, 6, 7, 8),
+#'   nrow = 4, byrow = TRUE
+#' )
+#' compute_shared_neighbors(matched_matrix)
+#'
+#' @export
+compute_shared_neighbors <- function(matched_matrix) {
+  N1 <- nrow(matched_matrix)
+
+  shared_neighbors <- matrix(FALSE, nrow = N1, ncol = N1)
+
+  for (i in 1:(N1 - 1)) {
+    for (j in (i + 1):N1) {
+      shared <- intersect(matched_matrix[i, ], matched_matrix[j, ])
+      shared_neighbors[i, j] <- shared_neighbors[j, i] <- length(shared)
+    }
+  }
+
+  return(shared_neighbors)
+}
+
+
+#' Compute Overlap Statistics
+#'
+#' Computes summary statistics for the overlap of shared neighbors in a matrix.
+#' The function calculates the median, 75th percentile, and maximum for the number of shared treated
+#' and control neighbors across rows.
+#'
+#' @param shared_neighbors A numeric matrix of dimensions \eqn{N1 \times M}, where each entry represents
+#' the number of shared neighbors between treated and control units.
+#'
+#' @return A list containing the following components:
+#' \item{avg_shared_controls}{Median number of shared control neighbors across rows.}
+#' \item{p75_shared_controls}{75th percentile of the number of shared control neighbors across rows.}
+#' \item{max_shared_controls}{Maximum number of shared control neighbors across rows.}
+#' \item{avg_shared_treated}{Median number of shared treated neighbors across rows.}
+#' \item{p75_shared_treated}{75th percentile of the number of shared treated neighbors across rows.}
+#' \item{max_shared_treated}{Maximum number of shared treated neighbors across rows.}
+#'
+#' @examples
+#' # Example matrix with shared neighbors
+#' shared_neighbors <- matrix(c(0, 1, 2, 3, 0, 1, 4, 5, 2, 1), nrow = 5, byrow = TRUE)
+#' compute_overlap_statistics(shared_neighbors)
+#'
+#' @export
+compute_overlap_statistics <- function(shared_neighbors) {
+  N1 <- nrow(shared_neighbors)
+
+  shared_neighbors_binary <- shared_neighbors > 0
+  n_shared_treated_vec <- rowSums(shared_neighbors_binary)
+  n_shared_controls_vec <- rowSums(shared_neighbors)
+
+  list(
+    avg_shared_controls = median(n_shared_controls_vec),
+    p75_shared_controls = quantile(n_shared_controls_vec, probs = 0.75),
+    max_shared_controls = max(n_shared_controls_vec),
+    avg_shared_treated = median(n_shared_treated_vec),
+    p75_shared_treated = quantile(n_shared_treated_vec, probs = 0.75),
+    max_shared_treated = max(n_shared_treated_vec)
+  )
+}
+
+
+
 
 #### Primary simulation function ####
 
 #' Run a simulation to check inference
+#   Repeat I times of DGP --> match --> getting bootstrapped intervals
 #'
 #' @param dgp_name Name of the DGP
 #' @param att0 True ATT
@@ -732,7 +884,9 @@ boot_CSM <- function(dgp_name,
                      kang_true=FALSE,
                      toy_ctr_dist=0.5,
                      M = 8,
-                     seed = NULL ){
+                     seed = NULL,
+                     N1 = NULL,
+                     N0 = NULL){
 
   covered <- CI_lower <- CI_upper <-
     att_true <- att_est <- att_debiased <-
@@ -742,6 +896,8 @@ boot_CSM <- function(dgp_name,
     noise <-
     bias <-
     N_T <- N_C <- numeric(I)
+  avg_shared_controls <- p75_shared_controls <-
+    avg_shared_treated <- p75_shared_treated <- numeric(I)
   T_star <- numeric(B)
   if ( !is.null(seed) ) {
     set.seed(123)
@@ -750,9 +906,13 @@ boot_CSM <- function(dgp_name,
   for (i in 1:I){
     print(i)
     dgp_obj <-
-      get_df_scaling_from_dgp_name(dgp_name=dgp_name,
-                                   kang_true=kang_true,
-                                   toy_ctr_dist=toy_ctr_dist)
+      get_df_scaling_from_dgp_name(
+        dgp_name=dgp_name,
+        kang_true=kang_true,
+        toy_ctr_dist=toy_ctr_dist,
+        N1 = N1,
+        N0 = N0
+        )
     list2env(dgp_obj,envir = environment())
 
     time_before_matching <- proc.time()
@@ -760,20 +920,12 @@ boot_CSM <- function(dgp_name,
     # output: the matched object mtch
     # We want to do a M-NN matching using M=8.
     # Then we want to do the debiasing step
-    # I think we
-    # mtch <- get_cal_matches(
-    #   df_dgp,
-    #   covs = starts_with("X"),
-    #   treatment = "Z",
-    #   scaling = 1,
-    #   metric = "euclidean",
-    #   rad_method = "knn",
-    #   k = M
-    # )
+    # Right now the
     matches_and_debiased_residuals<-
       get_matches_and_debiased_residuals(
         dgp_name, df_dgp,
         scaling, mu_model,n_split)
+
     list2env(matches_and_debiased_residuals,
              envir = environment())
     time_after_matching <- proc.time()
@@ -782,9 +934,18 @@ boot_CSM <- function(dgp_name,
 
     att_debiased[i] <- mean_tilde_tau
 
+    # Calculate
+    matched_matrix <- get_matched_matrix(preds_csm)
+    shared_neighbors <- compute_shared_neighbors(matched_matrix)
+    overlap_statistics <- compute_overlap_statistics(shared_neighbors)
+    avg_shared_controls[i] <- overlap_statistics[["avg_shared_controls"]]
+    p75_shared_controls[i] <- overlap_statistics[["p75_shared_controls"]]
+    avg_shared_treated[i] <- overlap_statistics[["avg_shared_treated"]]
+    p75_shared_treated[i] <- overlap_statistics[["p75_shared_treated"]]
+
     # Perform bootstrap
     # Input: tilde_tau_resids: a vector of length n of
-    # Output: a
+    # Output: sd, confint
     seed_addition = i * 11
     if (boot_mtd == "Bayesian" || boot_mtd == "wild"){
       T_star <-
@@ -911,23 +1072,126 @@ boot_CSM <- function(dgp_name,
   }
   mean(covered)
 
-  res_save_bayesian_boot <- tibble(id=1:I,
-                                   name=dgp_name,
-                                   boot_mtd = boot_mtd,
-                                   att_true = att_true,
-                                   att_est= att_est,
-                                   att_est_debiased = att_debiased,
-                                   lower=CI_lower,upper=CI_upper,
-                                   covered=covered,
-                                   sd_boot=sd_boot,
-                                   n_split=n_split,
-                                   mu_model=mu_model,
-                                   time_on_matching=time_on_matching,
-                                   time_on_bootstrap=time_on_bootstrap,
-                                   noise=noise,
-                                   bias=bias,
-                                   N_T =N_T,
-                                   N_C = N_C)
+  res_save_bayesian_boot <- tibble(
+    id=1:I,
+    name=dgp_name,
+    boot_mtd = boot_mtd,
+    att_true = att_true,
+    att_est= att_est,
+    att_est_debiased = att_debiased,
+    lower=CI_lower,upper=CI_upper,
+    covered=covered,
+    sd_boot=sd_boot,
+    n_split=n_split,
+    mu_model=mu_model,
+    time_on_matching=time_on_matching,
+    time_on_bootstrap=time_on_bootstrap,
+    noise=noise,
+    bias=bias,
+    N_T =N_T,
+    N_C = N_C,
+    avg_shared_controls = avg_shared_controls,
+    p75_shared_controls = p75_shared_controls,
+    avg_shared_treated = avg_shared_treated,
+    p75_shared_treated = p75_shared_treated)
+
   return(res_save_bayesian_boot)
+}
+
+
+### Result reporting ###
+create_bootstrap_comparison_plot <-
+  function(
+    boot_otsu_wild,
+    boot_otsu_A_E,
+    output_path = here("scripts/boot/figures/ci_comparison_plot.png")) {
+  library(tidyverse)
+
+  # Define true values for reference
+  true_coverage <- 0.9473
+  true_CI_length <- 0.2381
+
+  # Calculate statistics and summarize results
+  wild_results <- boot_otsu_wild %>%
+    mutate(CI_length = upper - lower) %>%
+    summarise(
+      coverage = mean(covered),
+      avg_CI_length = mean(CI_length)
+    ) %>%
+    mutate(method = "Wild Bootstrap")
+
+  A_E_results <- boot_otsu_A_E %>%
+    mutate(CI_length = upper - lower) %>%
+    summarise(
+      coverage = mean(covered),
+      avg_CI_length = mean(CI_length)
+    ) %>%
+    mutate(method = "A-E Bootstrap")
+
+  cat("Wild Bootstrap Results:\n")
+  cat("Coverage:", wild_results$coverage, "\n")
+  cat("Average CI Length:", wild_results$avg_CI_length, "\n\n")
+
+  cat("A-E Bootstrap Results:\n")
+  cat("Coverage:", A_E_results$coverage, "\n")
+  cat("Average CI Length:", A_E_results$avg_CI_length, "\n\n")
+
+  # Overlapping statistics
+  cat("### Overlapping Statistics ###\n")
+  cat("Wild Bootstrap:\n")
+  cat("Average Shared Treated Units:", mean(boot_otsu_wild$avg_shared_treated), "\n")
+  cat("Average Shared Control Units:", mean(boot_otsu_wild$avg_shared_controls), "\n\n")
+
+  cat("A-E Bootstrap:\n")
+  cat("Average Shared Treated Units:", mean(boot_otsu_A_E$avg_shared_treated), "\n")
+  cat("Average Shared Control Units:", mean(boot_otsu_A_E$avg_shared_controls), "\n\n")
+
+
+  # Combine results with true values for plotting
+  results <- bind_rows(wild_results, A_E_results) %>%
+    mutate(
+      coverage_diff = coverage - true_coverage,
+      CI_length_diff = avg_CI_length - true_CI_length
+    )
+
+  # Include true values as a separate row for reference
+  true_results <- tibble(
+    method = "True Values",
+    coverage = true_coverage,
+    avg_CI_length = true_CI_length,
+    coverage_diff = 0,
+    CI_length_diff = 0
+  )
+
+  results <- bind_rows(results, true_results)
+
+  # Create a bar plot for comparison
+  results_long <- results %>%
+    pivot_longer(
+      cols = c(coverage, avg_CI_length),
+      names_to = "metric",
+      values_to = "value"
+    )
+
+  plot <- ggplot(results_long, aes(x = method, y = value, fill = metric)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(
+      title = "Comparison of Wild Bootstrap, A-E Bootstrap, and True Values",
+      x = "Method",
+      y = "Value",
+      fill = "Metric"
+    ) +
+    theme_minimal() +
+    scale_fill_brewer(palette = "Set2") +
+    geom_hline(aes(yintercept = true_coverage), linetype = "dashed", color = "blue") +
+    geom_hline(aes(yintercept = true_CI_length), linetype = "dotted", color = "red") +
+    annotate("text", x = 2.5, y = true_coverage + 0.02, label = "True Coverage", color = "blue") +
+    annotate("text", x = 2.5, y = true_CI_length - 0.02, label = "True CI Length", color = "red")
+
+  # Save the plot
+  ggsave(output_path, plot, width = 8, height = 6)
+
+  # Return the plot object for further use or inspection
+  return(plot)
 }
 
