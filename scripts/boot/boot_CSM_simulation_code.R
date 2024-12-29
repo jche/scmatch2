@@ -74,14 +74,7 @@ get_df_scaling_from_dgp_name <- function(dgp_name,
                                          N0 = NULL){
   if (dgp_name == "toy"){
     df_dgp <- gen_one_toy(ctr_dist=toy_ctr_dist)
-    # Edit 4 Mar 2024:
     scaling <- 8
-    # scaling <- df_dgp %>%
-    #   summarize(across(starts_with("X"),
-    #                    function(x) {
-    #                      if (is.numeric(x)) 6 / (max(x) - min(x))
-    #                      else 1000
-    #                    }))
   }else if(dgp_name=="kang"){
     df_dgp <- gen_df_kang(n = 1000)
     if (kang_true){ # Replace X1 to X4 by V1 to V4
@@ -95,7 +88,6 @@ get_df_scaling_from_dgp_name <- function(dgp_name,
                          else 1000
                        }))
   }else if (dgp_name == "otsu"){
-    # df_dgp <- generate_one_otsu()
     if (is.null(N1) & is.null(N0)){
       df_dgp <- gen_df_otsu(N = 100,K = 2)
     }else{
@@ -118,171 +110,175 @@ get_df_scaling_from_dgp_name <- function(dgp_name,
 }
 
 
-get_matches_and_debiased_residuals <-
-  function(dgp_name,
-           df_dgp,
-           scaling,
-           mu_model,
-           n_split=1){
 
-    # TODO: What is the following for?  What is n_split for?  Not
-    # following this code:
-    # Step 1: get matches
-    preds_csm <- get_matches(dgp_name=dgp_name,
-                             df_dgp=df_dgp,
-                             scaling=scaling)
+debias_residuals <- function(preds_csm, X_names, Y_name, SL_lib, n_split) {
+  # Filter controls
+  df_controls <- preds_csm %>% filter(Z == 0)
 
-    # Step 2: Assign group_label to preds_csm for
-    #   cross-fitting the de-biasing model
-    df_dgp_splitted <-
-      assign_group_label(df_dgp,
-                         n_split = n_split) %>%
-      mutate( id = as.character(id) )
-    # print("n_split")
-    # print(n_split)
-    # print(df_dgp_splitted$group_label) # this is not doing
-
-    id_to_group_map <-
-      df_dgp_splitted %>%
-      select(id, group_label)
-
-    # Append the same label to preds_csm through join
-    # print(preds_csm$result) # This is currently NULL. This
-    preds_csm <-
-      dplyr::left_join(preds_csm,
-                id_to_group_map %>%
-                  distinct(id, .keep_all=T),
-                by="id")
+  # Nest data for sample splitting
+  df_to_fit_nested <- df_controls %>%
+    group_by(group_label) %>%
+    nest() %>%
+    arrange(group_label)
 
 
-    # Calculate pred_label
-    pred_label_map <-
-      get_pred_label_map(n=n_split)
-
-    preds_csm <-
-      left_join(preds_csm,
-                pred_label_map,
-                by="group_label")
-
-
-    # Step 3: train and predict the bias part
-    df_controls <-
-      df_dgp_splitted %>% filter(Z==0)
-
-    if (dgp_name == "toy" || dgp_name == "otsu") {
-      X_names<- c("X1","X2")
-      if (mu_model == "linear"){
-        SL_lib <- "SL.lm"
-      }else if (mu_model == "non-linear"){
-        SL_lib <-  "SL.randomForest"
-      }
-    } else if (dgp_name == "kang") {
-      if (mu_model == "kang_correct"){
-        X_names<- c("V1","V2","V3","V4")
-        SL_lib <- "SL.lm"
-      }else if (mu_model == "linear"){
-        X_names<- c("X1","X2","X3","X4")
-        SL_lib <- "SL.lm"
-      }
-    }
-    else {
-      stop("dgp_name must be toy or kang")
-    }
-
-
-    # Model fitting using sample splitting
-    # Nest data
-    # print(head(df_controls))
-    # print(df_controls$group_label)
-    df_to_fit_nested <-
-      df_controls %>%
-      group_by(group_label) %>%
-      nest() %>%
-      arrange(group_label)
-    models_n_split <-
-      vector("list", length = n_split)
-    for (i in 1:n_split){
-      # i <- 1
-      df_to_fit_i <- df_to_fit_nested$data[[i]]
-
-      models_n_split[[i]]<-
-        SL_fit <- get_SL_fit(df_to_fit=df_to_fit_i,
-                             X_names = X_names,
-                             Y_name = "Y",
-                             SL.library = SL_lib)
-      # get predictions:
-      preds_csm[,paste0("hat_mu_0_pred_",i)] <-
-        SL_pred  <- get_SL_pred(SL_fit=SL_fit,
-                                df_test=preds_csm,
-                                X_names=X_names)
-    }
-    #
-    # print(head(preds_csm))
-    # Finally, select the prediction
-    preds_csm <- preds_csm %>%
-      rowwise() %>%
-      mutate(hat_mu_0 =
-              get(paste0("hat_mu_0_pred_", pred_label)))
-
-
-    ## Step 4: Construct residuals
-    # We could construct
-    # First, construct each \tilde \tau_i
-    tmp0 <- preds_csm %>%
-      mutate(Y_bias_corrected = Y - hat_mu_0) %>%
-      group_by(subclass, Z) %>%
-      summarize(mn = sum(Y_bias_corrected*weights))
-    tmp <- tmp0 %>%
-      group_by(subclass) %>%
-      summarise(tilde_tau = last(mn)-first(mn), .groups="drop")
-    tilde_tau = tmp$tilde_tau
-
-    # Second, residual = \tilde \tau_i - mean(\tilde \tau_i)
-    mean_tilde_tau <- mean(tilde_tau)
-    tilde_tau_resids <- tilde_tau - mean_tilde_tau
-    return(list(preds_csm=preds_csm,
-                tilde_tau=tilde_tau,
-                mean_tilde_tau=mean_tilde_tau,
-                tilde_tau_resids=tilde_tau_resids))
-  }
-
-
-
-get_matches <- function(dgp_name, df_dgp, scaling){
-  # TODO: WHY should the type of dgp affect how to get matches?  E.g.,
-  # why is otsu different?  It should be a flag for kind of matching,
-  # instead.
-  # Answer: this is because we wanted
-  #     to do 8-NN matching in otsu but back then
-  #     kNN was not implemented in get_cal_matches
-
-  if (dgp_name == "toy" || dgp_name == "kang") {
-    df_dgp_with_matches <- get_cal_matches(
-      df = df_dgp,
-      metric = "maximum",
-      scaling = scaling,
-      rad_method = "fixed",
-      est_method = "scm",
-      return = "all"
+  fit_and_predict_split <- function(df_to_fit, preds_csm, X_names, Y_name, SL_lib, split_index) {
+    # Fit the model
+    SL_fit <- get_SL_fit(
+      df_to_fit = df_to_fit,
+      X_names = X_names,
+      Y_name = Y_name,
+      SL.library = SL_lib
     )
-  } else if (dgp_name == "otsu") {
-    df_dgp_with_matches <- get_cal_matches(
-      df_dgp,
-      covs = starts_with("X"),
-      treatment = "Z",
-      scaling = 1,
-      metric = "euclidean",
-      rad_method = "knn",
-      k = 8
+
+    # Predict using the fitted model
+    preds_csm[, paste0("hat_mu_0_pred_", split_index)] <- get_SL_pred(
+      SL_fit = SL_fit,
+      df_test = preds_csm,
+      X_names = X_names
     )
-    df_dgp_with_matches <- full_unit_table(df_dgp_with_matches,
-                                           nonzero_weight_only = F)
-    # df_dgp_with_matches <- get_NN_matches(df_dgp)
-  } else {
-    stop("dgp_name must be toy, kang, or otsu")
+
+    return(SL_fit)
   }
-  return(df_dgp_with_matches)
+  models_n_split <- lapply(seq_len(n_split), function(i) {
+    fit_and_predict_split(
+      df_to_fit = df_to_fit_nested$data[[i]],
+      preds_csm = preds_csm,
+      X_names = X_names,
+      Y_name = Y_name,
+      SL_lib = SL_lib,
+      split_index = i
+    )
+  })
+
+  # Select predictions based on `pred_label`
+  preds_csm <- preds_csm %>%
+    rowwise() %>%
+    mutate(hat_mu_0 = get(paste0("hat_mu_0_pred_", pred_label)))
+
+  # Construct residuals
+  tmp0 <- preds_csm %>%
+    mutate(Y_bias_corrected = Y - hat_mu_0) %>%
+    group_by(subclass, Z) %>%
+    summarize(mn = sum(Y_bias_corrected * weights), .groups = "drop")
+
+  tmp <- tmp0 %>%
+    group_by(subclass) %>%
+    summarise(tilde_tau = last(mn) - first(mn), .groups = "drop")
+
+  tilde_tau <- tmp$tilde_tau
+  mean_tilde_tau <- mean(tilde_tau)
+  tilde_tau_resids <- tilde_tau - mean_tilde_tau
+
+  return(list(
+    preds_csm = preds_csm,
+    tilde_tau = tilde_tau,
+    mean_tilde_tau = mean_tilde_tau,
+    tilde_tau_resids = tilde_tau_resids
+  ))
 }
+
+
+get_matches_and_debiased_residuals <- function(
+    dgp_name,
+    df_dgp,
+    scaling,
+    mu_model,
+    n_split = 1,
+    debias = TRUE
+) {
+  # Step 1: Determine matching type and get matches
+  matching_type <- switch(
+    dgp_name,
+    "toy" = "maximum_fixed_scm",
+    "kang" = "maximum_fixed_scm",
+    "otsu" = "euclidean_knn",
+    stop("Invalid dgp_name. Must be 'toy', 'kang', or 'otsu'.")
+  )
+
+  preds_csm <- get_matches(
+    matching_type = matching_type,
+    df_dgp = df_dgp,
+    scaling = scaling
+  )
+
+  # Step 2: Assign group labels for cross-fitting
+  df_dgp_splitted <- assign_group_label(df_dgp, n_split = n_split) %>%
+    mutate(id = as.character(id))
+
+  id_to_group_map <- df_dgp_splitted %>%
+    select(id, group_label)
+
+  preds_csm <- left_join(preds_csm, id_to_group_map, by = "id")
+
+  pred_label_map <- get_pred_label_map(n = n_split)
+  preds_csm <- left_join(preds_csm, pred_label_map, by = "group_label")
+
+  # Step 3: Debiasing step (optional)
+  if (debias) {
+    # Determine covariate names and model library
+    if (dgp_name == "toy" || dgp_name == "otsu") {
+      X_names <- c("X1", "X2")
+      SL_lib <- if (mu_model == "linear") "SL.lm" else "SL.randomForest"
+    } else if (dgp_name == "kang") {
+      if (mu_model == "kang_correct") {
+        X_names <- c("V1", "V2", "V3", "V4")
+        SL_lib <- "SL.lm"
+      } else if (mu_model == "linear") {
+        X_names <- c("X1", "X2", "X3", "X4")
+        SL_lib <- "SL.lm"
+      }
+    } else {
+      stop("dgp_name must be 'toy' or 'kang'")
+    }
+
+    # Perform debiasing
+    debiasing_result <- debias_residuals(
+      preds_csm = preds_csm,
+      X_names = X_names,
+      Y_name = "Y",
+      SL_lib = SL_lib,
+      n_split = n_split
+    )
+
+    return(debiasing_result)
+  } else {
+    return(list(preds_csm = preds_csm))
+  }
+}
+
+# get_matches_old <- function(dgp_name, df_dgp, scaling){
+#   # TODO: WHY should the type of dgp affect how to get matches?  E.g.,
+#   # why is otsu different?  It should be a flag for kind of matching,
+#   # instead.
+#
+#   if (dgp_name == "toy" || dgp_name == "kang") {
+#     df_dgp_with_matches <- get_cal_matches(
+#       df = df_dgp,
+#       metric = "maximum",
+#       scaling = scaling,
+#       rad_method = "fixed",
+#       est_method = "scm",
+#       return = "all"
+#     )
+#   } else if (dgp_name == "otsu") {
+#     df_dgp_with_matches <- get_cal_matches(
+#       df_dgp,
+#       covs = starts_with("X"),
+#       treatment = "Z",
+#       scaling = 1,
+#       metric = "euclidean",
+#       rad_method = "knn",
+#       k = 8
+#     )
+#     df_dgp_with_matches <- full_unit_table(df_dgp_with_matches,
+#                                            nonzero_weight_only = F)
+#     # df_dgp_with_matches <- get_NN_matches(df_dgp)
+#   } else {
+#     stop("dgp_name must be toy, kang, or otsu")
+#   }
+#   return(df_dgp_with_matches)
+# }
 
 
 
@@ -895,9 +891,11 @@ boot_CSM <- function(dgp_name,
     time_on_bootstrap <-
     noise <-
     bias <-
-    N_T <- N_C <- numeric(I)
-  avg_shared_controls <- p75_shared_controls <-
-    avg_shared_treated <- p75_shared_treated <- numeric(I)
+    N_T <- N_C <-
+    avg_shared_controls <-
+    p75_shared_controls <-
+    avg_shared_treated <-
+    p75_shared_treated <- numeric(I)
   T_star <- numeric(B)
   if ( !is.null(seed) ) {
     set.seed(123)
@@ -911,9 +909,9 @@ boot_CSM <- function(dgp_name,
         kang_true=kang_true,
         toy_ctr_dist=toy_ctr_dist,
         N1 = N1,
-        N0 = N0
-        )
-    list2env(dgp_obj,envir = environment())
+        N0 = N0)
+    df_dgp <- dgp_obj$df_dgp
+    scaling <- dgp_obj$scaling
 
     time_before_matching <- proc.time()
     # input: DGP, scaling (scaling does not matter if we do M-NN matching)
@@ -921,20 +919,27 @@ boot_CSM <- function(dgp_name,
     # We want to do a M-NN matching using M=8.
     # Then we want to do the debiasing step
     # Right now the
-    matches_and_debiased_residuals<-
-      get_matches_and_debiased_residuals(
-        dgp_name, df_dgp,
-        scaling, mu_model,n_split)
+    matches_and_debiased_residuals <- get_matches_and_debiased_residuals(
+      dgp_name = dgp_name,
+      df_dgp = df_dgp,
+      scaling = scaling,
+      mu_model = mu_model,
+      n_split = n_split
+    )
 
-    list2env(matches_and_debiased_residuals,
-             envir = environment())
+    # Explicitly unpack the returned list
+    preds_csm <- matches_and_debiased_residuals$preds_csm
+    tilde_tau <- matches_and_debiased_residuals$tilde_tau
+    mean_tilde_tau <- matches_and_debiased_residuals$mean_tilde_tau
+    tilde_tau_resids <- matches_and_debiased_residuals$tilde_tau_resids
+
     time_after_matching <- proc.time()
     time_on_matching[i] <-
       (time_after_matching - time_before_matching)[3]
 
     att_debiased[i] <- mean_tilde_tau
 
-    # Calculate
+    # Calculate overlap metrics
     matched_matrix <- get_matched_matrix(preds_csm)
     shared_neighbors <- compute_shared_neighbors(matched_matrix)
     overlap_statistics <- compute_overlap_statistics(shared_neighbors)
@@ -947,16 +952,27 @@ boot_CSM <- function(dgp_name,
     # Input: tilde_tau_resids: a vector of length n of
     # Output: sd, confint
     seed_addition = i * 11
-    if (boot_mtd == "Bayesian" || boot_mtd == "wild"){
-      T_star <-
-        boot_by_resids(resids=tilde_tau_resids,
-                       B=B,
-                       boot_mtd=boot_mtd,
-                       seed_addition=seed_addition)
+    if (boot_mtd == "Bayesian" || boot_mtd == "wild" || boot_mtd == "naive-resid"){
+      # T_star <-
+      #   boot_by_resids(resids=tilde_tau_resids,
+      #                  B=B,
+      #                  boot_mtd=boot_mtd,
+      #                  seed_addition=seed_addition)
+      #
+      # CI_lower[i] = mean_tilde_tau - quantile(T_star, 0.975)
+      # CI_upper[i] = mean_tilde_tau - quantile(T_star, 0.025)
+      # sd_boot[i] = sd(T_star)
+      boot_ci <- make_bootstrap_ci(boot_mtd)  # or "wild" or "naive-resid"
+      results <- boot_ci(
+        resids = tilde_tau_resids,
+        mean_est = mean_tilde_tau,
+        B = B,
+        seed_addition = seed_addition
+      )
 
-      CI_lower[i] = mean_tilde_tau - quantile(T_star, 0.975)
-      CI_upper[i] = mean_tilde_tau - quantile(T_star, 0.025)
-      sd_boot[i] = sd(T_star)
+      CI_lower[i] <- results$ci_lower
+      CI_upper[i] <- results$ci_upper
+      sd_boot[i] <- results$sd
     } else if (boot_mtd == "naive"){
       T_star <- boot_naive( df_dgp = df_dgp,
                             B = B,
@@ -1079,7 +1095,8 @@ boot_CSM <- function(dgp_name,
     att_true = att_true,
     att_est= att_est,
     att_est_debiased = att_debiased,
-    lower=CI_lower,upper=CI_upper,
+    lower=CI_lower,
+    upper=CI_upper,
     covered=covered,
     sd_boot=sd_boot,
     n_split=n_split,

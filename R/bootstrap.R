@@ -1,41 +1,202 @@
 
-#' Title
+#' #' Old residual bootstrap code
+#' #'
+#' #' @param resids (desc)
+#' #' @param B  (desc)
+#' #' @param boot_mtd  (desc)
+#' #' @param seed_addition  (desc)
+#' #'
+#' #' @return (desc)
+#' #' @export
+#' #'
+#' boot_by_resids <-
+#'   function(resids,
+#'            B,
+#'            boot_mtd,
+#'            seed_addition = 123){
+#'     T_star <- numeric(B)
+#'     for (b in 1:B){
+#'       set.seed(123 + seed_addition + b*13)
+#'       n1 <- length(resids)
+#'       # The implemented W is W(in the paper) / sqrt(n)
+#'       if (boot_mtd=="Bayesian"){
+#'         W = gtools::rdirichlet(1, alpha=rep(1,n1))
+#'       }else if (boot_mtd=="wild"){
+#'         W = sample(
+#'           c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
+#'           prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
+#'           replace = T, size = n1) / n1
+#'       }else if (boot_mtd == "sign"){
+#'         W = sample(
+#'           c(-1, 1),
+#'           prob = c( 1/2, 1/2 ),
+#'           replace = T, size = n1)
+#'       }else if (boot_mtd == "naive-resid"){
+#'         W_mat = rmultinom(1,n1, rep(1/n1,n1)) / 10
+#'         W = c(W_mat)
+#'       }
+#'       T_star[b] = sum(resids * W)
+#'     }
+#'     return(T_star)
+#'   }
+
+#' Create a bootstrap function factory for residual resampling
 #'
-#' @param resids (desc)
-#' @param B  (desc)
-#' @param boot_mtd  (desc)
-#' @param seed_addition  (desc)
+#' @description
+#' Creates a specialized bootstrap function for resampling residuals using various methods.
+#' The factory pattern allows creation of method-specific bootstrapping functions that can
+#' be reused efficiently.
 #'
-#' @return (desc)
+#' @param boot_mtd The bootstrap method to use. Must be one of:
+#'   \itemize{
+#'     \item "Bayesian" - Uses Dirichlet distribution for weights
+#'     \item "wild" - Uses wild bootstrap with Mammen weights
+#'     \item "sign" - Uses random sign flipping
+#'     \item "naive-resid" - Uses naive residual resampling
+#'   }
+#'
+#' @return A function that performs the specified bootstrap resampling with parameters:
+#'   \itemize{
+#'     \item resids - Numeric vector of residuals to bootstrap
+#'     \item B - Number of bootstrap iterations
+#'     \item seed_addition - Value added to base seed for reproducibility (default: 123)
+#'   }
+#'
+#' @examples
+#' # Create bootstrap functions for different methods
+#' bayesian_boot <- make_bootstrap("Bayesian")
+#' wild_boot <- make_bootstrap("wild")
+#'
+#' # Generate some example residuals
+#' resids <- rnorm(100)
+#'
+#' # Perform bootstrap with each method
+#' bayesian_results <- bayesian_boot(resids, B = 1000)
+#' wild_results <- wild_boot(resids, B = 1000)
+#'
 #' @export
-#'
-boot_by_resids <-
-  function(resids,
-           B,
-           boot_mtd,
-           seed_addition = 123){
+make_bootstrap <- function(boot_mtd) {
+  force(boot_mtd) # Ensure evaluation
+
+  # Define the sampling function based on method
+  sampler <- switch(boot_mtd,
+                    "Bayesian" = function(n) {
+                      gtools::rdirichlet(1, alpha = rep(1, n))
+                    },
+                    "wild" = function(n) {
+                      sample(
+                        c(-(sqrt(5)-1)/2, (sqrt(5)+1)/2),
+                        prob = c((sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5))),
+                        replace = TRUE,
+                        size = n
+                      ) / n
+                    },
+                    "sign" = function(n) {
+                      sample(
+                        c(-1, 1),
+                        prob = c(1/2, 1/2),
+                        replace = TRUE,
+                        size = n
+                      )
+                    },
+                    "naive-resid" = function(n) {
+                      W_mat <- rmultinom(1, n, rep(1/n, n)) / 10
+                      c(W_mat)
+                    },
+                    stop("Unknown bootstrap method:", boot_mtd)
+  )
+
+  #' Bootstrap Resampling Function
+  #'
+  #' @param resids Numeric vector of residuals to bootstrap
+  #' @param B Number of bootstrap iterations
+  #' @param seed_addition Value added to base seed for reproducibility
+  #'
+  #' @return Numeric vector of length B containing bootstrap statistics
+  function(resids, B, seed_addition = 123) {
+    n1 <- length(resids)
     T_star <- numeric(B)
-    for (b in 1:B){
+
+    for(b in 1:B) {
       set.seed(123 + seed_addition + b*13)
-      n1 <- length(resids)
-      # The implemented W is W(in the paper) / sqrt(n)
-      if (boot_mtd=="Bayesian"){
-        W = gtools::rdirichlet(1, alpha=rep(1,n1))
-      }else if (boot_mtd=="wild"){
-        W = sample(
-          c( -(sqrt(5)-1)/2, (sqrt(5)+1)/2 ),
-          prob = c( (sqrt(5)+1)/(2*sqrt(5)), (sqrt(5)-1)/(2*sqrt(5)) ),
-          replace = T, size = n1) / n1
-      }else if (boot_mtd == "sign"){
-        W = sample(
-          c(-1, 1),
-          prob = c( 1/2, 1/2 ),
-          replace = T, size = n1)
-      }
-      T_star[b] = sum(resids * W)
+      W <- sampler(n1)
+      T_star[b] <- sum(resids * W)
     }
-    return(T_star)
+
+    T_star
   }
+}
+
+#' Create a bootstrap confidence interval calculator factory
+#'
+#' @description
+#' Creates a specialized function for computing confidence intervals and standard errors
+#' from bootstrap samples using various resampling methods.
+#'
+#' @param boot_mtd The bootstrap method to use. Must be one of:
+#'   \itemize{
+#'     \item "Bayesian" - Uses Dirichlet distribution for weights
+#'     \item "wild" - Uses wild bootstrap with Mammen weights
+#'     \item "naive-resid" - Uses naive residual resampling
+#'   }
+#'
+#' @return A function that computes confidence intervals and standard errors with parameters:
+#'   \itemize{
+#'     \item resids - Numeric vector of residuals to bootstrap
+#'     \item mean_est - Point estimate (typically mean) around which to construct intervals
+#'     \item B - Number of bootstrap iterations
+#'     \item seed_addition - Value added to base seed for reproducibility (default: 123)
+#'   }
+#'
+#' @return A list containing:
+#'   \itemize{
+#'     \item ci_lower - Lower bound of confidence interval
+#'     \item ci_upper - Upper bound of confidence interval
+#'     \item sd - Bootstrap standard error
+#'   }
+#'
+#' @examples
+#' # Create bootstrap CI calculator
+#' bayesian_ci <- make_bootstrap_ci("Bayesian")
+#'
+#' # Generate example data
+#' resids <- rnorm(100)
+#' mean_est <- mean(resids)
+#'
+#' # Calculate CIs and SE
+#' results <- bayesian_ci(resids, mean_est, B = 1000)
+#' print(c(results$ci_lower, results$ci_upper, results$sd))
+#'
+#' @export
+make_bootstrap_ci <- function(boot_mtd) {
+  # First create the base bootstrap sampler
+  bootstrap_sampler <- make_bootstrap(boot_mtd)
+
+  #' Bootstrap Confidence Interval Calculator
+  #'
+  #' @param resids Numeric vector of residuals to bootstrap
+  #' @param mean_est Point estimate around which to construct intervals
+  #' @param B Number of bootstrap iterations
+  #' @param seed_addition Value added to base seed for reproducibility
+  #'
+  #' @return List containing ci_lower, ci_upper, and sd
+  function(resids, mean_est, B, seed_addition = 123) {
+    # Validate input
+    if (!is.numeric(resids) || !is.numeric(mean_est) || !is.numeric(B)) {
+      stop("All inputs must be numeric")
+    }
+
+    # Generate bootstrap samples
+    T_star <- bootstrap_sampler(resids, B, seed_addition)
+
+    # Calculate confidence intervals and standard error
+    list(
+      ci_lower = mean_est - quantile(T_star, 0.975),
+      ci_upper = mean_est - quantile(T_star, 0.025),
+      sd = sd(T_star)
+    )
+  }
+}
 
 
 #' Main function: Estimate the variance from the bootstrap

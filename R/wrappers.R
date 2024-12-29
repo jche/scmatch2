@@ -250,6 +250,92 @@ get_att_csm <- function(d,
 
 
 
+#' Perform Matching Based on Specified Type
+#'
+#' This function performs matching on a dataset based on the specified `matching_type`.
+#' It supports different matching methods and configurations, such as fixed-radius or
+#' k-nearest-neighbor methods.
+#'
+#' @param matching_type A string specifying the type of matching. Supported types are:
+#'   - `"maximum_fixed_scm"`: Uses the maximum metric with fixed radius and SCM estimation.
+#'   - `"euclidean_knn"`: Uses the Euclidean metric with k-nearest neighbors.
+#' @param df_dgp A data frame containing the dataset to be matched. The dataset should include
+#'   treatment and covariate columns.
+#' @param scaling A numeric value or vector used for scaling covariates during the matching process.
+#'   Defaults to `1`.
+#' @param k A numeric value to specify the number of nearest neighbors in knn matching
+#'   Defaults to `8`
+#'
+#' @return A list containing the matched dataset and associated metrics. The specific structure of
+#' the result depends on the `matching_type` and the underlying matching method used.
+#'
+#' @details
+#' The function abstracts the matching process, allowing for different types of matching algorithms
+#' to be applied to the same dataset. The input `matching_type` determines the matching method,
+#' metric, and additional parameters.
+#'
+#' @examples
+#' # Example for 'maximum_fixed_scm' matching type
+#' test_df <- data.frame(
+#'   Z = c(1, 0, 0, 0, 1),
+#'   X = c(0, 0.5, 0.8, 3, 1.6)
+#' )
+#' scaling <- 1
+#' result <- get_matches(
+#'   matching_type = "maximum_fixed_scm",
+#'   df_dgp = test_df,
+#'   scaling = scaling
+#' )
+#'
+#' # Example for 'euclidean_knn' matching type
+#' test_df <- data.frame(
+#'   Z = c(1, 0, 0, 0, 1),
+#'   X1 = c(0, 0.5, 0.8, 3, 1.6),
+#'   X2 = c(0, 0, 0, 0, 0)
+#' )
+#' result <- get_matches(
+#'   matching_type = "euclidean_knn",
+#'   df_dgp = test_df,
+#'   scaling = scaling
+#' )
+#'
+#' @export
+get_matches <- function(matching_type,
+                        df_dgp,
+                        scaling,
+                        k = 8) {
+  if (matching_type == "maximum_fixed_scm") {
+    df_dgp_with_matches <- get_cal_matches(
+      df = df_dgp,
+      metric = "maximum",
+      scaling = scaling,
+      rad_method = "fixed",
+      est_method = "scm",
+      return = "all"
+    )
+
+  } else if (matching_type == "euclidean_knn") {
+    df_dgp_with_matches <- get_cal_matches(
+      df = df_dgp,
+      covs = starts_with("X"),
+      treatment = "Z",
+      scaling = 1,
+      metric = "euclidean",
+      rad_method = "knn",
+      k = k
+    )
+  } else {
+    stop("Invalid matching_type. Must be 'maximum_fixed_scm' or 'euclidean_knn'.")
+  }
+  df_dgp_with_matches <- full_unit_table(
+    df_dgp_with_matches,
+    nonzero_weight_only = FALSE
+  )
+  return(df_dgp_with_matches)
+}
+
+
+
 # Code to implement CEM matching via the MatchIt package
 # Allows SCM within cells if desired.
 get_cem_matches <- function(
