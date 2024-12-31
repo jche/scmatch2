@@ -54,28 +54,28 @@
 #'     \item "sign" - Uses random sign flipping
 #'     \item "naive-resid" - Uses naive residual resampling
 #'   }
+#' @param use_moving_block Logical flag to determine if Moving Block Bootstrap should be applied.
 #'
 #' @return A function that performs the specified bootstrap resampling with parameters:
 #'   \itemize{
 #'     \item resids - Numeric vector of residuals to bootstrap
 #'     \item B - Number of bootstrap iterations
+#'     \item block_size - Size of blocks for moving block bootstrap (required if use_moving_block is TRUE)
 #'     \item seed_addition - Value added to base seed for reproducibility (default: 123)
 #'   }
 #'
 #' @examples
 #' # Create bootstrap functions for different methods
 #' bayesian_boot <- make_bootstrap("Bayesian")
-#' wild_boot <- make_bootstrap("wild")
 #'
 #' # Generate some example residuals
 #' resids <- rnorm(100)
 #'
-#' # Perform bootstrap with each method
-#' bayesian_results <- bayesian_boot(resids, B = 1000)
-#' wild_results <- wild_boot(resids, B = 1000)
+#' # Perform bootstrap with Moving Block Bootstrap enabled
+#' mbb_results <- make_bootstrap("Bayesian", use_moving_block = TRUE)(resids, B = 1000, block_size = 5)
 #'
 #' @export
-make_bootstrap <- function(boot_mtd) {
+make_bootstrap <- function(boot_mtd, use_moving_block = FALSE) {
   force(boot_mtd) # Ensure evaluation
 
   # Define the sampling function based on method
@@ -110,17 +110,29 @@ make_bootstrap <- function(boot_mtd) {
   #'
   #' @param resids Numeric vector of residuals to bootstrap
   #' @param B Number of bootstrap iterations
+  #' @param block_size Size of blocks for moving block bootstrap (only used if use_moving_block is TRUE)
   #' @param seed_addition Value added to base seed for reproducibility
   #'
   #' @return Numeric vector of length B containing bootstrap statistics
-  function(resids, B, seed_addition = 123) {
+  function(resids, B, block_size = NULL, seed_addition = 123) {
     n1 <- length(resids)
     T_star <- numeric(B)
 
     for(b in 1:B) {
       set.seed(123 + seed_addition + b*13)
-      W <- sampler(n1)
-      T_star[b] <- sum(resids * W)
+
+      if (use_moving_block) {
+        if (is.null(block_size)) stop("block_size must be specified when use_moving_block is TRUE")
+        num_blocks <- ceiling(n1 / block_size) # number of block to sample for eahc
+        indices <- sample(1:(n1 - block_size + 1), size = num_blocks, replace = TRUE)
+        bootstrapped_sample <- unlist(lapply(indices, function(i) resids[i:(i + block_size - 1)]))[1:n1]
+        sample_length <- length(bootstrapped_sample)
+        W <- sampler(sample_length)
+        T_star[b] <- sum(bootstrapped_sample * W)
+      } else {
+        W <- sampler(n1)
+        T_star[b] <- sum(resids * W)
+      }
     }
 
     T_star
@@ -139,12 +151,14 @@ make_bootstrap <- function(boot_mtd) {
 #'     \item "wild" - Uses wild bootstrap with Mammen weights
 #'     \item "naive-resid" - Uses naive residual resampling
 #'   }
+#' @param use_moving_block Logical flag to determine if Moving Block Bootstrap should be applied.
 #'
 #' @return A function that computes confidence intervals and standard errors with parameters:
 #'   \itemize{
 #'     \item resids - Numeric vector of residuals to bootstrap
 #'     \item mean_est - Point estimate (typically mean) around which to construct intervals
 #'     \item B - Number of bootstrap iterations
+#'     \item block_size - Size of blocks for moving block bootstrap (only required if use_moving_block is TRUE)
 #'     \item seed_addition - Value added to base seed for reproducibility (default: 123)
 #'   }
 #'
@@ -157,37 +171,38 @@ make_bootstrap <- function(boot_mtd) {
 #'
 #' @examples
 #' # Create bootstrap CI calculator
-#' bayesian_ci <- make_bootstrap_ci("Bayesian")
+#' bayesian_ci <- make_bootstrap_ci("Bayesian", use_moving_block = TRUE)
 #'
 #' # Generate example data
 #' resids <- rnorm(100)
 #' mean_est <- mean(resids)
 #'
 #' # Calculate CIs and SE
-#' results <- bayesian_ci(resids, mean_est, B = 1000)
+#' results <- bayesian_ci(resids, mean_est, B = 1000, block_size = 5)
 #' print(c(results$ci_lower, results$ci_upper, results$sd))
 #'
 #' @export
-make_bootstrap_ci <- function(boot_mtd) {
+make_bootstrap_ci <- function(boot_mtd, use_moving_block = FALSE) {
   # First create the base bootstrap sampler
-  bootstrap_sampler <- make_bootstrap(boot_mtd)
+  bootstrap_sampler <- make_bootstrap(boot_mtd, use_moving_block)
 
   #' Bootstrap Confidence Interval Calculator
   #'
   #' @param resids Numeric vector of residuals to bootstrap
   #' @param mean_est Point estimate around which to construct intervals
   #' @param B Number of bootstrap iterations
+  #' @param block_size Size of blocks for moving block bootstrap (only used if use_moving_block is TRUE)
   #' @param seed_addition Value added to base seed for reproducibility
   #'
   #' @return List containing ci_lower, ci_upper, and sd
-  function(resids, mean_est, B, seed_addition = 123) {
+  function(resids, mean_est, B, block_size = NULL, seed_addition = 123) {
     # Validate input
     if (!is.numeric(resids) || !is.numeric(mean_est) || !is.numeric(B)) {
       stop("All inputs must be numeric")
     }
 
     # Generate bootstrap samples
-    T_star <- bootstrap_sampler(resids, B, seed_addition)
+    T_star <- bootstrap_sampler(resids, B, block_size, seed_addition)
 
     # Calculate confidence intervals and standard error
     list(
@@ -197,6 +212,7 @@ make_bootstrap_ci <- function(boot_mtd) {
     )
   }
 }
+
 
 
 #' Main function: Estimate the variance from the bootstrap

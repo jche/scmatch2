@@ -243,7 +243,26 @@ get_matches_and_debiased_residuals <- function(
 
     return(debiasing_result)
   } else {
-    return(list(preds_csm = preds_csm))
+    tmp0 <- preds_csm %>%
+      mutate(Y_bias_corrected = Y) %>%
+      group_by(subclass, Z) %>%
+      summarize(mn = sum(Y_bias_corrected * weights), .groups = "drop")
+
+    tmp <- tmp0 %>%
+      group_by(subclass) %>%
+      summarise(tilde_tau = last(mn) - first(mn), .groups = "drop")
+
+    tilde_tau <- tmp$tilde_tau
+    mean_tilde_tau <- mean(tilde_tau)
+    tilde_tau_resids <- tilde_tau - mean_tilde_tau
+
+    return(list(
+      preds_csm = preds_csm,
+      tilde_tau = tilde_tau,
+      mean_tilde_tau = mean_tilde_tau,
+      tilde_tau_resids = tilde_tau_resids
+    ))
+    # return(list(preds_csm = preds_csm))
   }
 }
 
@@ -295,9 +314,14 @@ get_pred_label_map <- function(n){
 
 get_se_AE <- function(preds_csm){
   # 1. Get debiased units; Get the subclasses
+  if (is.null(preds_csm$hat_mu_0)){
+    preds_csm <- preds_csm %>%
+      mutate(Y_bias_corrected = Y)
+  }else{
+    preds_csm <- preds_csm %>%
+      mutate(Y_bias_corrected = Y - hat_mu_0)
+  }
 
-  preds_csm <- preds_csm %>%
-    mutate(Y_bias_corrected = Y - hat_mu_0)
 
   # 2. Filter the controls
   #     and the subclasses with n_controls >= 2
@@ -882,7 +906,10 @@ boot_CSM <- function(dgp_name,
                      M = 8,
                      seed = NULL,
                      N1 = NULL,
-                     N0 = NULL){
+                     N0 = NULL,
+                     debias = T,
+                     use_moving_block=F,
+                     block_size = 8){
 
   covered <- CI_lower <- CI_upper <-
     att_true <- att_est <- att_debiased <-
@@ -919,13 +946,15 @@ boot_CSM <- function(dgp_name,
     # We want to do a M-NN matching using M=8.
     # Then we want to do the debiasing step
     # Right now the
-    matches_and_debiased_residuals <- get_matches_and_debiased_residuals(
-      dgp_name = dgp_name,
-      df_dgp = df_dgp,
-      scaling = scaling,
-      mu_model = mu_model,
-      n_split = n_split
-    )
+    matches_and_debiased_residuals <-
+      get_matches_and_debiased_residuals(
+        dgp_name = dgp_name,
+        df_dgp = df_dgp,
+        scaling = scaling,
+        mu_model = mu_model,
+        n_split = n_split,
+        debias = debias
+      )
 
     # Explicitly unpack the returned list
     preds_csm <- matches_and_debiased_residuals$preds_csm
@@ -953,21 +982,13 @@ boot_CSM <- function(dgp_name,
     # Output: sd, confint
     seed_addition = i * 11
     if (boot_mtd == "Bayesian" || boot_mtd == "wild" || boot_mtd == "naive-resid"){
-      # T_star <-
-      #   boot_by_resids(resids=tilde_tau_resids,
-      #                  B=B,
-      #                  boot_mtd=boot_mtd,
-      #                  seed_addition=seed_addition)
-      #
-      # CI_lower[i] = mean_tilde_tau - quantile(T_star, 0.975)
-      # CI_upper[i] = mean_tilde_tau - quantile(T_star, 0.025)
-      # sd_boot[i] = sd(T_star)
-      boot_ci <- make_bootstrap_ci(boot_mtd)  # or "wild" or "naive-resid"
+      boot_ci <- make_bootstrap_ci(boot_mtd, use_moving_block=use_moving_block)  # or "wild" or "naive-resid"
       results <- boot_ci(
         resids = tilde_tau_resids,
         mean_est = mean_tilde_tau,
         B = B,
-        seed_addition = seed_addition
+        seed_addition = seed_addition,
+        block_size = block_size
       )
 
       CI_lower[i] <- results$ci_lower
@@ -1121,7 +1142,8 @@ create_bootstrap_comparison_plot <-
   function(
     boot_otsu_wild,
     boot_otsu_A_E,
-    output_path = here("scripts/boot/figures/ci_comparison_plot.png")) {
+    output_path = here("scripts/boot/figures/ci_comparison_plot.png"),
+    show_paper_result = T) {
   library(tidyverse)
 
   # Define true values for reference
@@ -1143,7 +1165,7 @@ create_bootstrap_comparison_plot <-
       coverage = mean(covered),
       avg_CI_length = mean(CI_length)
     ) %>%
-    mutate(method = "A-E Bootstrap")
+    mutate(method = "Pooled Variance")
 
   cat("Wild Bootstrap Results:\n")
   cat("Coverage:", wild_results$coverage, "\n")
@@ -1171,16 +1193,18 @@ create_bootstrap_comparison_plot <-
       CI_length_diff = avg_CI_length - true_CI_length
     )
 
-  # Include true values as a separate row for reference
-  true_results <- tibble(
-    method = "True Values",
-    coverage = true_coverage,
-    avg_CI_length = true_CI_length,
-    coverage_diff = 0,
-    CI_length_diff = 0
-  )
+  if (show_paper_result){
+    true_results <- tibble(
+      method = "OR17 Reported Values",
+      coverage = true_coverage,
+      avg_CI_length = true_CI_length,
+      coverage_diff = 0,
+      CI_length_diff = 0
+    )
 
-  results <- bind_rows(results, true_results)
+    results <- bind_rows(results, true_results)
+  }
+
 
   # Create a bar plot for comparison
   results_long <- results %>%
@@ -1190,7 +1214,10 @@ create_bootstrap_comparison_plot <-
       values_to = "value"
     )
 
-  plot <- ggplot(results_long, aes(x = method, y = value, fill = metric)) +
+  plot <- ggplot(results_long,
+                 aes(x = method,
+                     y = value,
+                     fill = metric)) +
     geom_bar(stat = "identity", position = "dodge") +
     labs(
       title = "Comparison of Wild Bootstrap, A-E Bootstrap, and True Values",
@@ -1198,13 +1225,14 @@ create_bootstrap_comparison_plot <-
       y = "Value",
       fill = "Metric"
     ) +
-    theme_minimal() +
-    scale_fill_brewer(palette = "Set2") +
-    geom_hline(aes(yintercept = true_coverage), linetype = "dashed", color = "blue") +
-    geom_hline(aes(yintercept = true_CI_length), linetype = "dotted", color = "red") +
-    annotate("text", x = 2.5, y = true_coverage + 0.02, label = "True Coverage", color = "blue") +
-    annotate("text", x = 2.5, y = true_CI_length - 0.02, label = "True CI Length", color = "red")
-
+    theme_minimal()
+  if (show_paper_result){
+    plot <- plot +scale_fill_brewer(palette = "Set2") +
+      geom_hline(aes(yintercept = true_coverage), linetype = "dashed", color = "blue") +
+      geom_hline(aes(yintercept = true_CI_length), linetype = "dotted", color = "red") +
+      annotate("text", x = 2.5, y = true_coverage + 0.02, label = "True Coverage", color = "blue") +
+      annotate("text", x = 2.5, y = true_CI_length - 0.02, label = "True CI Length", color = "red")
+  }
   # Save the plot
   ggsave(output_path, plot, width = 8, height = 6)
 
