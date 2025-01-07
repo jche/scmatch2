@@ -20,15 +20,19 @@ get_est_att_from_wt <- function(df,
 #'
 #' Given a matched dataset, calculate the estimated ATT
 #'
-#' @param matched_df A matched dataset
+#' @param matched_df A matched dataset, either the dataframe of
+#'   treatment and control units, or a csm_matches object.  If
+#'   dataframe, needs the treatment, outcome, and a "weights" column.
 #'
 #' @export
 get_att_ests <- function(matched_df, treatment = "Z", outcome = "Y") {
 
   if ( is.csm_matches(matched_df) ) {
-    matched_df <- matched_df$result
+    matched_df <- result_table( matched_df, "sc" )
   }
   stopifnot( all( c(treatment, outcome) %in% names(matched_df) ) )
+  stopifnot( "weights" %in% names(matched_df) )
+
   matched_df$Z = matched_df[[treatment]]
   matched_df$Y = matched_df[[outcome]]
 
@@ -196,15 +200,17 @@ get_se_AE_table <- function(
   ))
 }
 
-#' Title
+#' Get the standard error using the weighting approach
+#'
+#' Method taken from the balancing weights literature.
 #'
 #' @param matches The CSM match object, an R S3 object
 #' @param outcome Name of the outcome variable (default "Y")
 #' @param treatment Name of the treatment variable (default "Z")
 #' @param var_weight_type The way that cluster variances are averaged
-#' "num_units": weight by number of units in the subclass
-#' "ess_units": weight effective size of units in the subclass
-#' "uniform: weight each cluster equally
+#'   "num_units": weight by number of units in the subclass
+#'   "ess_units": weight effective size of units in the subclass
+#'   "uniform: weight each cluster equally
 #'
 #' @return A tibble with SE, sigma_hat, N_T, and N_C_tilde
 #' @export

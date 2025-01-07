@@ -511,9 +511,13 @@ create_love_plot_df <- function(res, covs){
 #'
 #' Make a ggplot love plot of covariate balance for each covariate
 #' passed.
+#'
 #' @export
-love_plot <- function(res, covs, B=NA) {
+love_plot <- function(res, covs, covs_names = NULL, B=NA) {
   love_steps <- create_love_plot_df(res, covs)
+  if ( !is.null( covs_names ) ) {
+    love_steps$name <- covs_names[ match( love_steps$name, covs ) ]
+  }
   p <- love_steps %>%
     ggplot(aes(x=order, color=name)) +
     geom_point(data=. %>%

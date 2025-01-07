@@ -54,6 +54,16 @@ test_that("get_cal_matches works well", {
   res$matches
   expect_equal( nrow( result_table( res ) ), 5 )
 
+  # Test the various helper functions
+  df = as.data.frame( res )
+  df
+  expect_equal( nrow( res ), 5  )
+  expect_equal( res[ 1, 4 ], "U1" )
+  expect_equal( res[[ 1, 1]], 1 )
+  expect_true( is.data.frame( res[ 1, ] ) )
+
+  expect_output( p <- summary( res ), "match pattern")
+  # summary(res)
 
 })
 

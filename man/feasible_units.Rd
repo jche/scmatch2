@@ -6,6 +6,10 @@
 \usage{
 feasible_units(csm)
 }
+\value{
+Dataframe of all the treated units (not controls) that were
+matched within a caliper.
+}
 \description{
 Return table of treated units
 }

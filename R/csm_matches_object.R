@@ -70,11 +70,7 @@ dim.csm_matches <- function(x, ... )
 as.data.frame.csm_matches <- function(
     x, row.names = NULL, optional = FALSE, return = "all", ...
 ) {
-  rs <- switch(return,
-               sc_units     = agg_sc_units(csm$matches),
-               agg_co_units = agg_co_units(csm$matches),
-               all          = bind_rows(csm$matches) )
-
+  rs <- result_table( x, return=return )
 
   rs
 }
@@ -122,7 +118,8 @@ print.csm_matches <- function(x, ...) {
     scaling = paste( round( scaling, digits=3), collapse = ", " )
   }
   cal <- settings$cal
-  cat( glue::glue( 'csm_matches: matching w/ {settings$metric} distance on {covs} \
+  cat( glue::glue( 'csm_matches: matching with "{settings$metric}" distance\
+                        match covariates: {covs} \
                    {ntx} Treated units matched to control units ({ntx_over} above set caliper) \
                    Adaptive calipers: {adas} \
                    \tTarget caliper = {cal} \
@@ -131,6 +128,148 @@ print.csm_matches <- function(x, ...) {
 
   cat("\n")
 }
+
+
+#' Summary method for csm_matches object
+#' @param x object to summarize
+#' @param ... Extra arguments (currently ignored).
+#' @export
+summary.csm_matches <- function(x, ...) {
+
+  print.csm_matches(x)
+
+  rs = result_table(x)
+  rsC = filter( rs, Z == 0 )
+
+  nunique1 = length( unique( rsC$id ) )
+  nunique2 = length( unique( rsC$id[ rsC$weights > 0 ] ) )
+  cat( glue::glue( "{nunique1} unique control units matched, {nunique2} with non-zero weight" ) )
+  cat( "\n" )
+
+  cat( "Treatment match pattern (before weighting):\n" )
+  rs0 = filter( rs, Z == 0 )
+  tb = as.numeric( table( rs$subclass ) )
+  max = max( tb )
+  tb[ tb > 7 ] = 7
+  tb = table( tb )
+  if ( "7" %in% names(tb) ) {
+    w = which( names(tb) == "7" )
+    names(tb)[w] = paste0( "7-", max )
+  }
+  print(tb)
+
+  cat( "Treatment match pattern (after weighting):" )
+  rs0 = filter( rs, weights > 0, Z == 0 )
+  tb = table( table( rs0$subclass ) )
+  print( tb )
+
+  cat( "Control unit reuse:" )
+  tb = table( table( rsC$id ) )
+  print( tb )
+
+  cat( "Summary of aggregated control weights\n" )
+  rs2 = result_table( x, return = "agg_co_units" ) %>%
+    filter( weights > 0 )
+  print( summary( rs2$weights ) )
+}
+
+
+
+#' Return table of calipers for all treated units
+#'
+#' @export
+caliper_table <- function( csm ) {
+  csm$treatment_table %>%
+    dplyr::select( id, subclass, max_dist, adacal )
+}
+
+
+#' Return table of treated units
+#'
+#' @return Dataframe of all the treated units (not controls) that were
+#'   matched within a caliper.
+#'
+#' @export
+feasible_units <- function( csm ) {
+  csm$treatment_table %>%
+    filter( feasible == 1 ) %>%
+    dplyr::select( -feasible )
+}
+
+
+
+#' List all IDs of subclasses of units that are feasible
+#'
+#' For all units matched without expanding the caliper, get the
+#' subclass IDs (i.e., the ids that link controls to treated units in
+#' matched clusters).
+#'
+#' @return Numeric vector of IDs
+#'
+#' @export
+feasible_unit_subclass <- function( csm ) {
+  csm$treatment_table %>%
+    filter( feasible == 1 ) %>%
+    pull( subclass )
+}
+
+
+#' Obtain rows of treatment table for treated units that were not matched
+#'
+#' @return dataframe, one row per treated unit.
+#'
+#' @export
+unmatched_units <- function( csm ) {
+  csm$treatment_table %>%
+    filter( matched == 0 ) %>%
+    dplyr::select( -matched, -feasible )
+}
+
+
+#' Get table of aggregated results, with rows for synthetic units if
+#' that was asked for
+#'
+#' This method will give the controls as synthetic controls
+#' (sc_units), the individual controls with repeat rows if controls
+#' were used for different treated units (all), or aggregated controls
+#' with only one row per control unit (agg_co_units).
+#'
+#' @param return Possible values: "sc_units", "agg_co_units", or
+#'   "all". How to aggregate units, if at all, in making the result
+#'   table.  Defaults to "all".
+#' @param feasible_only TRUE means only return units which were
+#'   matched without expanding the caliper.
+#'
+#' @return dataframe
+#' @export
+#'
+result_table <- function( csm,
+                          return = c( "all", "sc_units", "agg_co_units" ),
+                          feasible_only = FALSE,
+                          nonzero_weight_only = FALSE ) {
+
+  return = match.arg( return )
+
+  # Swap result type if asked
+  rs <- switch(return,
+               sc_units     = agg_sc_units(csm$matches),
+               agg_co_units = agg_co_units(csm$matches),
+               all          = bind_rows(csm$matches) )
+
+
+
+  if ( feasible_only ) {
+    fs = feasible_unit_subclass(csm)
+    rs <- filter( rs, subclass %in% fs )
+  }
+
+  if ( nonzero_weight_only ) {
+    rs <- filter( rs, weights > 0 )
+  }
+
+  rs
+}
+
 
 
 
@@ -146,104 +285,16 @@ print.csm_matches <- function(x, ...) {
 #'   caliper.
 #' @param nonzero_weight_only TRUE means drop any control units with 0
 #'   weight (e.g., due to scm weighting).
-#' @return dataframe
+#' @return dataframe, one row per treated unit and a row per control
+#'   unit for each time it was used.
+#' @seealso [result_table()]
 #' @export
 full_unit_table <- function( csm,
                              feasible_only = FALSE,
                              nonzero_weight_only = FALSE ) {
-  rs <- csm$matches %>%
-    bind_rows()
-
-  if ( feasible_only ) {
-    fs = csm$treatment_table %>%
-      filter( feasible == 1 ) %>%
-      pull( subclass )
-    rs <- filter( rs, subclass %in% fs )
-  }
-
-  if ( nonzero_weight_only ) {
-    rs <- filter( rs, weights > 0 )
-  }
-
-  return( rs )
+  result_table( csm, "all", feasible_only = feasible_only,
+                nonzero_weight_only = nonzero_weight_only )
 }
 
 
-#' Return table of calipers for all treated units
-#'
-#' @export
-caliper_table <- function( csm ) {
-  csm$treatment_table %>%
-    dplyr::select( id, subclass, max_dist, adacal )
-}
-
-
-#' Return table of treated units
-#' @export
-feasible_units <- function( csm ) {
-  csm$treatment_table %>%
-    filter( feasible == 1 ) %>%
-    dplyr::select( -feasible )
-}
-
-#' List all IDs of subclasses of units that are feasible
-#'
-#' For all units matched without adapting the caliper, get the
-#' subclass IDs (i.e., the ids that link controls to treated units in
-#' matched clusters).
-#'
-#' @return Numeric vector of IDs
-#'
-#' @export
-feasible_unit_subclass <- function( csm ) {
-  csm$treatment_table %>%
-    filter( feasible == 1 ) %>%
-    pull( subclass )
-}
-
-
-#' Obtain rows of treatment table for units that were not matched
-#'
-#' @return dataframe
-#' @export
-unmatched_units <- function( csm ) {
-  csm$treatment_table %>%
-    filter( matched == 0 ) %>%
-    dplyr::select( -matched, -feasible )
-}
-
-
-#' Get table of aggregated results, with rows for synthetic units if
-#' that was asked for
-#'
-#' @param return Possible values: NULL, "sc_units", "agg_co_units", or "all".
-#'   How to aggregate units, if at all, in making the result table.
-#' @param feasible_only TRUE means only return units which were given
-#'   non-zero weight.
-#'
-#' @return dataframe
-#' @export
-#'
-result_table <- function( csm,
-                          return = c( "all", "sc_units", "agg_co_units" ),
-                          feasible_only = FALSE ) {
-
-  return = match.arg( return )
-
-  # Swap result type if asked
-  rs <- switch(return,
-               sc_units     = agg_sc_units(csm$matches),
-               agg_co_units = agg_co_units(csm$matches),
-               all          = bind_rows(csm$matches) )
-
-
-
-  if ( feasible_only ) {
-    fs = csm$treatment_table %>%
-      filter( feasible == 1 ) %>%
-      pull( subclass )
-    rs <- filter( rs, subclass %in% fs )
-  }
-  rs
-}
 

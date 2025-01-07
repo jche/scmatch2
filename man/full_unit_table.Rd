@@ -17,10 +17,14 @@ caliper.}
 weight (e.g., due to scm weighting).}
 }
 \value{
-dataframe
+dataframe, one row per treated unit and a row per control
+unit for each time it was used.
 }
 \description{
 Return dataframe with control units repeated, grouped with treated
 unit with individual weights with those treated units.  Treated
 units also included.
+}
+\seealso{
+\code{\link[=result_table]{result_table()}}
 }
