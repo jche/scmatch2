@@ -9,25 +9,45 @@ theme_set( theme_classic() )
 
 ferman_for_analysis <-
   readRDS(here::here( "scripts/ferman-analysis/data/ferman_for_analysis.rds" ))
+head( ferman_for_analysis )
 
+# Drop unneeded variables
+ferman_for_analysis$UF = NULL
+ferman_for_analysis$y2011 = NULL
+ferman_for_analysis$y2012 = NULL
+ferman_for_analysis$Control = NULL
+ferman_for_analysis$Y = NULL
+
+names( ferman_for_analysis )
+
+# The main matching analysis ----
 c <- 0.35
 covariate_caliper <- c(rep(0.2, 3), 1/1000)
-ferman_scm <- ferman_for_analysis %>%
-  get_cal_matches(
+ferman_scm <- get_cal_matches( ferman_for_analysis,
     covs = c("y2007", "y2008", "y2009", "is_sao_paolo"),
     treatment = "Z",
     caliper = c,
     metric = "maximum",   # "maximum", "euclidean", "manhattan"
     rad_method = "adaptive",
     scaling = 1/covariate_caliper,
-    est_method = "scm",
-    return = "sc_units")
+    est_method = "scm" )
+ferman_scm
+
+full_unit_table(ferman_scm, nonzero_weight_only = TRUE ) %>%
+  rename( isp = is_sao_paolo )
+
+get_ATT_estimate( ferman_scm, "Z", "y2010" )
+
 
 ## Number of used controls
+
+# These are only units within the initial caliper
 d <- full_unit_table(
   ferman_scm,
-  feasible_only = TRUE
+  feasible_only = TRUE, nonzero_weight_only = TRUE
 )
+d
+
 (n_t_SCM <- length(unique(
   (d %>% filter(Z==0, weights!=0))$id )))
 (n_t_avg <-length(unique(

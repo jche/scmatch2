@@ -23,12 +23,13 @@ get_est_att_from_wt <- function(df,
 #' @param matched_df A matched dataset
 #'
 #' @export
-get_att_ests <- function(matched_df, outcome = "Y") {
+get_att_ests <- function(matched_df, treatment = "Z", outcome = "Y") {
 
   if ( is.csm_matches(matched_df) ) {
     matched_df <- matched_df$result
   }
-  stopifnot( all( c("Z", "Y") %in% names(matched_df) ) )
+  stopifnot( all( c(treatment, outcome) %in% names(matched_df) ) )
+  matched_df$Z = matched_df[[treatment]]
   matched_df$Y = matched_df[[outcome]]
 
   matched_df %>%
@@ -213,10 +214,10 @@ get_se_AE <- function(matches,
 #' method from paper with locally estimated residual variation.
 #'
 #' @export
-get_ATT_estimate <- function( scmatch, outcome = "Y" ) {
+get_ATT_estimate <- function( scmatch, treatment = "Z", outcome = "Y" ) {
 
-  ATT = get_att_ests( scmatch, outcome = outcome )
-  se = get_se_AE( scmatch, outcome = outcome )
+  ATT = get_att_ests( scmatch, treatment = treatment, outcome = outcome )
+  se = get_se_AE( scmatch, treatment = treatment, outcome = outcome )
   se$ATT = ATT
 
   se %>% relocate( ATT ) %>%

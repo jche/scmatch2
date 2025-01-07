@@ -135,7 +135,8 @@ test_that("gen_matches do the correct thing with non-uniform scaling", {
                          metric = "euclidean",
                          scaling = 1,
                          caliper = 5)
-  expect_equal( nrow( res$result ), 8 )
+  rt = result_table( res, "sc" )
+  expect_equal( nrow( rt ), 8 )
 
 
   resf <- get_cal_matches(df=test_df,
@@ -145,10 +146,14 @@ test_that("gen_matches do the correct thing with non-uniform scaling", {
                           rad_method = "fixed",
                           scaling = 1,
                           caliper = 5, warn=FALSE)
-  expect_equal( nrow( resf$result ), 6 )
 
-  expect_equal( resf$result[5:6,]$Y,
-                res$result[7:8,]$Y )
+  rtf = result_table(resf, "sc" )
+  expect_equal( nrow( rtf ), 6 )
+
+  rtf
+  rt
+  expect_equal( rtf[5:6,]$Y,
+                rt[7:8,]$Y )
 
 
 
@@ -157,7 +162,6 @@ test_that("gen_matches do the correct thing with non-uniform scaling", {
                          treatment = "Z",
                          scaling = c(1, 0.25),
                          rad_method="fixed",
-                         return = "all",
                          caliper = 1)
   res
   expect_equal( res$adacalipers, c( 1, NA, 1, 1 ) )
@@ -169,12 +173,11 @@ test_that("gen_matches do the correct thing with non-uniform scaling", {
                           treatment = "Z",
                           scaling = c(4, 1),
                           rad_method = "fixed",
-                          return = "all",
                           caliper = 1/0.25)
 
 
-  expect_equal( res$result$weights, retx2$result$weights )
-  expect_equal( res$result$ID, retx2$result$ID )
+  expect_equal( result_table( res )$weights, result_table( retx2 )$weights )
+  expect_equal( result_table( res )$ID, result_table( retx2 )$ID )
 })
 
 

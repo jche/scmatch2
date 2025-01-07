@@ -471,10 +471,12 @@ satt_plot4 <- function(res, B=NA) {
 # love plot ---------------------------------------------------------------
 
 get_diff_scm_co_and_tx <- function(res,covs){
+  stopifnot( is.csm_matches(res) )
+
   ada = res$treatment_table %>%
     select(id, adacal) %>%
     mutate( id = as.character(id) )
-  df_diff_scm_co_and_tx <- res$result %>%
+  df_diff_scm_co_and_tx <- result_table(res) %>%
     left_join(ada,
               by="id") %>%
     group_by(subclass) %>%

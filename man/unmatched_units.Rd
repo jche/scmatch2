@@ -2,7 +2,7 @@
 % Please edit documentation in R/csm_matches_object.R
 \name{unmatched_units}
 \alias{unmatched_units}
-\title{List rows of treatment table for units that were not matched}
+\title{Obtain rows of treatment table for units that were not matched}
 \usage{
 unmatched_units(csm)
 }
@@ -10,5 +10,5 @@ unmatched_units(csm)
 dataframe
 }
 \description{
-List rows of treatment table for units that were not matched
+Obtain rows of treatment table for units that were not matched
 }

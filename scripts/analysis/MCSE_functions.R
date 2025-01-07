@@ -2,6 +2,8 @@
 # Utility functions called by "table_Section5.4.R" to calculate monte
 # carlo standard errors.
 
+# Written by Xiang Meng
+
 
 kurtosis <- function(x){
   S_T = sd(x)
@@ -10,7 +12,10 @@ kurtosis <- function(x){
 }
 
 MCvar_SE <- function(x){
-  S_T = sd(x); R <- length(x); k_T <- kurtosis(x)
+  S_T = sd(x)
+  R <- length(x)
+  k_T <- kurtosis(x)
+
   return(S_T^2 * sqrt( (k_T-1)/R ))
 }
 
@@ -19,6 +24,7 @@ MCSE_SE <- function(x){
 }
 
 MCSE_bias <- function(x){
-  S_T = sd(x); R <- length(x)
+  S_T = sd(x)
+  R <- length(x)
   return( sqrt(S_T^2 /R ))
 }

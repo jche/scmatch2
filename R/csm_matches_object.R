@@ -1,10 +1,5 @@
 
-
-
 # The various methods for the csm_matches object
-
-
-
 
 
 
@@ -57,25 +52,31 @@ dim.csm_matches <- function(x, ... )
 
 
 
-#' @title Cast csm_matches result to data.frame
+#' @title Cast csm_matches to data.frame
 #'
-#' @param row.names NULL or a character vector giving the
-#' row names for the data frame.
-#' @param optional logical. If TRUE, setting row names and
-#' converting column names is optional.
+#' @param row.names NULL or a character vector giving the row names
+#'   for the data frame.
+#' @param optional logical. If TRUE, setting row names and converting
+#'   column names is optional. (Currently ignored.)
 #' @param ... additional arguments to be passed to the
-#' as.data.frame.list methods.
+#'   as.data.frame.list methods.  (Currently ignored.)
 #'
-#' @return as.data.frame: csm_matches object as a clean
-#' dataframe (no more attributes from csm_matches).
+#' @return as.data.frame: The matched data as a clean dataframe (no
+#'   more attributes from csm_matches).
 #' @rdname csm_matches
 #'
 #' @export
 #'
 as.data.frame.csm_matches <- function(
-    x, row.names = NULL, optional = FALSE, ...
+    x, row.names = NULL, optional = FALSE, return = "all", ...
 ) {
-  x$result
+  rs <- switch(return,
+               sc_units     = agg_sc_units(csm$matches),
+               agg_co_units = agg_co_units(csm$matches),
+               all          = bind_rows(csm$matches) )
+
+
+  rs
 }
 
 
@@ -139,10 +140,12 @@ print.csm_matches <- function(x, ...) {
 #' unit with individual weights with those treated units.  Treated
 #' units also included.
 #'
-#' @param feasible_only TRUE means only return units which were
-#'   matched within the set caliper.
-#' @param nonzero_weight_only TRUE means drop any units with 0 weight
-#'   (e.g., due to scm weighting).
+#' @param csm A csm_matches object from a matching call.
+#' @param feasible_only TRUE means only return treated units and
+#'   matched controls for units that could be matched within the set
+#'   caliper.
+#' @param nonzero_weight_only TRUE means drop any control units with 0
+#'   weight (e.g., due to scm weighting).
 #' @return dataframe
 #' @export
 full_unit_table <- function( csm,
@@ -199,7 +202,8 @@ feasible_unit_subclass <- function( csm ) {
 }
 
 
-#' List rows of treatment table for units that were not matched
+#' Obtain rows of treatment table for units that were not matched
+#'
 #' @return dataframe
 #' @export
 unmatched_units <- function( csm ) {
@@ -221,19 +225,18 @@ unmatched_units <- function( csm ) {
 #' @export
 #'
 result_table <- function( csm,
-                          return = NULL,
+                          return = c( "all", "sc_units", "agg_co_units" ),
                           feasible_only = FALSE ) {
 
-  rs <- csm$result
+  return = match.arg( return )
 
   # Swap result type if asked
-  if ( !is.null( return ) ) {
-    rs <- switch(return,
-                  sc_units     = agg_sc_units(csm$matches),
-                  agg_co_units = agg_co_units(csm$matches),
-                  all          = bind_rows(csm$matches) )
+  rs <- switch(return,
+               sc_units     = agg_sc_units(csm$matches),
+               agg_co_units = agg_co_units(csm$matches),
+               all          = bind_rows(csm$matches) )
 
-  }
+
 
   if ( feasible_only ) {
     fs = csm$treatment_table %>%

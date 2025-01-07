@@ -7,11 +7,14 @@
 full_unit_table(csm, feasible_only = FALSE, nonzero_weight_only = FALSE)
 }
 \arguments{
-\item{feasible_only}{TRUE means only return units which were
-matched within the set caliper.}
+\item{csm}{A csm_matches object from a matching call.}
 
-\item{nonzero_weight_only}{TRUE means drop any units with 0 weight
-(e.g., due to scm weighting).}
+\item{feasible_only}{TRUE means only return treated units and
+matched controls for units that could be matched within the set
+caliper.}
+
+\item{nonzero_weight_only}{TRUE means drop any control units with 0
+weight (e.g., due to scm weighting).}
 }
 \value{
 dataframe
