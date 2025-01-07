@@ -172,24 +172,23 @@ test_that("get_plug_in_SE calculates SE correctly", {
 ######
 # Test get_se_AE
 ######
-# Mock data for testing
-mock_matches <- data.frame(
-  subclass = rep(1:3, each = 3),
-  Z = c(0, 0, 1,
-        1, 1, 1,
-        0, 0, 1),
-  Y = c(1, 3, 2,
-        0, 3, 10,
-        2, 4, 5),
-  weights = c(0.9, 0.1, 1,
-              1/3, 1/3, 1/3,
-              0.5, 0.5, 1),
-  id = c(1,2,3,
-         4,5,6,
-         1,2,7)
-)
-
 test_that("get_se_AE_table calculates SE and related values correctly", {
+  mock_matches <- data.frame(
+    subclass = rep(1:3, each = 3),
+    Z = c(0, 0, 1,
+          1, 1, 1,
+          0, 0, 1),
+    Y = c(1, 3, 2,
+          0, 3, 10,
+          2, 4, 5),
+    weights = c(0.9, 0.1, 1,
+                1/3, 1/3, 1/3,
+                0.5, 0.5, 1),
+    id = c(1,2,3,
+           4,5,6,
+           1,2,7)
+  )
+
   result <-
     get_se_AE_table(
       mock_matches,
@@ -202,13 +201,28 @@ test_that("get_se_AE_table calculates SE and related values correctly", {
   expect_true("N_T" %in% names(result))
   expect_true("N_C_tilde" %in% names(result))
 
-  expect_type(result$SE, "double")
-  expect_true(result$SE > 0)  # SE should be positive
+  expect_true( abs(result$SE - 0.7652451) < 0.01 )  # SE should be positive
   expect_type(result$sigma_hat, "double")
   expect_true(result$sigma_hat > 0)  # sigma_hat should be positive
 })
 
 test_that("get_se_AE_table handles single subclass case", {
+  mock_matches <- data.frame(
+    subclass = rep(1:3, each = 3),
+    Z = c(0, 0, 1,
+          1, 1, 1,
+          0, 0, 1),
+    Y = c(1, 3, 2,
+          0, 3, 10,
+          2, 4, 5),
+    weights = c(0.9, 0.1, 1,
+                1/3, 1/3, 1/3,
+                0.5, 0.5, 1),
+    id = c(1,2,3,
+           4,5,6,
+           1,2,7)
+  )
+
   mock_matches_single <- mock_matches[mock_matches$subclass == 1, ]
 
   result <- get_se_AE_table(mock_matches_single, outcome = "Y", treatment = "Z")
@@ -219,6 +233,22 @@ test_that("get_se_AE_table handles single subclass case", {
 
 
 test_that("get_se_AE_table handles different outcome variables", {
+  mock_matches <- data.frame(
+    subclass = rep(1:3, each = 3),
+    Z = c(0, 0, 1,
+          1, 1, 1,
+          0, 0, 1),
+    Y = c(1, 3, 2,
+          0, 3, 10,
+          2, 4, 5),
+    weights = c(0.9, 0.1, 1,
+                1/3, 1/3, 1/3,
+                0.5, 0.5, 1),
+    id = c(1,2,3,
+           4,5,6,
+           1,2,7)
+  )
+
   mock_matches$Y2 <- rnorm(9)  # Adding a second outcome variable
 
   result <- get_se_AE_table(mock_matches, outcome = "Y2", treatment = "Z")

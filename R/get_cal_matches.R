@@ -75,11 +75,13 @@ get_cal_matches <- function( df,
                              treatment = "Z",
                              metric = c("maximum", "euclidean", "manhattan"),
                              caliper = 1,
-                             rad_method = c("adaptive", "fixed", "1nn","adaptive-5nn"),
+                             rad_method = c("adaptive", "fixed", "1nn","adaptive-5nn", "knn"),
                              est_method = c("scm", "scm_extrap", "average"),
                              scaling = default_scaling(df,covs),
                              id_name = "id",
-                             warn = TRUE ) {
+                             warn = TRUE ,
+                             k = 5  ## for KNN matching
+                             ) {
   metric <- match.arg(metric)
   rad_method <- match.arg(rad_method)
   est_method <- match.arg(est_method)
@@ -99,7 +101,8 @@ get_cal_matches <- function( df,
       scaling = scaling,
       metric = metric,
       caliper = caliper,
-      rad_method = rad_method )
+      rad_method = rad_method,
+      k = k )
 
   # scmatches$matches is a list of length ntx. Each element is a data
   # frame of matched controls for the given unit.

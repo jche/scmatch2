@@ -60,6 +60,52 @@ test_that( "cem works", {
   expect_true( is.numeric(cem) )
 })
 
+test_that("get_matches works with different matching types", {
+  test_df <- data.frame(
+    Z = c(1, 0, 0, 0, 1),
+    X = c(0, 0.5, 0.8, 3, 1.6)
+  )
+  scaling <- 1  # Example scaling factor
+
+  res_toy <- get_matches(
+    matching_type = "maximum_fixed_scm",
+    df_dgp = test_df,
+    scaling = scaling
+  )
+  expect_equal(nrow(res_toy), 5)  # Ensure 4 rows in the result
+
+  # Test data for otsu
+  test_df_otsu <- data.frame(
+    Z = c(1, 0, 0, 0, 1),
+    X1 = c(0, 0.5, 0.8, 3, 1.6),
+    X2 = c(0, 0, 0, 0, 0)
+  )
+  test_df_otsu <- bind_rows(
+    test_df_otsu,
+    transform(test_df_otsu, X2 = 1, Z = 0)
+  )
+
+  # Test for 'euclidean_knn'
+  res_otsu <- get_matches(
+    matching_type = "euclidean_knn",
+    df_dgp = test_df_otsu,
+    scaling = scaling
+  )
+  expect_equal(nrow(res_otsu), 18)
+
+  # Test for invalid matching_type
+  expect_error(
+    get_matches(
+      matching_type = "invalid_type",
+      df_dgp = test_df,
+      scaling = scaling
+    ),
+    "Invalid matching_type"
+  )
+})
+
+
+
 test_that( "all other methods run and give ATT estimates", {
 
   set.seed( 40440 )

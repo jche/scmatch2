@@ -118,10 +118,10 @@ gen_sc_weights <- function(d,
     V = V^2
 
     sol <- synth_qp(X1 = d[1,] %>%
-                      select(all_of(match_cols)) %>%
+                      dplyr::select(all_of(match_cols)) %>%
                       as.numeric(),
                     X0 = d[-1,] %>%
-                      select(all_of(match_cols)) %>%
+                      dplyr::select(all_of(match_cols)) %>%
                       as.matrix(),
                     V  = V)
   } else if (metric == "manhattan") {

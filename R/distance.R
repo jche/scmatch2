@@ -98,7 +98,7 @@ gen_dm <- function(df,
 
   # pull out df with only covariates
   covs <- df %>%
-    select(all_of(covs))
+    dplyr::select(all_of(covs))
 
   covs_coerced <-  coerce_covs(covs)
 

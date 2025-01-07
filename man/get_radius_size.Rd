@@ -4,7 +4,7 @@
 \alias{get_radius_size}
 \title{get the radius size for each treated unit}
 \usage{
-get_radius_size(dm, rad_method, caliper)
+get_radius_size(dm, rad_method, caliper, k)
 }
 \arguments{
 \item{dm}{data}

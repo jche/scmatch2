@@ -13,7 +13,8 @@
 #' @export
 get_radius_size <- function(dm,
                             rad_method,
-                            caliper){
+                            caliper,
+                            k){
   ntx = nrow(dm)
   radius_sizes <- numeric(ntx)
   if (rad_method == "adaptive") {
@@ -32,7 +33,14 @@ get_radius_size <- function(dm,
       adacal <- max(caliper, temp_sorted[1])
       radius_sizes[i] <- min(adacal, temp_sorted[5])
     }
-  } else {
+  } else if (rad_method == "knn") {
+    for (i in 1:ntx) {
+      temp <- dm[i,]
+      temp_sorted <- sort(temp)
+      radius_sizes[i] <- temp_sorted[k]
+    }
+  }
+  else {
     radius_sizes <- rep(caliper, nrow(dm))
   }
   return(radius_sizes)
@@ -152,7 +160,8 @@ gen_matches <- function(df,
                         scaling=1,
                         metric="maximum",
                         caliper=1,
-                        rad_method = c("adaptive", "1nn", "fixed","adaptive-5nn"),
+                        rad_method = c("adaptive", "1nn", "fixed","adaptive-5nn", "knn"),
+                        k = 5,
                         ...) {
 
   ### Step -1: set up some constants
@@ -164,7 +173,7 @@ gen_matches <- function(df,
 
   # store helpful constants
   ntx <- df %>% pull({{treatment}}) %>% sum()   # number of tx units
-  p   <- df %>% select(all_of(covs)) %>% ncol()     # number of matched covariates
+  p   <- df %>% dplyr::select(all_of(covs)) %>% ncol()     # number of matched covariates
 
   ### step 0: generate distance matrix, and
   #   store an uncapped version as well.
@@ -177,7 +186,7 @@ gen_matches <- function(df,
 
   ### step 1: get the radius size for each treated unit
   radius_sizes <-
-    get_radius_size(dm, rad_method, caliper)
+    get_radius_size(dm, rad_method, caliper, k)
 
 
   ### step 2: remove all control units farther than caliper
