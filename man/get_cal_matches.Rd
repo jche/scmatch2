@@ -12,7 +12,6 @@ get_cal_matches(
   caliper = 1,
   rad_method = c("adaptive", "fixed", "1nn", "adaptive-5nn", "knn"),
   est_method = c("scm", "scm_extrap", "average"),
-  return = c("sc_units", "agg_co_units", "all"),
   scaling = default_scaling(df, covs),
   id_name = "id",
   warn = TRUE,
@@ -20,25 +19,27 @@ get_cal_matches(
 )
 }
 \arguments{
-\item{df}{The data frame to be matched.  Option id column to
-uniquely identify units.  If missing, will make a new ID column
-(with name \code{id}).}
+\item{df}{The data frame of data to be matched.  Option id column
+to uniquely identify units.  If missing, this method will make a
+new ID column (with name \code{id}) corresponding to the row numbers
+of the initial data.}
 
 \item{metric}{A string specifying the distance metric}
 
 \item{caliper}{A numeric specifying the caliper size}
 
-\item{rad_method}{adaptive caliper, fixed caliper, only 1nn caliper}
+\item{rad_method}{Caliper method of adaptive caliper, fixed
+caliper, only 1nn caliper, or adaptive caliper to obtain 5nn.}
 
 \item{est_method}{A string specifying the estimation method}
 
-\item{return}{A string specifying what to return}
-
 \item{scaling}{A vector of scaling constants for covariates (can
-also be a single row matrix).}
+also be a single row matrix).  These are often just the inverses
+of covariate-specific calipers.}
 
 \item{id_name}{Name of column to look for ID values.  If that
-column not found, make canonical \code{id}.}
+column not found, make canonical \code{id} corresponding to row
+numbers.}
 
 \item{warn}{A logical indicating whether to warn about dropped
 units.}
@@ -47,6 +48,7 @@ units.}
 df with a bunch of attributes.
 }
 \description{
-Conduct (adaptive) radius matching with optional synthetic step on
-the resulting sets of controls.
+This is the core method of the CSM package. Conduct (adaptive)
+radius matching with optional synthetic step on the resulting sets
+of controls.
 }

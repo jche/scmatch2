@@ -10,7 +10,7 @@ feasible_unit_subclass(csm)
 Numeric vector of IDs
 }
 \description{
-For all units matched without adapting the caliper, get the
+For all units matched without expanding the caliper, get the
 subclass IDs (i.e., the ids that link controls to treated units in
 matched clusters).
 }

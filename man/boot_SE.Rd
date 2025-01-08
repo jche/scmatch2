@@ -2,7 +2,7 @@
 % Please edit documentation in R/bootstrap.R
 \name{boot_SE}
 \alias{boot_SE}
-\title{Main function: Estimate the variance from the bootstrap}
+\title{Estimate the variance from the bootstrap}
 \usage{
 boot_SE(
   matches_table,
@@ -22,11 +22,11 @@ boot_SE(
 \item{var_weight_type}{The way that cluster variances are averaged
 "num_units": weight by number of units in the subclass
 "ess_units": weight effective size of units in the subclass
-"uniform: weight each cluster equally}
+"uniform: weight each cluster equally.}
 }
 \value{
 A tibble with SE, sigma_hat, N_T, and N_C_tilde
 }
 \description{
-Main function: Estimate the variance from the bootstrap
+This is the main bootstrap function.
 }

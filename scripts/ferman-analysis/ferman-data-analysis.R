@@ -9,41 +9,40 @@ theme_set( theme_classic() )
 
 ferman_for_analysis <-
   readRDS(here::here( "scripts/ferman-analysis/data/ferman_for_analysis.rds" ))
+head( ferman_for_analysis )
 
+# Drop unneeded variables
+ferman_for_analysis$UF = NULL
+ferman_for_analysis$y2011 = NULL
+ferman_for_analysis$y2012 = NULL
+ferman_for_analysis$Control = NULL
+ferman_for_analysis$Y = NULL
+
+names( ferman_for_analysis )
+
+# The main matching analysis ----
 c <- 0.35
 covariate_caliper <- c(rep(0.2, 3), 1/1000)
-ferman_scm <- ferman_for_analysis %>%
-  get_cal_matches(
+ferman_scm <- get_cal_matches( ferman_for_analysis,
     covs = c("y2007", "y2008", "y2009", "is_sao_paolo"),
     treatment = "Z",
     caliper = c,
     metric = "maximum",   # "maximum", "euclidean", "manhattan"
     rad_method = "adaptive",
     scaling = 1/covariate_caliper,
-    est_method = "scm",
-    return = "sc_units")
+    est_method = "scm" )
+ferman_scm
+
+full_unit_table(ferman_scm, nonzero_weight_only = TRUE ) %>%
+  rename( isp = is_sao_paolo )
+
+get_ATT_estimate( ferman_scm, "Z", "y2010" )
+
 
 ## Number of used controls
-d <- full_unit_table(
-  ferman_scm,
-  feasible_only = TRUE
-)
-(n_t_SCM <- length(unique(
-  (d %>% filter(Z==0, weights!=0))$id )))
-(n_t_avg <-length(unique(
-  (d %>% filter(Z==0))$id )))
 
+summary( ferman_scm )
 
-list_distinct_control_1nn <- d %>%
-  group_by(Z,subclass) %>%
-  filter(Z == 0) %>%
-  filter(dist == min(dist)) %>%
-  slice(1) %>%
-  mutate(weights = 1) %>%
-  ungroup() %>%
-  distinct(id)
-
-(n_t_1nn <- nrow(list_distinct_control_1nn))
 
 
 #####
@@ -106,11 +105,10 @@ list_distinct_control_1nn <- d %>%
 feasible_subclasses <- feasible_unit_subclass(ferman_scm)
 (n_feasible <- length(feasible_subclasses) )
 
-matched_controls <- ferman_scm$matches %>%
-  bind_rows() %>%
+matched_controls <- result_table( ferman_scm, "all" ) %>%
   group_by(subclass) %>%
   summarise(n_controls = n()-1) %>%
-  filter(subclass %in% subclass_feasible)
+  filter(subclass %in% feasible_subclasses)
 
 sum(matched_controls$n_controls)
 hist_matched_controls <-
@@ -121,6 +119,7 @@ hist_matched_controls <-
     y = "Frequency"
   ) +
   theme_minimal()
+hist_matched_controls
 
 matched_controls_nonzero_weights <-
   ferman_scm$matches %>%
@@ -128,8 +127,9 @@ matched_controls_nonzero_weights <-
   filter(weights > 0) %>%
   group_by(subclass) %>%
   summarise(n_controls = n()-1) %>%
-  filter(subclass %in% subclass_feasible)
+  filter(subclass %in% feasible_subclasses)
 sum(matched_controls_nonzero_weights$n_controls)
+
 hist_matched_controls_nonzero_weights<-
   ggplot(matched_controls_nonzero_weights, aes(x = n_controls)) +
   geom_histogram(binwidth = 1, fill = "skyblue", color = "white") +
@@ -138,7 +138,7 @@ hist_matched_controls_nonzero_weights<-
     y = "Frequency"
   ) +
   theme_minimal()
-p <- grid.arrange(
+p <- gridExtra::grid.arrange(
   hist_matched_controls,
   hist_matched_controls_nonzero_weights,
   ncol=2
@@ -156,12 +156,12 @@ ggsave(
 ######
 
 ggd_att <-
-  ferman_scm$result %>%
+  result_table( ferman_scm ) %>%
   left_join( caliper_table( ferman_scm ),
              by = c( "id", "subclass" ) ) %>%
   group_by(subclass) %>%
   summarize(adacal = last(adacal),
-            tx = Y[2] - Y[1]) %>%
+            tx = y2010[2] - y2010[1]) %>%
   arrange(adacal) %>%
   mutate(order = 1:n(),
          cum_avg = cumsum(tx) / order ) %>%
@@ -250,7 +250,7 @@ for (i in n_unique_subclass:n_feasible) {
     group_by(subclass) %>%
     summarise(nj = n(),
               w_nj = ess(weights),
-              var_cluster = var(Y), .groups="drop")
+              var_cluster = var(y2010), .groups="drop")
 
   weighted_var_df <- cluster_var_df %>%
     summarise(weighted_var = weighted.mean(var_cluster, w = w_nj), .groups="drop")
@@ -298,7 +298,7 @@ plot_SATT <- p+
   ) +
   ylim(c(-0.1,0.2))
 
-plot_all <- grid.arrange(
+plot_all <- gridExtra::grid.arrange(
   plot_max_caliper_size,
   plot_SATT,
   ncol=2
@@ -313,9 +313,11 @@ ggsave(
 
 
 #########
-# Estimate using average and 1-nn with MatchIt
+# Estimate using average and 1-nn with MatchIt ----
 #########
+
 library(MatchIt)
+covs <- c("y2007", "y2008", "y2009", "is_sao_paolo")
 covs_backtick <-
   sapply(covs, function(x) paste0("`", x, "`"))
 formula <-
@@ -323,9 +325,9 @@ formula <-
     paste("Z ~",
           paste(covs_backtick, collapse = " + ")))
 ferman_1nn_match <- matchit(
-  as.formula(formula),
+  formula,
   data = ferman_for_analysis,
-  method = "average",
+  method = "nearest", # used to be 'average'?
   distance = "euclidean")
 
 summary(ferman_1nn_match)
@@ -334,7 +336,7 @@ m.data <- match.data(ferman_1nn_match)
 #Linear model with covariates
 formula_outcome <-
   as.formula(
-    paste("Y ~ Z*(",
+    paste("y2010 ~ Z*(",
           paste(covs_backtick, collapse = " + "),
           ")"
         )
@@ -357,9 +359,8 @@ ferman_scm_avg <- ferman_for_analysis %>%
     caliper = c,
     metric = "maximum",   # "maximum", "euclidean", "manhattan"
     rad_method = "adaptive",
-    scaling = scaling,
-    est_method = "average",
-    return = "sc_units")
+    scaling = 1/covariate_caliper,
+    est_method = "average" )
 
 feasible_w_adacal <-
   full_unit_table(ferman_scm_avg) %>%
@@ -416,7 +417,7 @@ se_AEs <- numeric(n_unique_subclass)
     group_by(subclass) %>%
     summarise(nj = n(),
               w_nj = ess(weights),
-              var_cluster = var(Y), .groups="drop")
+              var_cluster = var(y2010), .groups="drop")
 
   weighted_var_df <- cluster_var_df %>%
     summarise(weighted_var = weighted.mean(var_cluster, w = w_nj), .groups="drop")
@@ -429,5 +430,5 @@ se_AEs <- numeric(n_unique_subclass)
   sd_curr <- sqrt((1/Ns$N_T + 1/Ns$N_C_tilde)) * sigma_hat
 
   (se_AE_avg <- sd_curr)
-  get_att_ests(df_curr)
+  get_att_ests(df_curr, outcome = "y2010")
 

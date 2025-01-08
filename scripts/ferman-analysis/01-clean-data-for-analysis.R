@@ -1,4 +1,7 @@
 
+# Prep raw data for analysis by dropping some missing data and
+# renaming variables.
+
 library(tidyverse)
 library( haven )
 data_ferman <- read_dta(
@@ -8,7 +11,6 @@ data_ferman <- read_dta(
 colnames(data_ferman)
 hist(data_ferman$y2008 - data_ferman$OBJETIVA2008)
 # The above shows that y2008 and OBJETIVA2008 are the same variable
-
 
 ferman_for_analysis <-
   data_ferman %>%

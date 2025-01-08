@@ -4,10 +4,12 @@
 \alias{get_att_ests}
 \title{Estimate the ATT from a matched dataframe}
 \usage{
-get_att_ests(matched_df, outcome = "Y")
+get_att_ests(matched_df, treatment = "Z", outcome = "Y")
 }
 \arguments{
-\item{matched_df}{A matched dataset}
+\item{matched_df}{A matched dataset, either the dataframe of
+treatment and control units, or a csm_matches object.  If
+dataframe, needs the treatment, outcome, and a "weights" column.}
 }
 \description{
 Given a matched dataset, calculate the estimated ATT

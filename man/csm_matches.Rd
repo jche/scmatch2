@@ -16,17 +16,17 @@ is.csm_matches(x)
 
 \method{dim}{csm_matches}(x, ...)
 
-\method{as.data.frame}{csm_matches}(x, row.names = NULL, optional = FALSE, ...)
+\method{as.data.frame}{csm_matches}(x, row.names = NULL, optional = FALSE, return = "all", ...)
 }
 \arguments{
 \item{...}{additional arguments to be passed to the
-as.data.frame.list methods.}
+as.data.frame.list methods.  (Currently ignored.)}
 
-\item{row.names}{NULL or a character vector giving the
-row names for the data frame.}
+\item{row.names}{NULL or a character vector giving the row names
+for the data frame.}
 
-\item{optional}{logical. If TRUE, setting row names and
-converting column names is optional.}
+\item{optional}{logical. If TRUE, setting row names and converting
+column names is optional. (Currently ignored.)}
 }
 \value{
 is.csm_matches: TRUE if object is a csm_matches object.
@@ -37,11 +37,11 @@ is.csm_matches: TRUE if object is a csm_matches object.
 
 dim: Dimension of csm_matches (as matrix)
 
-as.data.frame: csm_matches object as a clean
-dataframe (no more attributes from csm_matches).
+as.data.frame: The matched data as a clean dataframe (no
+more attributes from csm_matches).
 }
 \description{
 Dimension of csm_matches object
 
-Cast csm_matches result to data.frame
+Cast csm_matches to data.frame
 }

@@ -61,6 +61,10 @@ get_SL_pred <- function(SL_fit, df_test, X_names){
 
 
 get_att_diff <- function(d) {
+  if ( is.csm_matches( d ) ) {
+    d <- result_table(d, "sc" )
+  }
+
   d %>%
     group_by(Z) %>%
     summarize(mn = mean(Y) ) %>%
@@ -219,14 +223,14 @@ get_att_csm <- function(d,
     metric = metric,
     scaling = scaling,
     rad_method = rad_method,
-    est_method = est_method,
-    return = "sc_units" )
+    est_method = est_method )
+
 
   if (F) {
     # when return = "all":
     #  - in hain simulation, see that you get some
     #    very extreme estimates from units with 1 or 2 matched controls...
-    preds_csm$result %>%
+    result_table( preds_csm, "sc" ) %>%
       group_by(subclass) %>%
       summarize(n = n(),
                 est = sum(weights*Y*Z) - sum(weights*Y*(1-Z))) %>%
@@ -244,7 +248,7 @@ get_att_csm <- function(d,
     print(p)
   }
 
-  get_att_diff( preds_csm$result )
+  get_att_diff( preds_csm )
 
 }
 
@@ -310,8 +314,7 @@ get_matches <- function(matching_type,
       metric = "maximum",
       scaling = scaling,
       rad_method = "fixed",
-      est_method = "scm",
-      return = "all"
+      est_method = "scm"
     )
 
   } else if (matching_type == "euclidean_knn") {
@@ -434,7 +437,7 @@ get_att_cem <- function(d,
     df = d,
     num_bins = num_bins,
     est_method = est_method,
-    return = "sc_units", warn=FALSE )
+    warn=FALSE )
   # print("Printing preds_feasible")
   # print(preds_feasible)
   # get ATT estimate:
@@ -457,9 +460,8 @@ get_att_cem <- function(d,
                                          function(x) {
                                            if (is.numeric(x)) num_bins / (max(x) - min(x))
                                            else 1000
-                                         })),
-                      return = "sc_units")
-    att_infeasible <- get_att_diff( preds_infeasible$result )
+                                         })) )
+    att_infeasible <- get_att_diff( preds_infeasible )
 
     return((att_feasible * sum(preds_feasible$Z) +
               att_infeasible * sum(preds_infeasible$Z)) / sum(d$Z))
@@ -477,11 +479,10 @@ get_att_1nn <- function(d, scaling) {
     metric = "maximum",
     rad_method = "1nn",
     est_method = "average",
-    scaling = scaling,
-    return = "sc_units" )
+    scaling = scaling )
 
   # get ATT estimate:
-  get_att_diff( preds_1nn$result )
+  get_att_diff( preds_1nn )
 }
 
 

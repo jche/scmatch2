@@ -471,10 +471,12 @@ satt_plot4 <- function(res, B=NA) {
 # love plot ---------------------------------------------------------------
 
 get_diff_scm_co_and_tx <- function(res,covs){
+  stopifnot( is.csm_matches(res) )
+
   ada = res$treatment_table %>%
     select(id, adacal) %>%
     mutate( id = as.character(id) )
-  df_diff_scm_co_and_tx <- res$result %>%
+  df_diff_scm_co_and_tx <- result_table(res) %>%
     left_join(ada,
               by="id") %>%
     group_by(subclass) %>%
@@ -509,9 +511,13 @@ create_love_plot_df <- function(res, covs){
 #'
 #' Make a ggplot love plot of covariate balance for each covariate
 #' passed.
+#'
 #' @export
-love_plot <- function(res, covs, B=NA) {
+love_plot <- function(res, covs, covs_names = NULL, B=NA) {
   love_steps <- create_love_plot_df(res, covs)
+  if ( !is.null( covs_names ) ) {
+    love_steps$name <- covs_names[ match( love_steps$name, covs ) ]
+  }
   p <- love_steps %>%
     ggplot(aes(x=order, color=name)) +
     geom_point(data=. %>%

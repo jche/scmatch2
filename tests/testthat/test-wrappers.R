@@ -12,8 +12,12 @@ test_that("get_att_ests works well",{
 })
 
 
-test_that("get_att_bal should work for a example dataset with either
-          Z in 0,1 or Z in F,T, but not in other numerical Z",{
+test_that("get_att_bal should work for a example dataset",{
+
+  # Should work  with either
+  # Z in 0,1 or Z in F,T, but not in other numerical Z
+
+  require( optweight )
 
   source( here::here( "scripts/datagen/gen_six_points.R" ) )
   df_six_points <- gen_six_points()
@@ -143,8 +147,7 @@ test_that( "all other methods run and give ATT estimates", {
     scaling = 100,
     #caliper = 0.001,
     rad_method = "adaptive",
-    est_method = "scm",
-    return = "sc_units")
+    est_method = "scm" )
   preds_csm$treatment_table
   head( preds_csm$matches )
 

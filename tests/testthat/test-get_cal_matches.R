@@ -13,10 +13,9 @@ test_that("get_cal_matches works well", {
                                caliper = 1,
                                rad_method = "adaptive",
                                est_method = "scm",
-                               return = "agg_co_units",
                                scaling = 1)
   res$matches
-  expect_equal( nrow( res$result ), 4 )
+  expect_equal( nrow( result_table(res) ), 5 )
 
 
 
@@ -37,10 +36,11 @@ test_that("get_cal_matches works well", {
                                caliper = 1,
                                rad_method = "adaptive",
                                est_method = "scm",
-                               return = "agg_co_units",
                                scaling = c( 1, 5 ) )
   res$matches
-  expect_equal( nrow( res$result ), 4 )
+  result_table( res, "agg" )
+  expect_equal( nrow( result_table(res, "sc") ), 4 )
+  expect_equal( nrow( result_table(res, "agg") ), 4 )
 
 
   res <- CSM:::get_cal_matches(df = test_df,
@@ -50,11 +50,20 @@ test_that("get_cal_matches works well", {
                                caliper = 1,
                                rad_method = "adaptive",
                                est_method = "scm",
-                               return = "all",
                                scaling = c( 1, 5 ) )
   res$matches
-  expect_equal( nrow( res$result ), 5 )
+  expect_equal( nrow( result_table( res ) ), 5 )
 
+  # Test the various helper functions
+  df = as.data.frame( res )
+  df
+  expect_equal( nrow( res ), 5  )
+  expect_equal( res[ 1, 4 ], "U1" )
+  expect_equal( res[[ 1, 1]], 1 )
+  expect_true( is.data.frame( res[ 1, ] ) )
+
+  expect_output( p <- summary( res ), "match pattern")
+  # summary(res)
 
 })
 
@@ -91,7 +100,6 @@ test_that("get_cal_matches adaptive caliper", {
                                caliper = 1,
                                rad_method = "adaptive",
                                est_method = "scm",
-                               return = "agg_co_units",
                                scaling = 1)
   res$treatment_table
   expect_equal( res$treatment_table$adacal, c( 1, 5, 1, 2 ) )
@@ -137,14 +145,13 @@ test_that("id and subclass ID make sense", {
                                caliper = 1,
                                rad_method = "adaptive",
                                est_method = "scm",
-                               return = "agg_co_units",
                                scaling = 1)
   res$treatment_table
-  # Expect subclass all starts with S in treatment table:
+  # Expect subclass all starts with U in treatment table:
   expect_true( all( grepl( "^U", res$treatment_table$subclass ) ) )
 
 
-  rs <- result_table( res )
+  rs <- result_table( res, "agg" )
   rs
   # Expect no subclass in results since units aggregated
   expect_true( all( is.na( rs$subclass ) ) )
@@ -153,37 +160,15 @@ test_that("id and subclass ID make sense", {
 
 
   # different aggregation
-  res <- CSM:::get_cal_matches(df = test_df,
-                               covs = c( "X1", "X2" ),
-                               treatment = "Z",
-                               metric = "maximum",
-                               caliper = 1,
-                               rad_method = "adaptive",
-                               est_method = "scm",
-                               return = "all",
-                               #return = c("sc_units", "agg_co_units", "all"),
-
-                               scaling = 1)
-  res$result
+  result = result_table( res, "all" )
   expect_true( all( grepl( "^U", res$result$subclass ) ) )
   expect_true( all( !is.na( res$result$dist ) ) )
-  expect_equal( nrow( res$result ), 9 )
+  expect_equal( nrow( result ), 9 )
 
 
-  res_sc_units <- CSM:::get_cal_matches(df = test_df,
-                               covs = c( "X1", "X2" ),
-                               treatment = "Z",
-                               metric = "maximum",
-                               caliper = 1,
-                               rad_method = "adaptive",
-                               est_method = "scm",
-                               return = "sc_units",
-                               #return = c("sc_units", "agg_co_units", "all"),
-
-                               scaling = 1)
-  res_sc_units$result
-  expect_true( all( grepl( "^U", res_sc_units$result$subclass ) ) )
-  expect_equal( nrow( res_sc_units$result ), 8 )
+  result = result_table( res, "sc" )
+  expect_true( all( grepl( "^U", result$subclass ) ) )
+  expect_equal( nrow( result ), 8 )
 
 
 
@@ -192,11 +177,11 @@ test_that("id and subclass ID make sense", {
   r_co <- agg_co_units( res )
   expect_equal( r_co, rs )
   r_syn <- agg_sc_units( res )
-  expect_equal( r_syn, result_table(res_sc_units) )
+  expect_equal( r_syn, result_table(res, "sc") )
   r_avg <- agg_avg_units( res )
   r_avg
   expect_equal( r_avg[2,], r_syn[2,] )
-  expect_equal( res_sc_units$result, r_syn )
+  expect_equal( result_table(res, "sc"), r_syn )
 })
 
 

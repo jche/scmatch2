@@ -4,7 +4,7 @@
 \alias{get_ATT_estimate}
 \title{Estimate ATT}
 \usage{
-get_ATT_estimate(scmatch, outcome = "Y")
+get_ATT_estimate(scmatch, treatment = "Z", outcome = "Y")
 }
 \description{
 Calculate ATT and associated standard error using the weighting
