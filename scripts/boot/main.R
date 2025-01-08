@@ -133,8 +133,9 @@ saveRDS(boot_otsu_wild_moving_block,
 ### Visulize realized DF ###
 df_otsu <- gen_df_otsu(N = 100,K = 2)
 ggplot(df_otsu, aes(x=X1,y=X2))+
-  geom_point()
+  geom_point(aes(colour = as.factor(Z) ))
 ggsave(here("scripts/boot/figures/otsu-rai-2d-x-plot.png"))
+## Next: visualize the overlapped KNNs
 
 ggplot(df_otsu, aes(x=norm_X,y=m_X))+
   geom_point()
