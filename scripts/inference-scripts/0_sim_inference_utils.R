@@ -215,7 +215,6 @@ if ( FALSE ) {
     pull(bias)
 
   rs
-
 }
 
 
@@ -292,7 +291,152 @@ if ( FALSE ) {
 }
 
 
+one_iteration_OR <- function( i,
+                           toy_ctr_dist=0.5,
+                           scaling = 8,
+                           true_sigma = 0.5,
+                           prop_nc_unif = 1/3,
+                           nc = 500,
+                           verbose = TRUE ) {
+  # i <- 1
+  if( verbose ) {
+    if ( i %% 10 == 0 || (i == R) ) {
+      cat("iteration", i, "\n" )
+    }
+  }
 
+  ### Make the data
+  df_dgp <-
+    gen_one_toy( nc = nc,
+                 ctr_dist=toy_ctr_dist,
+                 prop_nc_unif=prop_nc_unif) %>%
+    mutate(Y0_denoised = Y0 - noise,
+           Y1_denoised = Y1 - noise,
+           Y_denoised = Y - noise)
+
+  ## Add in the noise to set variation
+  df_dgp_i <- df_dgp %>%
+    mutate(noise = rnorm(n(), mean=0, sd=true_sigma)) %>%
+    mutate(Y0 = Y0_denoised + noise,
+           Y1 = Y1_denoised + noise,
+           Y = Y_denoised + noise)
+
+
+  ### Perform matching
+  mtch <- get_cal_matches(
+    df_dgp_i,
+    metric = "maximum",
+    scaling = scaling,
+    caliper = 1,
+    # rad_method = "adaptive",
+    rad_method = "adaptive-5nn",
+    est_method = "scm"
+  )
+
+  # ### Perform inference using the A-E method
+  # ATT_estimate <- get_ATT_estimate( mtch )
+
+  ### Perform inference using the OR method
+  get_ATT_estimate_OR <- function( scmatch, treatment = "Z", outcome = "Y" ) {
+
+    ATT = get_att_ests( scmatch, treatment = treatment, outcome = outcome )
+    se = get_se_OR( scmatch, treatment = treatment, outcome = outcome )
+    # se = get_se_AE( scmatch, treatment = treatment, outcome = outcome )
+    se$ATT = ATT
+
+    se %>% relocate( ATT ) %>%
+      mutate(  t = ATT/SE )
+  }
+  ATT_estimate <- get_ATT_estimate_OR( mtch )
+
+
+  rs = tibble(
+    runID = i,
+    att_est = ATT_estimate$ATT,
+    se_AE = ATT_estimate$SE,
+    CI_lower = att_est -1.96 *  se_AE,
+    CI_upper = att_est + 1.96 * se_AE,
+    N_T = ATT_estimate$N_T,
+    N_C_tilde = ATT_estimate$N_C_tilde,
+    true_SE = true_sigma * sqrt(1 / N_T + 1 / N_C_tilde),
+    CI_lower_with_true_SE = att_est - 1.96 * true_SE,
+    CI_upper_with_true_SE = att_est + 1.96 * true_SE
+  )
+
+  # Get true ATT
+  rs$att_true <-
+    df_dgp_i %>%
+    filter(Z ==1) %>%
+    summarize(att = mean(Y1-Y0)) %>%
+    pull(att)
+
+  # Calculate true post-match bias, given the covariates.
+  full_units <- full_unit_table(mtch, nonzero_weight_only = TRUE )
+  rs$bias <- full_units %>%
+    group_by(Z) %>%
+    summarize(mn = sum(Y0_denoised*weights) / sum(weights)) %>%
+    summarize(bias = last(mn) - first(mn)) %>%
+    pull(bias)
+
+  rs
+
+}
+
+# simulation inference using Otsu and Rai boostrap variance
+#' Run a simulation to check inference on the
+#' A-E inference method
+#'
+#' @param dgp_name Name of the DGP
+#' @param att0 True ATT
+#' @param R Number of MC runs
+#' @param toy_ctr_dist distance between centers in the to
+#'
+#' @return
+#' @export
+#'
+#' @examples
+sim_inference_CSM_OR <- function(R=100,
+                                  toy_ctr_dist=0.5,
+                                  prop_nc_unif = 1/3,
+                                  scaling = 8,
+                                  true_sigma = 0.5,
+                                  nc = 500,
+                                  seed = NULL, parallel = FALSE ) {
+  ### Example run inputs
+  # R <- 10; toy_ctr_dist=0.5; dgp_name <- "toy"; att0<-F
+
+  if ( is.null(seed) ) {
+    warning( "Setting seed within sim_inference_CSM_A_E", call. = FALSE )
+    set.seed(123)
+  }
+
+  if ( parallel ) {
+    library( furrr )
+    library( future )
+    plan(multisession, workers = parallel::detectCores() - 1 )
+    results = future_map_dfr( 1:R,
+                              .f = one_iteration_OR,
+                              toy_ctr_dist = toy_ctr_dist,
+                              prop_nc_unif = prop_nc_unif,
+                              scaling = scaling,
+                              true_sigma = true_sigma,
+                              nc = nc,
+                              verbose = FALSE,
+                              .options = furrr_options(seed = NULL),
+                              .progress = TRUE )
+  } else {
+    results <- map_df( 1:R, one_iteration_OR,
+                       toy_ctr_dist = toy_ctr_dist,
+                       prop_nc_unif = prop_nc_unif,
+                       scaling = scaling,
+                       true_sigma = true_sigma,
+                       nc = nc,
+                       .progress = TRUE )
+  }
+
+
+  return(results)
+}
 
 
 

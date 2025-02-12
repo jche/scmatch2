@@ -231,6 +231,63 @@ get_se_AE <- function(matches,
   )
 }
 
+
+
+get_se_OR <- function(matches,
+                      outcome = "Y",
+                      treatment = "Z",
+                      boot_mtd = "wild",
+                      B = 250,
+                      use_moving_block=F,
+                      seed_addition = 11,
+                      block_size = NA){
+  # matches <- mock_matches; outcome = "Y"; treatment = "Z"; boot_mtd = "wild"
+  if ( is.csm_matches( matches ) ) {
+    matches <- full_unit_table(matches)
+  }
+  tmp0 <- matches %>%
+    mutate(Y_bias_corrected = Y) %>%
+    group_by(subclass, Z) %>%
+    summarize(mn = sum(Y_bias_corrected * weights), .groups = "drop")
+
+  tmp <- tmp0 %>%
+    group_by(subclass) %>%
+    summarise(tilde_tau = last(mn) - first(mn), .groups = "drop")
+
+  tilde_tau <- tmp$tilde_tau
+  mean_tilde_tau <- mean(tilde_tau)
+  tilde_tau_resids <- tilde_tau - mean_tilde_tau
+
+  if (boot_mtd == "Bayesian" || boot_mtd == "wild" || boot_mtd == "naive-resid"){
+    boot_ci <- make_bootstrap_ci(
+      boot_mtd,
+      use_moving_block=use_moving_block
+    )  # or "wild" or "naive-resid"
+    results <- boot_ci(
+      resids = tilde_tau_resids,
+      mean_est = mean_tilde_tau,
+      B = B,
+      seed_addition = seed_addition,
+      block_size = block_size
+    )
+
+    CI_lower <- results$ci_lower
+    CI_upper <- results$ci_upper
+    sd_boot <- results$sd
+  }
+  Ns <- calc_N_T_N_C(matches)
+
+  return( tibble(
+    SE = sd_boot,
+    sigma_hat = NA,
+    N_T = Ns$N_T,
+    N_C_tilde = Ns$N_C_tilde,
+    CI_lower = CI_lower,
+    CI_upper = CI_upper
+  ) )
+}
+
+
 #' Estimate ATT
 #'
 #' Calculate ATT and associated standard error using the weighting
