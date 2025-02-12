@@ -32,52 +32,6 @@ results <-
   )
 
 
-## Check the overlap impact
-N1 = 10
-M = 4
-panel = "D"
-cat("Running Panel", panel, "N1 =", N1, "M =", M, "\n")
-result_has_overlap_adj <-
-  compute_rejection_rate(
-    N1, N0, M, tau_0, alpha,
-    num_replicates=300,
-    max_permutations = 200,
-    panel)
-source(here("scripts/new-inference/utils-replicate-ferman.R"))
-result_no_overlap_adj <-
-  compute_rejection_rate(
-    N1, N0, M, tau_0, alpha,
-    num_replicates=300,
-    max_permutations=200,
-    panel,
-    overlap_adj = F)
-## Seems no impact -- i think this needs to
-
-
-## Check the method difference
-result_ferman <-
-  compute_rejection_rate(
-    N1, N0, M, tau_0, alpha,
-    num_replicates=300,
-    max_permutations = 200,
-    panel,
-    overlap_adj = T)
-source(here("scripts/new-inference/utils-replicate-ferman.R"))
-result_pooled <-
-  compute_rejection_rate(
-    N1, N0, M, tau_0, alpha,
-    num_replicates=300,
-    max_permutations = 200,
-    panel,
-    overlap_adj = T,
-    sd_method = "pooled")
-# This runs 1 hour
-saveRDS(result_ferman, here("scripts/new-inference/outputs/result_ferman.rds"))
-saveRDS(result_pooled, here("scripts/new-inference/outputs/result_pooled.rds"))
-
-result_pooled <- readRDS(here::here("scripts/new-inference/outputs/result_pooled.rds"))
-result_ferman <- readRDS(here::here("scripts/new-inference/outputs/result_ferman.rds"))
-
 ## Develop the testing procedure with our method
 # # Read one dataset
 # full_matched_table <-
