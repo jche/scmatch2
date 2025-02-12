@@ -1,17 +1,4 @@
-setwd("~/Dropbox (Harvard University)/Xiang_Luke/scmatch2")
-library(tidyverse)
-require(mvtnorm)
-source("R/distance.R")
-source("R/sc.R")
-source("R/matching.R")
-source("R/estimate.R")
-source("R/inference.R")
-source("R/sim_data.R")
-source("R/wrappers.R")
-source("R/utils.R")
-source("R/bootstrap.R")
-
-
+load_all()
 test_split_data <- function(){
   dgp_obj <-
     get_df_scaling_from_dgp_name(dgp_name="toy")

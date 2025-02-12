@@ -20,15 +20,20 @@ get_est_att_from_wt <- function(df,
 #'
 #' Given a matched dataset, calculate the estimated ATT
 #'
-#' @param matched_df A matched dataset
+#' @param matched_df A matched dataset, either the dataframe of
+#'   treatment and control units, or a csm_matches object.  If
+#'   dataframe, needs the treatment, outcome, and a "weights" column.
 #'
 #' @export
-get_att_ests <- function(matched_df, outcome = "Y") {
+get_att_ests <- function(matched_df, treatment = "Z", outcome = "Y") {
 
   if ( is.csm_matches(matched_df) ) {
-    matched_df <- matched_df$result
+    matched_df <- result_table( matched_df, "sc" )
   }
-  stopifnot( all( c("Z", "Y") %in% names(matched_df) ) )
+  stopifnot( all( c(treatment, outcome) %in% names(matched_df) ) )
+  stopifnot( "weights" %in% names(matched_df) )
+
+  matched_df$Z = matched_df[[treatment]]
   matched_df$Y = matched_df[[outcome]]
 
   matched_df %>%
@@ -195,15 +200,17 @@ get_se_AE_table <- function(
   ))
 }
 
-#' Title
+#' Get the standard error using the weighting approach
+#'
+#' Method taken from the balancing weights literature.
 #'
 #' @param matches The CSM match object, an R S3 object
 #' @param outcome Name of the outcome variable (default "Y")
 #' @param treatment Name of the treatment variable (default "Z")
 #' @param var_weight_type The way that cluster variances are averaged
-#' "num_units": weight by number of units in the subclass
-#' "ess_units": weight effective size of units in the subclass
-#' "uniform: weight each cluster equally
+#'   "num_units": weight by number of units in the subclass
+#'   "ess_units": weight effective size of units in the subclass
+#'   "uniform: weight each cluster equally
 #'
 #' @return A tibble with SE, sigma_hat, N_T, and N_C_tilde
 #' @export
@@ -224,16 +231,73 @@ get_se_AE <- function(matches,
   )
 }
 
+
+
+get_se_OR <- function(matches,
+                      outcome = "Y",
+                      treatment = "Z",
+                      boot_mtd = "wild",
+                      B = 250,
+                      use_moving_block=F,
+                      seed_addition = 11,
+                      block_size = NA){
+  # matches <- mock_matches; outcome = "Y"; treatment = "Z"; boot_mtd = "wild"
+  if ( is.csm_matches( matches ) ) {
+    matches <- full_unit_table(matches)
+  }
+  tmp0 <- matches %>%
+    mutate(Y_bias_corrected = Y) %>%
+    group_by(subclass, Z) %>%
+    summarize(mn = sum(Y_bias_corrected * weights), .groups = "drop")
+
+  tmp <- tmp0 %>%
+    group_by(subclass) %>%
+    summarise(tilde_tau = last(mn) - first(mn), .groups = "drop")
+
+  tilde_tau <- tmp$tilde_tau
+  mean_tilde_tau <- mean(tilde_tau)
+  tilde_tau_resids <- tilde_tau - mean_tilde_tau
+
+  if (boot_mtd == "Bayesian" || boot_mtd == "wild" || boot_mtd == "naive-resid"){
+    boot_ci <- make_bootstrap_ci(
+      boot_mtd,
+      use_moving_block=use_moving_block
+    )  # or "wild" or "naive-resid"
+    results <- boot_ci(
+      resids = tilde_tau_resids,
+      mean_est = mean_tilde_tau,
+      B = B,
+      seed_addition = seed_addition,
+      block_size = block_size
+    )
+
+    CI_lower <- results$ci_lower
+    CI_upper <- results$ci_upper
+    sd_boot <- results$sd
+  }
+  Ns <- calc_N_T_N_C(matches)
+
+  return( tibble(
+    SE = sd_boot,
+    sigma_hat = NA,
+    N_T = Ns$N_T,
+    N_C_tilde = Ns$N_C_tilde,
+    CI_lower = CI_lower,
+    CI_upper = CI_upper
+  ) )
+}
+
+
 #' Estimate ATT
 #'
 #' Calculate ATT and associated standard error using the weighting
 #' method from paper with locally estimated residual variation.
 #'
 #' @export
-get_ATT_estimate <- function( scmatch, outcome = "Y" ) {
+get_ATT_estimate <- function( scmatch, treatment = "Z", outcome = "Y" ) {
 
-  ATT = get_att_ests( scmatch, outcome = outcome )
-  se = get_se_AE( scmatch, outcome = outcome )
+  ATT = get_att_ests( scmatch, treatment = treatment, outcome = outcome )
+  se = get_se_AE( scmatch, treatment = treatment, outcome = outcome )
   se$ATT = ATT
 
   se %>% relocate( ATT ) %>%

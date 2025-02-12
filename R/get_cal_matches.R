@@ -46,24 +46,28 @@ make_treatment_table <- function( df, matches, caliper ) {
 
 #' Caliper Synthetic Matching
 #'
-#' Conduct (adaptive) radius matching with optional synthetic step on
-#' the resulting sets of controls.
+#' This is the core method of the CSM package. Conduct (adaptive)
+#' radius matching with optional synthetic step on the resulting sets
+#' of controls.
 #'
 #'
-#' @param df The data frame to be matched.  Option id column to
-#'   uniquely identify units.  If missing, will make a new ID column
-#'   (with name `id`).
+#' @param df The data frame of data to be matched.  Option id column
+#'   to uniquely identify units.  If missing, this method will make a
+#'   new ID column (with name `id`) corresponding to the row numbers
+#'   of the initial data.
 #' @param metric A string specifying the distance metric
 #' @param caliper A numeric specifying the caliper size
-#' @param rad_method adaptive caliper, fixed caliper, only 1nn caliper
+#' @param rad_method Caliper method of adaptive caliper, fixed
+#'   caliper, only 1nn caliper, or adaptive caliper to obtain 5nn.
 #' @param est_method A string specifying the estimation method
-#' @param return A string specifying what to return
 #' @param scaling A vector of scaling constants for covariates (can
-#'   also be a single row matrix).
+#'   also be a single row matrix).  These are often just the inverses
+#'   of covariate-specific calipers.
 #' @param warn A logical indicating whether to warn about dropped
 #'   units.
 #' @param id_name Name of column to look for ID values.  If that
-#'   column not found, make canonical `id`.
+#'   column not found, make canonical `id` corresponding to row
+#'   numbers.
 #' @return df with a bunch of attributes.
 #' @export
 get_cal_matches <- function( df,
@@ -73,7 +77,6 @@ get_cal_matches <- function( df,
                              caliper = 1,
                              rad_method = c("adaptive", "fixed", "1nn","adaptive-5nn", "knn"),
                              est_method = c("scm", "scm_extrap", "average"),
-                             return = c("sc_units", "agg_co_units", "all"),
                              scaling = default_scaling(df,covs),
                              id_name = "id",
                              warn = TRUE ,
@@ -82,7 +85,7 @@ get_cal_matches <- function( df,
   metric <- match.arg(metric)
   rad_method <- match.arg(rad_method)
   est_method <- match.arg(est_method)
-  return <- match.arg(return)
+
   if ( !( id_name %in% colnames(df) ) ) {
     df$id <- paste0( "U", 1:nrow(df) )
   } else {
@@ -101,19 +104,13 @@ get_cal_matches <- function( df,
       rad_method = rad_method,
       k = k )
 
-  # scmatches$matches is a list of length ntx.
-  #   Each element is a data frame of matched controls
+  # scmatches$matches is a list of length ntx. Each element is a data
+  # frame of matched controls for the given unit.
 
 
   ### use est_method to add individual unit weights: scm or average
   scweights <- est_weights( matched_gps = scmatches,
                             est_method = est_method)
-
-  ### use return to figure out how to aggregate: sc units, aggregated weights per control, all weights
-  res <- switch(return,
-                sc_units     = agg_sc_units(scweights$matches),
-                agg_co_units = agg_co_units(scweights$matches),
-                all          = bind_rows(scweights$matches) )
 
 
   # Make a tibble of treated units with calipers and number of controls, etc.
@@ -132,7 +129,6 @@ get_cal_matches <- function( df,
 
   scmatches$matches <- scweights$matches
   scmatches$treatment_table <- treatment_table
-  scmatches$result <- res
 
   # keep a bunch of attributes around, just in case
   settings <- attr(scmatches, "settings" )

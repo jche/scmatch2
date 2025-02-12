@@ -12,8 +12,12 @@ test_that("get_att_ests works well",{
 })
 
 
-test_that("get_att_bal should work for a example dataset with either
-          Z in 0,1 or Z in F,T, but not in other numerical Z",{
+test_that("get_att_bal should work for a example dataset",{
+
+  # Should work  with either
+  # Z in 0,1 or Z in F,T, but not in other numerical Z
+
+  require( optweight )
 
   source( here::here( "scripts/datagen/gen_six_points.R" ) )
   df_six_points <- gen_six_points()
@@ -56,6 +60,52 @@ test_that( "cem works", {
   expect_true( is.numeric(cem) )
 })
 
+test_that("get_matches works with different matching types", {
+  test_df <- data.frame(
+    Z = c(1, 0, 0, 0, 1),
+    X = c(0, 0.5, 0.8, 3, 1.6)
+  )
+  scaling <- 1  # Example scaling factor
+
+  res_toy <- get_matches(
+    matching_type = "maximum_fixed_scm",
+    df_dgp = test_df,
+    scaling = scaling
+  )
+  expect_equal(nrow(res_toy), 5)  # Ensure 4 rows in the result
+
+  # Test data for otsu
+  test_df_otsu <- data.frame(
+    Z = c(1, 0, 0, 0, 1),
+    X1 = c(0, 0.5, 0.8, 3, 1.6),
+    X2 = c(0, 0, 0, 0, 0)
+  )
+  test_df_otsu <- bind_rows(
+    test_df_otsu,
+    transform(test_df_otsu, X2 = 1, Z = 0)
+  )
+
+  # Test for 'euclidean_knn'
+  res_otsu <- get_matches(
+    matching_type = "euclidean_knn",
+    df_dgp = test_df_otsu,
+    scaling = scaling
+  )
+  expect_equal(nrow(res_otsu), 18)
+
+  # Test for invalid matching_type
+  expect_error(
+    get_matches(
+      matching_type = "invalid_type",
+      df_dgp = test_df,
+      scaling = scaling
+    ),
+    "Invalid matching_type"
+  )
+})
+
+
+
 test_that( "all other methods run and give ATT estimates", {
 
   set.seed( 40440 )
@@ -97,8 +147,7 @@ test_that( "all other methods run and give ATT estimates", {
     scaling = 100,
     #caliper = 0.001,
     rad_method = "adaptive",
-    est_method = "scm",
-    return = "sc_units")
+    est_method = "scm" )
   preds_csm$treatment_table
   head( preds_csm$matches )
 

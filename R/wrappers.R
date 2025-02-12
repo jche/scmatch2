@@ -61,6 +61,10 @@ get_SL_pred <- function(SL_fit, df_test, X_names){
 
 
 get_att_diff <- function(d) {
+  if ( is.csm_matches( d ) ) {
+    d <- result_table(d, "sc" )
+  }
+
   d %>%
     group_by(Z) %>%
     summarize(mn = mean(Y) ) %>%
@@ -219,14 +223,14 @@ get_att_csm <- function(d,
     metric = metric,
     scaling = scaling,
     rad_method = rad_method,
-    est_method = est_method,
-    return = "sc_units" )
+    est_method = est_method )
+
 
   if (F) {
     # when return = "all":
     #  - in hain simulation, see that you get some
     #    very extreme estimates from units with 1 or 2 matched controls...
-    preds_csm$result %>%
+    result_table( preds_csm, "sc" ) %>%
       group_by(subclass) %>%
       summarize(n = n(),
                 est = sum(weights*Y*Z) - sum(weights*Y*(1-Z))) %>%
@@ -244,8 +248,93 @@ get_att_csm <- function(d,
     print(p)
   }
 
-  get_att_diff( preds_csm$result )
+  get_att_diff( preds_csm )
 
+}
+
+
+
+#' Perform Matching Based on Specified Type
+#'
+#' This function performs matching on a dataset based on the specified `matching_type`.
+#' It supports different matching methods and configurations, such as fixed-radius or
+#' k-nearest-neighbor methods.
+#'
+#' @param matching_type A string specifying the type of matching. Supported types are:
+#'   - `"maximum_fixed_scm"`: Uses the maximum metric with fixed radius and SCM estimation.
+#'   - `"euclidean_knn"`: Uses the Euclidean metric with k-nearest neighbors.
+#' @param df_dgp A data frame containing the dataset to be matched. The dataset should include
+#'   treatment and covariate columns.
+#' @param scaling A numeric value or vector used for scaling covariates during the matching process.
+#'   Defaults to `1`.
+#' @param k A numeric value to specify the number of nearest neighbors in knn matching
+#'   Defaults to `8`
+#'
+#' @return A list containing the matched dataset and associated metrics. The specific structure of
+#' the result depends on the `matching_type` and the underlying matching method used.
+#'
+#' @details
+#' The function abstracts the matching process, allowing for different types of matching algorithms
+#' to be applied to the same dataset. The input `matching_type` determines the matching method,
+#' metric, and additional parameters.
+#'
+#' @examples
+#' # Example for 'maximum_fixed_scm' matching type
+#' test_df <- data.frame(
+#'   Z = c(1, 0, 0, 0, 1),
+#'   X = c(0, 0.5, 0.8, 3, 1.6)
+#' )
+#' scaling <- 1
+#' result <- get_matches(
+#'   matching_type = "maximum_fixed_scm",
+#'   df_dgp = test_df,
+#'   scaling = scaling
+#' )
+#'
+#' # Example for 'euclidean_knn' matching type
+#' test_df <- data.frame(
+#'   Z = c(1, 0, 0, 0, 1),
+#'   X1 = c(0, 0.5, 0.8, 3, 1.6),
+#'   X2 = c(0, 0, 0, 0, 0)
+#' )
+#' result <- get_matches(
+#'   matching_type = "euclidean_knn",
+#'   df_dgp = test_df,
+#'   scaling = scaling
+#' )
+#'
+#' @export
+get_matches <- function(matching_type,
+                        df_dgp,
+                        scaling,
+                        k = 8) {
+  if (matching_type == "maximum_fixed_scm") {
+    df_dgp_with_matches <- get_cal_matches(
+      df = df_dgp,
+      metric = "maximum",
+      scaling = scaling,
+      rad_method = "fixed",
+      est_method = "scm"
+    )
+
+  } else if (matching_type == "euclidean_knn") {
+    df_dgp_with_matches <- get_cal_matches(
+      df = df_dgp,
+      covs = starts_with("X"),
+      treatment = "Z",
+      scaling = 1,
+      metric = "euclidean",
+      rad_method = "knn",
+      k = k
+    )
+  } else {
+    stop("Invalid matching_type. Must be 'maximum_fixed_scm' or 'euclidean_knn'.")
+  }
+  df_dgp_with_matches <- full_unit_table(
+    df_dgp_with_matches,
+    nonzero_weight_only = FALSE
+  )
+  return(df_dgp_with_matches)
 }
 
 
@@ -348,7 +437,7 @@ get_att_cem <- function(d,
     df = d,
     num_bins = num_bins,
     est_method = est_method,
-    return = "sc_units", warn=FALSE )
+    warn=FALSE )
   # print("Printing preds_feasible")
   # print(preds_feasible)
   # get ATT estimate:
@@ -371,9 +460,8 @@ get_att_cem <- function(d,
                                          function(x) {
                                            if (is.numeric(x)) num_bins / (max(x) - min(x))
                                            else 1000
-                                         })),
-                      return = "sc_units")
-    att_infeasible <- get_att_diff( preds_infeasible$result )
+                                         })) )
+    att_infeasible <- get_att_diff( preds_infeasible )
 
     return((att_feasible * sum(preds_feasible$Z) +
               att_infeasible * sum(preds_infeasible$Z)) / sum(d$Z))
@@ -391,11 +479,10 @@ get_att_1nn <- function(d, scaling) {
     metric = "maximum",
     rad_method = "1nn",
     est_method = "average",
-    scaling = scaling,
-    return = "sc_units" )
+    scaling = scaling )
 
   # get ATT estimate:
-  get_att_diff( preds_1nn$result )
+  get_att_diff( preds_1nn )
 }
 
 

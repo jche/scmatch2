@@ -31,7 +31,6 @@ results <-
     result_path = here("scripts/new-inference/outputs/results_table.rds")
   )
 
-
 ## Develop the testing procedure with our method
 # # Read one dataset
 # full_matched_table <-
@@ -40,48 +39,79 @@ results <-
 #     M = 4,
 #     i = 1,
 #     panel = "D")
+## Check the overlap impact
+N1 = 10
+M = 4
+panel = "D"
+cat("Running Panel", panel, "N1 =", N1, "M =", M, "\n")
+result_has_overlap_adj <-
+  compute_rejection_rate(
+    N1, N0, M, tau_0, alpha,
+    num_replicates=300,
+    max_permutations = 200,
+    panel)
+source(here("scripts/new-inference/utils-replicate-ferman.R"))
+result_no_overlap_adj <-
+  compute_rejection_rate(
+    N1, N0, M, tau_0, alpha,
+    num_replicates=300,
+    max_permutations=200,
+    panel,
+    overlap_adj = F)
+## Seems no impact -- i think this needs to
 
-# # Get the
-# library(CSM)
-# treatment = "Z"
-# outcome = "Y"
-# var_weight_type = "uniform"
-#
-# weighted_var <- get_pooled_variance(
-#   matches_table = full_matched_table,
-#   outcome = outcome,
-#   treatment = treatment,
-#   var_weight_type = var_weight_type
-# )
-# sigma_hat <- sqrt(weighted_var)
 
-# ## Test of get_plug_in_SE worked
-# signs <- sample(c(-1, 1), N_T, replace=T)
-# signs <- c(1, 1,1,1,1,1,1,1,-1,1)
-# unique_subclasses <- full_matched_table %>%
-#   filter(Z == TRUE) %>%
-#   distinct(subclass) %>%
-#   arrange(subclass) %>% # Ensure a stable ordering
-#   mutate(sign = signs)
-#
-# # Join the signs back to the full table
-# full_matched_table_signed <- full_matched_table %>%
-#   left_join(unique_subclasses, by = "subclass") %>%
-#   mutate(weights = weights * sign) %>%
-#   select(-sign)
-#
-# Ns <- calc_N_T_N_C(full_matched_table)
-# Ns_signed <- calc_N_T_N_C(full_matched_table_signed)
-#
-# Ns$N_C_tilde
-# Ns_signed$N_C_tilde
-#
-# # Step 5: Calculate the plug-in standard error
-# SE <- get_plug_in_SE(
-#   N_T = Ns_signed$N_T,
-#   ESS_C = Ns_signed$N_C_tilde,
-#   sigma_hat = sigma_hat
-# )
+## Check the method difference
+result_ferman <-
+  compute_rejection_rate(
+    N1, N0, M, tau_0, alpha,
+    num_replicates=300,
+    max_permutations = 200,
+    panel,
+    overlap_adj = T)
+source(here("scripts/new-inference/utils-replicate-ferman.R"))
+result_pooled <-
+  compute_rejection_rate(
+    N1, N0, M, tau_0, alpha,
+    num_replicates=300,
+    max_permutations = 200,
+    panel,
+    overlap_adj = T,
+    sd_method = "pooled")
+# This runs 1 hour
+saveRDS(result_ferman, here("scripts/new-inference/outputs/result_ferman.rds"))
+saveRDS(result_pooled, here("scripts/new-inference/outputs/result_pooled.rds"))
+
+result_pooled <- readRDS(here::here("scripts/new-inference/outputs/result_pooled.rds"))
+result_ferman <- readRDS(here::here("scripts/new-inference/outputs/result_ferman.rds"))
+
+
+### Now i want to run ferman
+source(here("scripts/new-inference/utils-replicate-ferman.R"))
+N0 = 1000; N1_values = 25; M_values = 10;
+panels = "F"; num_replicates = 300;
+generate_all_dgp_and_matched_table(
+  N0 = 1000,
+  N1_values = 25,
+  M_values = 10,
+  panels = "F",
+  num_replicates = 300,
+  verbose = 2)
+source(here("scripts/new-inference/utils-replicate-ferman.R"))
+tau_0 = 0; alpha = 0.1; max_permutations = 100
+## How to speed up the procedure? If we know the truth,
+#   can we calculate the null distribution only just once?
+##  i.e., can we get one critical value?
+table_testing_panel_F <-
+  generate_full_table(
+    N0, N1_values, M_values,
+    panels, tau_0, alpha,
+    num_replicates = 100,
+    max_permutations = 50,
+    result_path = here("scripts/new-inference/outputs/table_testing_panel_F.rds")
+  )
+# This is working really well -- 0.11
+
 
 
 results_path <- here("scripts/new-inference/outputs/results_table.rds")

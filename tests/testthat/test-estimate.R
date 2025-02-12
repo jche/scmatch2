@@ -71,10 +71,8 @@ test_that("agg_sc_units works", {
 
 })
 
-######
-# Test supporting functions of get_se_AE
-######
 
+# Test supporting functions of get_se_AE ----
 test_that("calculate_subclass_variances calculates variances correctly", {
   filtered_data <-
     data.frame(
@@ -169,9 +167,9 @@ test_that("get_plug_in_SE calculates SE correctly", {
   expect_equal(SE, sqrt(1/3 + 1/5)* 1.5)
 })
 
-######
-# Test get_se_AE
-######
+
+
+### Test get_se_AE
 test_that("get_se_AE_table calculates SE and related values correctly", {
   mock_matches <- data.frame(
     subclass = rep(1:3, each = 3),
@@ -256,3 +254,63 @@ test_that("get_se_AE_table handles different outcome variables", {
   expect_true("SE" %in% names(result))
   expect_true(result$SE > 0)  # SE should be positive
 })
+
+
+
+# Test get_se_OR ---------
+test_that("get_se_OR calculates SE and related values correctly", {
+  mock_matches <- data.frame(
+    subclass = rep(1:3, each = 3),
+    Z = c(0, 0, 1,
+          1, 1, 1,
+          0, 0, 1),
+    Y = c(1, 3, 2,
+          0, 3, 10,
+          2, 4, 5),
+    weights = c(0.9, 0.1, 1,
+                1/3, 1/3, 1/3,
+                0.5, 0.5, 1),
+    id = c(1,2,3,
+           4,5,6,
+           1,2,7)
+  )
+  # load_all()
+  result <-
+    get_se_OR(
+      mock_matches,
+      outcome = "Y",
+      treatment = "Z"
+    )
+
+  expect_true("SE" %in% names(result))
+  expect_true("sigma_hat" %in% names(result))
+  expect_true("N_T" %in% names(result))
+  expect_true("N_C_tilde" %in% names(result))
+
+  expect_true( result$SE > 0)  # SE should be positive
+})
+
+
+
+
+test_that("get_se_OR calculates SE and related values correctly", {
+  ## want to have a real dataset because we will perform match
+  mock_matches <- readRDS("./tests/testthat/data/1d_DGP-A_M-10_N1-10_i-1.rds")
+  # load_all()
+  result <-
+    get_se_OR(
+      mock_matches,
+      outcome = "Y",
+      treatment = "Z",
+      B=100
+    )
+
+  expect_true("SE" %in% names(result))
+  expect_true("sigma_hat" %in% names(result))
+  expect_true("N_T" %in% names(result))
+  expect_true("N_C_tilde" %in% names(result))
+
+  expect_true( result$SE > 0)  # SE should be positive
+})
+
+

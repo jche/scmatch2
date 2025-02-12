@@ -1,10 +1,7 @@
-library(haven)
-library(tidyverse)
-library(xtable)
 
-data_ferman <- read_dta(
-  file = "./data/inputs/Final.dta"
-)
+source( here::here( "scripts/ferman-analysis/02-core-ferman-analysis.R" ) )
+data_ferman = ferman_for_analysis
+
 colnames(data_ferman)
 df_for_analysis <-
   data_ferman %>%
@@ -19,6 +16,7 @@ df_for_analysis <-
          X2 = y2008,
          X3 = y2009,
          X4 = UF == 35)
+
 # Make table: two columns: Z == 1 and Z ==0 represent
 #  treated and control; three rows: X1, X2, X3
 #   Each cell fill in average value of Y
@@ -46,8 +44,10 @@ table_result <- df_for_analysis %>%
     `Difference (treated - control)` =
       `Treated (Z == 1)`- `Control (Z == 0)`
   )
+table_result
 
-# Use R code to generate the latex code of table_result
+
+# generate the latex code of table_result
 latex_code <-
   xtable::xtable(table_result)
 print(latex_code)

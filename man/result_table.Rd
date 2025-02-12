@@ -5,19 +5,27 @@
 \title{Get table of aggregated results, with rows for synthetic units if
 that was asked for}
 \usage{
-result_table(csm, return = NULL, feasible_only = FALSE)
+result_table(
+  csm,
+  return = c("all", "sc_units", "agg_co_units"),
+  feasible_only = FALSE,
+  nonzero_weight_only = FALSE
+)
 }
 \arguments{
-\item{return}{Possible values: NULL, "sc_units", "agg_co_units", or "all".
-How to aggregate units, if at all, in making the result table.}
+\item{return}{Possible values: "sc_units", "agg_co_units", or
+"all". How to aggregate units, if at all, in making the result
+table.  Defaults to "all".}
 
-\item{feasible_only}{TRUE means only return units which were given
-non-zero weight.}
+\item{feasible_only}{TRUE means only return units which were
+matched without expanding the caliper.}
 }
 \value{
 dataframe
 }
 \description{
-Get table of aggregated results, with rows for synthetic units if
-that was asked for
+This method will give the controls as synthetic controls
+(sc_units), the individual controls with repeat rows if controls
+were used for different treated units (all), or aggregated controls
+with only one row per control unit (agg_co_units).
 }

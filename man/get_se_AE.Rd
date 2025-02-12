@@ -2,7 +2,7 @@
 % Please edit documentation in R/estimate.R
 \name{get_se_AE}
 \alias{get_se_AE}
-\title{Title}
+\title{Get the standard error using the weighting approach}
 \usage{
 get_se_AE(
   matches,
@@ -27,5 +27,5 @@ get_se_AE(
 A tibble with SE, sigma_hat, N_T, and N_C_tilde
 }
 \description{
-Title
+Method taken from the balancing weights literature.
 }

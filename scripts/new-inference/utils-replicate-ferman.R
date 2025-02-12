@@ -24,18 +24,37 @@ generate_dgp <- function(N1, N0, panel = "A") {
   } else if (panel == "E") {
     mu_1 <- function(x) (qchisq(pnorm(x), df = 1) - 1) / sqrt(2)
     epsilon_1 <- function() 2 * (rchisq(1, df = 1) - 1) / sqrt(2)
+  }else if (panel == "F") {
+    # Panel F: Distribution of tau(x)
+    mu_1 <- function(x) {
+      10 * sin(pi * x[1] * x[2]) +
+        20 * (x[3] - 0.5)^2 +
+        10 * x[4] + 5 * x[5] +
+        x[3] * cos(pi * x[1] * x[2])
+    }
+    epsilon_1 <- function() rnorm(1, mean = 0, sd = 1)
+    generate_X <- function(n) matrix(rnorm(n * 10), nrow = n, ncol = 10)
   } else {
-    stop("Invalid panel specified. Choose from 'A', 'B', 'C', 'D', or 'E'.")
+    stop("Invalid panel specified. Choose from 'A', 'B', 'C', 'D', 'E', or 'F'.")
   }
 
-  epsilon_1_values <- sapply(1:(N1 + N0), function(i) epsilon_1())
   epsilon_0_values <- rnorm(N1 + N0, mean = 0, sd = 1)
+  if (panel == "F") {
+    X <- generate_X(N1 + N0)
+    tau_x <- X[, 3] * cos(pi * X[, 1] * X[, 2])
+    mu_1_values <- apply(X, 1, mu_1)
+    mu_0_values <- mu_1_values - tau_x
+    epsilon_1_values <- rnorm(N1 + N0, mean = 0, sd = 1)
+  } else {
+    epsilon_1_values <- sapply(1:(N1 + N0), function(i) epsilon_1())
+    mu_1_values <- mu_1(X)
+    mu_0_values <- rep(0, N1 + N0)
+  }
 
-  Y1 <- mu_1(X) + epsilon_1_values
-  Y0 <- epsilon_0_values
-
+  # Generate outcomes
+  Y1 <- mu_1_values + epsilon_1_values
+  Y0 <- mu_0_values + epsilon_0_values
   Y <- ifelse(Z == 1, Y1, Y0)
-
   data <- data.frame(
     ID = 1:(N1 + N0),
     X = X,
@@ -59,7 +78,8 @@ generate_full_matched_table <- function(dat,
   # devtools::load_all()
   mtch <- get_cal_matches(
     dat,
-    covs = "X",
+    # covs = "X",
+    covs = starts_with("X"),
     treatment = "Z",
     scaling = 1,
     metric = "euclidean",
@@ -265,6 +285,29 @@ ferman_sign_change_test <-
     reject
   }
 
+#' Compute Overlap Statistics
+#'
+#' Computes summary statistics for the overlap of shared neighbors in a matrix.
+#' The function calculates the median, 75th percentile, and maximum for the number of shared treated
+#' and control neighbors across rows.
+#'
+#' @param shared_neighbors A numeric matrix of dimensions \eqn{N1 \times M}, where each entry represents
+#' the number of shared neighbors between treated and control units.
+#'
+#' @return A list containing the following components:
+#' \item{avg_shared_controls}{Median number of shared control neighbors across rows.}
+#' \item{p75_shared_controls}{75th percentile of the number of shared control neighbors across rows.}
+#' \item{max_shared_controls}{Maximum number of shared control neighbors across rows.}
+#' \item{avg_shared_treated}{Median number of shared treated neighbors across rows.}
+#' \item{p75_shared_treated}{75th percentile of the number of shared treated neighbors across rows.}
+#' \item{max_shared_treated}{Maximum number of shared treated neighbors across rows.}
+#'
+#' @examples
+#' # Example matrix with shared neighbors
+#' shared_neighbors <- matrix(c(0, 1, 2, 3, 0, 1, 4, 5, 2, 1), nrow = 5, byrow = TRUE)
+#' compute_overlap_statistics(shared_neighbors)
+#'
+#' @export
 compute_overlap_statistics <- function(shared_neighbors) {
   N1 <- nrow(shared_neighbors)
 
