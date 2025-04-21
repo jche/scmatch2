@@ -87,7 +87,7 @@ calada_scm <- lalonde_df_renamed %>%
                   wider = FALSE)
 calada_scm
 
-get_att_ests(calada_scm)
+get_att_point_est(calada_scm)
 
 ### Inference with the A-E method
 calada_scm$hat_mu_0 <- 0
@@ -138,7 +138,7 @@ ggsave("figures/lalonde_love2.png", height=3, width=6)
 # FSATT results -----------------------------------------------------------
 
 feasible <- full_unit_table( calada_scm, feasible_only = TRUE )
-get_att_ests(feasible)
+get_att_point_est(feasible)
 
 
 # compare distances between units represented by average and sc weights

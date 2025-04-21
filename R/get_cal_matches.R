@@ -48,27 +48,84 @@ make_treatment_table <- function( df, matches, caliper ) {
 #'
 #' This is the core method of the CSM package. Conduct (adaptive)
 #' radius matching with optional synthetic step on the resulting sets
-#' of controls.
+#' of controls. The function creates a matched dataset by finding control
+#' units that are similar to treatment units based on specified covariates
+#' and distance metrics, then optionally weights these controls using synthetic
+#' control methods.
 #'
-#'
-#' @param df The data frame of data to be matched.  Option id column
-#'   to uniquely identify units.  If missing, this method will make a
-#'   new ID column (with name `id`) corresponding to the row numbers
-#'   of the initial data.
-#' @param metric A string specifying the distance metric
-#' @param caliper A numeric specifying the caliper size
-#' @param rad_method Caliper method of adaptive caliper, fixed
-#'   caliper, only 1nn caliper, or adaptive caliper to obtain 5nn.
-#' @param est_method A string specifying the estimation method
+#' @param df The data frame of data to be matched. Must contain treatment
+#'   indicator and covariates for matching.
+#' @param covs Specification of covariates to use for matching. Can be variable
+#'   names or tidyselect helpers like \code{starts_with("X")}. Defaults to
+#'   variables starting with "X".
+#' @param treatment Name of the column in \code{df} containing the treatment
+#'   indicator (0/1 or TRUE/FALSE). Defaults to "Z".
+#' @param metric A string specifying the distance metric. One of
+#'   "maximum", "euclidean", or "manhattan".
+#' @param caliper A numeric specifying the caliper size for matching.
+#'   Controls the maximum allowable distance between matched units.
+#' @param rad_method Method to determine the radius size for each treated unit.
+#'   Options include:
+#'   \itemize{
+#'     \item "adaptive": Uses the maximum of the caliper and the distance to nearest control
+#'     \item "fixed": Uses the specified caliper value
+#'     \item "1nn": Uses the distance to the nearest neighbor
+#'     \item "adaptive-5nn": Adaptive radius with cap at 5th nearest neighbor
+#'     \item "knn": Uses the distance to the kth nearest neighbor
+#'   }
+#' @param est_method Method for estimating weights for control units.
+#'   Options include:
+#'   \itemize{
+#'     \item "scm": Synthetic control method weighting
+#'     \item "scm_extrap": Synthetic control with extrapolation
+#'     \item "average": Simple average weighting
+#'   }
 #' @param scaling A vector of scaling constants for covariates (can
-#'   also be a single row matrix).  These are often just the inverses
-#'   of covariate-specific calipers.
+#'   also be a single row matrix). These are often just the inverses
+#'   of covariate-specific standard deviations. Controls the relative
+#'   importance of different covariates in the distance calculation.
+#' @param id_name Name of column to look for ID values. If that
+#'   column is not found, a canonical \code{id} corresponding to row
+#'   numbers will be created.
 #' @param warn A logical indicating whether to warn about dropped
-#'   units.
-#' @param id_name Name of column to look for ID values.  If that
-#'   column not found, make canonical `id` corresponding to row
-#'   numbers.
-#' @return df with a bunch of attributes.
+#'   units (those that cannot be matched within the caliper).
+#' @param k Integer specifying the number of neighbors to use when
+#'   \code{rad_method = "knn"}.
+#'
+#' @return An S3 object of class "csm_matches" containing:
+#'   \itemize{
+#'     \item \code{matches}: A list of data frames, each containing matched control units for a treated unit
+#'     \item \code{adacalipers}: Vector of adaptive calipers for each treated unit
+#'     \item \code{dm_trimmed}: Distance matrix with control units farther than caliper set to NA
+#'     \item \code{dm_uncapped}: Original distance matrix without censoring
+#'     \item \code{treatment_table}: Table of treated units with matching information
+#'   }
+#'   The object also has attributes storing the settings used for matching.
+#'
+#' @seealso
+#'   \code{\link{gen_matches}} for the underlying matching function,
+#'   \code{\link{est_weights}} for weight calculation,
+#'   \code{\link{result_table}} for extracting results
+#'
+#' @examples
+#' # Generate example data
+#' set.seed(4044440)
+#' dat <- gen_one_toy(nt = 5)
+#'
+#' # Perform matching
+#' mtch <- get_cal_matches(dat,
+#'                         metric = "maximum",
+#'                         scaling = c(1/0.2, 1/0.2),
+#'                         caliper = 1,
+#'                         rad_method = "adaptive",
+#'                         est_method = "scm")
+#'
+#' # View matching results
+#' mtch
+#'
+#' # Convert to data frame
+#' as.data.frame(mtch)
+#'
 #' @export
 get_cal_matches <- function( df,
                              covs = starts_with("X"),

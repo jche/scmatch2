@@ -30,7 +30,9 @@ if ( FALSE ){
 # New code -----
 #' Generalized function to run simulations for sim_inference_CSM_A_E or sim_inference_CSM_OR
 #' Saves results to the specified filename
-run_sim_inference <- function(R = 10, method = c("A_E", "OR"), FNAME,
+run_sim_inference <- function(R = 10,
+                              method = c("A_E", "OR"),
+                              FNAME,
                               toy_ctr_dist = 0.5,
                               scaling = 8,
                               true_sigma = 0.5,
@@ -43,7 +45,8 @@ run_sim_inference <- function(R = 10, method = c("A_E", "OR"), FNAME,
   deg_overlap_labels <- c("very_low", "low", "mid", "high", "very_high")
 
   # Select appropriate function
-  sim_function <- if (method == "A_E") sim_inference_CSM_A_E else sim_inference_CSM_OR
+  sim_function <- if (method == "A_E")
+    sim_inference_CSM_A_E else sim_inference_CSM_OR
 
   for (i in seq_along(prop_nc_unif_values)) {
     cat("Simulation", i, "(", method, ")\n")

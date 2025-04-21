@@ -39,3 +39,4 @@ A tibble with standard error (SE), bootstrap confidence intervals, and sample si
 This function estimates the standard error of the ATT using a bootstrap approach
 based on residuals from the OR method.
 }
+

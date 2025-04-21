@@ -1,12 +1,12 @@
 
 
-test_that("get_att_ests works well",{
+test_that("get_att_point_est works well",{
   test_matched_weighted_df <-
     data.frame(Z= c(1,0,0,0,1),
                Y = c(1,-1,1,0,1),
                weights = c(1,0.5,0.5,1,1) )
   test_matched_weighted_df
-  atts <- CSM:::get_att_ests(test_matched_weighted_df)
+  atts <- CSM:::get_att_point_est(test_matched_weighted_df)
   atts
   expect_equal( atts, 1 )
 })

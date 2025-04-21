@@ -53,7 +53,7 @@ for (num_bins in c(4, 1)){
                       dist_scaling = DIST_SCALING
       )
     cal_matches$Y <- cal_matches$Y0
-    CSM_ests[r] <- CSM_est <- get_att_ests(cal_matches)
+    CSM_ests[r] <- CSM_est <- get_att_point_est(cal_matches)
 
 
     ## CEM
@@ -69,7 +69,7 @@ for (num_bins in c(4, 1)){
     m.data3 <- MatchIt::match.data(tmp)
     m.data3$Y <- m.data3$Y0
     CEM_ests[r] <- CEM_est <-
-      get_att_ests(m.data3)
+      get_att_point_est(m.data3)
 
   }
   res_curr_bin_size <- data.frame(
