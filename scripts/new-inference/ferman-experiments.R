@@ -31,7 +31,14 @@ results <-
     result_path = here("scripts/new-inference/outputs/results_table.rds")
   )
 
-
+## Develop the testing procedure with our method
+# # Read one dataset
+# full_matched_table <-
+#   read_one_matched_table(
+#     N1 = 10,
+#     M = 4,
+#     i = 1,
+#     panel = "D")
 ## Check the overlap impact
 N1 = 10
 M = 4
