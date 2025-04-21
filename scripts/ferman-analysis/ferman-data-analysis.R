@@ -430,5 +430,5 @@ se_AEs <- numeric(n_unique_subclass)
   sd_curr <- sqrt((1/Ns$N_T + 1/Ns$N_C_tilde)) * sigma_hat
 
   (se_AE_avg <- sd_curr)
-  get_att_ests(df_curr, outcome = "y2010")
+  get_att_point_est(df_curr, outcome = "y2010")
 

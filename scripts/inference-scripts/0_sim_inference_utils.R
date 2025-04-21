@@ -92,10 +92,10 @@ one_iteration <- function( i,
     CI_lower = att_est -1.96 *  se_AE,
     CI_upper = att_est + 1.96 * se_AE,
     N_T = ATT_estimate$N_T,
-    N_C_tilde = ATT_estimate$N_C_tilde,
-    true_SE = true_sigma * sqrt(1 / N_T + 1 / N_C_tilde),
-    CI_lower_with_true_SE = att_est - 1.96 * true_SE,
-    CI_upper_with_true_SE = att_est + 1.96 * true_SE
+    N_C_tilde = ATT_estimate$N_C_tilde
+    # true_SE = true_sigma * sqrt(1 / N_T + 1 / N_C_tilde),
+    # CI_lower_with_true_SE = att_est - 1.96 * true_SE,
+    # CI_upper_with_true_SE = att_est + 1.96 * true_SE
   )
 
   # Get true ATT
@@ -339,7 +339,7 @@ one_iteration_OR <- function( i,
   ### Perform inference using the OR method
   get_ATT_estimate_OR <- function( scmatch, treatment = "Z", outcome = "Y" ) {
 
-    ATT = get_att_ests( scmatch, treatment = treatment, outcome = outcome )
+    ATT = get_att_point_est( scmatch, treatment = treatment, outcome = outcome )
     se = get_se_OR( scmatch, treatment = treatment, outcome = outcome )
     # se = get_se_AE( scmatch, treatment = treatment, outcome = outcome )
     se$ATT = ATT

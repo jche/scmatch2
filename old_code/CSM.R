@@ -29,6 +29,6 @@ get_att_csm <- function(df,
       dist_scaling = dist_scaling,
       ...
     )
-  est <- get_att_ests(match_weighted_df)
+  est <- get_att_point_est(match_weighted_df)
   return(est)
 }

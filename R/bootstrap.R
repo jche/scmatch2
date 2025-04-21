@@ -248,7 +248,7 @@ boot_SE <- function(
   }
 
   # Step 1: give uniform weight
-  # get_att_ests(matches_table, outcome = "Y")
+  # get_att_point_est(matches_table, outcome = "Y")
   nrow(matches_table %>% filter(Z==0) %>% distinct(id))
   matches_table_weights <-
     matches_table %>%

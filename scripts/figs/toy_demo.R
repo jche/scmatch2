@@ -112,7 +112,7 @@ cal_matches <- get_cal_matches(df_six_points,
                 dist_scaling = 1 # impt: scaling matrix
                 )
 
-CSM_est <- get_att_ests(cal_matches)
+CSM_est <- get_att_point_est(cal_matches)
 
 ### Step 2.5: Choose Mtd_Comp, and make it work
 covs <- c("X1", "X2")

@@ -62,7 +62,7 @@ table_section_5_4 <- res %>%
     att_pop = mean(att_true),
     V_pop = var(att_true)
   ) %>%
-  mutate( V = E_Var + V_pop) %>%
+  mutate( V = E_Var + V_pop) %>% # TODO: we want one V for each run
   arrange(deg_overlap)
 
 table_section_5_4
@@ -92,17 +92,37 @@ ggplot(res, aes(x = standardized_att)) +
     y = "Density"
   ) +
   theme_minimal()
+ggsave(here::here( "figures", "clt-verification.png" ))
 
-# Result: the standardized ATT is too diversely distributed
-# For example, the sd of standardized_att can be as high as 10
-sd(res %>% filter(deg_overlap == "low") %>% pull(standardized_att) )
-mean((res %>% filter(deg_overlap == "low") %>% pull(standardized_att) ))
+# Result: we successfully get that the distributions are quite similar
+res %>%
+  mutate(att_T = standardized_att) %>%
+  group_by(deg_overlap) %>%
+  summarise(sd(att_T))
+## Verify through coverage ------
+# Compute the coverage
+# First compute the CI using V
+res <- res %>%
+  mutate(
+    CI_lower_V = (att_est - bias) - 1.96 * sqrt(V/N_T),
+    CI_upper_V = (att_est - bias) + 1.96 * sqrt(V/N_T)
+  ) %>%
+  mutate(
+    covered_V = CI_lower_V <= att_true & att_true <= CI_upper_V,
+  )
+coverage <- res %>% group_by(deg_overlap) %>%
+  summarize(coverage_ratio_V = mean(covered_V))
+coverage
 
-# Write this result up for CLT
 
-#### Old thought
+
+#### Old thought -----------
 ## This old thought made me realized that we need to
 ##  multiply N_T to Var to get the valid variance
+# # Result: the standardized ATT is too diversely distributed
+# # For example, the sd of standardized_att can be as high as 10
+# sd(res %>% filter(deg_overlap == "low") %>% pull(standardized_att) )
+# mean((res %>% filter(deg_overlap == "low") %>% pull(standardized_att) ))
 # Let's debug this
 # interestingly, if we multiply by * sqrt(V), i.e.,
 # When we compare
@@ -134,4 +154,3 @@ res %>%
 # 4 high              0.928
 # 5 very_high         0.888
 
-# Question: is this by chance, i.e., due to this dgp

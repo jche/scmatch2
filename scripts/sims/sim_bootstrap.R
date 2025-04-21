@@ -102,7 +102,7 @@ res_fun <- function(d, dist_scaling, name, att0, B=250) {
     id = i,
     data = name,
     att = att,
-    att_hat = get_att_ests(preds_csm),
+    att_hat = get_att_point_est(preds_csm),
     sd = sd(boot_fsatt),
     q025 = quantile(boot_fsatt, 0.025),
     q975 = quantile(boot_fsatt, 0.975)
@@ -143,7 +143,7 @@ res_fun_wild <- function(d, dist_scaling, name, att0, B=250) {
     id = i,
     data = name,
     att = att,
-    att_hat = get_att_ests(preds_csm),
+    att_hat = get_att_point_est(preds_csm),
     sd = sd(boot_fsatt)
   ) %>%
     mutate(covered = att_hat-1.96*sd < att & att < att_hat+1.96*sd,
@@ -184,7 +184,7 @@ res_fun_redux <- function(d, dist_scaling, name, att0, B=250) {
 
   if (F) {
     hist(boot_fsatt)
-    get_att_ests(preds_csm)
+    get_att_point_est(preds_csm)
 
     preds_csm %>%
       filter(Z) %>%
@@ -206,7 +206,7 @@ res_fun_redux <- function(d, dist_scaling, name, att0, B=250) {
     id = i,
     data = name,
     att = att,
-    att_hat = get_att_ests(preds_csm),
+    att_hat = get_att_point_est(preds_csm),
     q025 = quantile(boot_fsatt, 0.025),
     q975 = quantile(boot_fsatt, 0.975)
   ) %>%

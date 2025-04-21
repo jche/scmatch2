@@ -25,7 +25,7 @@ boot_bayesian <- function(d, B=100) {
               mutate(weights = weights * 
                        as.numeric(gtools::rdirichlet(1, alpha=rep(1,nrow(d))))) %>% 
                        # rdirichlet(alpha=rep(1,nrow(d)))) %>% 
-              get_att_ests()
+              get_att_point_est()
           })
 }
 
@@ -67,7 +67,7 @@ boot_bayesian2 <- function(d, B=100) {
                     as.numeric(),
                   each=2),
                 weights = weights * boot_weights) %>%
-              get_att_ests()
+              get_att_point_est()
             
             d %>% 
               mutate(
@@ -98,14 +98,14 @@ boot_bayesian2 <- function(d, B=100) {
 #'                          size=nrow(d)/2, replace=T),
 #'                   each=2),
 #'                 weights = weights * boot_weights) %>%
-#'               get_att_ests()
+#'               get_att_point_est()
 #'           })
 #' }
 
 
 # directly compute T* = 1/sqrt(n1) sum(wt * (tau_i - tau))
 boot_bayesian_redux <- function(d, B=100) {
-  att_hat <- get_att_ests(d)
+  att_hat <- get_att_point_est(d)
   n <- nrow(d)
   n1 <- sum(d$Z)
   
@@ -139,7 +139,7 @@ boot_bayesian_redux2 <- function(d, B=100) {
 
 # input tx and aggregated co units
 boot_bayesian_finalattempt <- function(d, B=100) {
-  att_hat <- get_att_ests(d)
+  att_hat <- get_att_point_est(d)
   n1 <- sum(d$Z)
   n <- nrow(d)
   
@@ -166,7 +166,7 @@ boot_bayesian_finalattempt <- function(d, B=100) {
 # input tx and aggregated co units
 #  - with wild bootstrap weights
 boot_bayesian_finalattempt <- function(d, B=100) {
-  att_hat <- get_att_ests(d)
+  att_hat <- get_att_point_est(d)
   n1 <- sum(d$Z)
   n <- nrow(d)
   
@@ -324,9 +324,9 @@ boot_naive <- function(d,
             
             return(tibble(FSATT = res %>% 
                             filter(subclass %in% feasible_subclasses) %>% 
-                            get_att_ests(),
+                            get_att_point_est(),
                           SATT = res %>% 
-                            get_att_ests()))
+                            get_att_point_est()))
           })
 }
 
