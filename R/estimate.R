@@ -232,7 +232,23 @@ get_se_AE <- function(matches,
 }
 
 
-
+#' Get the standard error using the OR bootstrap approach
+#'
+#' This function estimates the standard error of the ATT using a bootstrap approach
+#' based on residuals from the OR method.
+#'
+#' @param matches A CSM match object (R S3 object)
+#' @param outcome Name of the outcome variable (default: "Y")
+#' @param treatment Name of the treatment variable (default: "Z")
+#' @param boot_mtd The bootstrap method to use. Options are "Bayesian", "wild", or "naive-resid".
+#' @param B Number of bootstrap samples (default: 250)
+#' @param use_moving_block Whether to use a moving block bootstrap (default: FALSE)
+#' @param seed_addition Additional seed value to ensure reproducibility (default: 11)
+#' @param block_size Block size for bootstrap (default: NA, automatically chosen)
+#'
+#' @return A tibble with standard error (SE), bootstrap confidence intervals, and sample sizes.
+#' @export
+#'
 get_se_OR <- function(matches,
                       outcome = "Y",
                       treatment = "Z",

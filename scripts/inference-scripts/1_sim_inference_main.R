@@ -75,10 +75,13 @@ if (TRUE) {
 
   # for (method in c("A_E", "OR")) {
   for (method in c("OR")) {
+    file_folder <- here::here(paste0("data/outputs/", method, "-overlap-by-prop-unif"))
+    dir.create(file_folder, showWarnings = FALSE, recursive = TRUE)
     FNAME = here::here(
       paste0("data/outputs/", method, "-overlap-by-prop-unif/",
              method, "_toy_low_mid_high_R=", R, ".csv")
     )
+
     file.remove(FNAME)
 
     # Run simulation
@@ -98,72 +101,3 @@ if (TRUE) {
     cat("Results saved to", FNAME, "\n")
   }
 }
-
-# Old code -----
-#' Run suite of simulations, for range of overlaps, for given number
-#' of replicates and save results to given filename
-run_sim_inference_A_E <- function(R = 10, FNAME,
-                                  toy_ctr_dist=0.5,
-                                  scaling = 8,
-                                  true_sigma = 0.5,
-                                  nc = 500,
-                                  parallel = TRUE ) {
-  ### 3 degrees of freedoms
-  # prop_nc_unif_values <- c(1/3, 2/3, 3/3)
-  # deg_overlap_labels <- c("low", "mid", "high")
-
-  ### 5 degrees of freedoms
-  prop_nc_unif_values <- seq(0.2, 1, by = 0.2)
-  deg_overlap_labels <- c("very_low", "low", "mid", "high", "very_high")
-
-  for (i in seq_along(prop_nc_unif_values)) {
-    cat( "Simulation", i, "\n" )
-    sim_result <- sim_inference_CSM_A_E(
-      R = R,
-      prop_nc_unif = prop_nc_unif_values[i],
-      scaling = scaling,
-      toy_ctr_dist=toy_ctr_dist,
-      true_sigma = true_sigma,
-      nc = nc,
-      seed = c(123 + i*2),
-      parallel = parallel
-    )
-
-    sim_result$deg_overlap <- deg_overlap_labels[i]
-
-    save_res_to_csv(sim_result, FNAME = FNAME)
-  }
-
-  cat( "Simulation complete\n" )
-
-  invisible( 0 )
-}
-
-
-
-# Run the simulation ----
-
-if ( FALSE ) {
-  R = 500
-  FNAME =
-    here::here(
-      paste0("data/outputs/A-E-overlap-by-prop-unif/",
-             "A_E_toy_low_mid_high_R=",R,".csv")
-    )
-  file.remove( FNAME )
-
-  # Run simulation
-  tictoc::tic()
-  run_sim_inference_A_E(R=R, FNAME = FNAME,
-                        scaling = 8, true_sigma = 0.5,
-                        nc = 500 )
-  tictoc::toc()
-
-  # Check saved file
-  rs = read_csv( FNAME )
-  skimr::skim( rs )
-
-  cat("Results saved to", FNAME, "\n" )
-}
-
-

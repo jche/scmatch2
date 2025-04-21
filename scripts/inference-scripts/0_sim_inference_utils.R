@@ -413,7 +413,8 @@ sim_inference_CSM_OR <- function(R=100,
   if ( parallel ) {
     library( furrr )
     library( future )
-    plan(multisession, workers = parallel::detectCores() - 1 )
+    # plan(multisession, workers = parallel::detectCores() - 1 )
+    plan(multisession, workers = min(4, parallel::detectCores() - 1))
     results = future_map_dfr( 1:R,
                               .f = one_iteration_OR,
                               toy_ctr_dist = toy_ctr_dist,
