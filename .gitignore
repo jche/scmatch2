@@ -40,4 +40,7 @@ vignettes/*.pdf
 /tables
 /data
 /scripts/new-inference/data
+/scripts/future-work/
+/scripts/more-inference-applications/
+/scripts/replication_code_wang_zubizarreta_mabw/
 /figures
