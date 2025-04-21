@@ -4,12 +4,12 @@
 \alias{summary.csm_matches}
 \title{Summary method for csm_matches object}
 \usage{
-\method{summary}{csm_matches}(object, ...)
+\method{summary}{csm_matches}(x, ...)
 }
 \arguments{
-\item{...}{Extra arguments (currently ignored).}
-
 \item{x}{object to summarize}
+
+\item{...}{Extra arguments (currently ignored).}
 }
 \description{
 Summary method for csm_matches object

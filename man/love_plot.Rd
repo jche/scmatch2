@@ -4,7 +4,7 @@
 \alias{love_plot}
 \title{Love plot of covariate balance}
 \usage{
-love_plot(res, covs, B = NA)
+love_plot(res, covs, covs_names = NULL, B = NA)
 }
 \description{
 Make a ggplot love plot of covariate balance for each covariate

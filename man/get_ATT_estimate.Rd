@@ -2,11 +2,28 @@
 % Please edit documentation in R/estimate.R
 \name{get_ATT_estimate}
 \alias{get_ATT_estimate}
-\title{Estimate ATT}
+\title{Estimate ATT with correct variance estimation}
 \usage{
-get_ATT_estimate(scmatch, treatment = "Z", outcome = "Y")
+get_ATT_estimate(
+  scmatch,
+  treatment = "Z",
+  outcome = "Y",
+  var_weight_type = "ess_units"
+)
+}
+\arguments{
+\item{scmatch}{The CSM match object, an R S3 object}
+
+\item{treatment}{Name of the treatment variable (default "Z")}
+
+\item{outcome}{Name of the outcome variable (default "Y")}
+
+\item{var_weight_type}{The way that cluster variances are averaged (default "ess_units")}
+}
+\value{
+A tibble with ATT estimate, standard error, t-statistic, and variance components
 }
 \description{
-Calculate ATT and associated standard error using the weighting
-method from paper with locally estimated residual variation.
+Calculate ATT and associated standard error using the total variance estimator
+from the paper that accounts for both measurement error and population heterogeneity.
 }
