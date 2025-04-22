@@ -27,3 +27,27 @@ result_table( mtch, feasible_only = TRUE )
 
 # Effect estimate
 get_ATT_estimate( mtch )
+
+
+#########
+## Try 6 dims
+set.seed( 4044440 )
+toy_data_6d <- gen_one_toy(k = 6, nc = 600, nt = 5)
+
+print(head(toy_data_6d))
+
+mtch <- get_cal_matches( toy_data_6d,
+                         metric = "maximum",
+                         scaling = rep(1,6)/0.2,
+                         caliper = 1,
+                         rad_method = "adaptive",
+                         est_method = "scm" )
+mtch
+
+mtch$treatment_table # a table of statistics on the treated units
+
+full_unit_table(mtch, nonzero_weight_only = TRUE )
+
+result_table( mtch, feasible_only = TRUE )
+get_ATT_estimate( mtch )
+

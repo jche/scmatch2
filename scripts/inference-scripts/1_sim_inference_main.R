@@ -1,7 +1,8 @@
 
 library(tidyverse)
 require(mvtnorm)
-library( CSM )
+# library( CSM )
+load_all()
 source( here::here( "scripts/inference-scripts/0_sim_inference_utils.R" ) )
 
 # Test run ------
@@ -77,7 +78,7 @@ if (TRUE) {
   R = 500
 
   # for (method in c("A_E", "OR")) {
-  for (method in c("OR")) {
+  for (method in c("A_E")) {
     file_folder <- here::here(paste0("data/outputs/", method, "-overlap-by-prop-unif"))
     dir.create(file_folder, showWarnings = FALSE, recursive = TRUE)
     FNAME = here::here(

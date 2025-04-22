@@ -118,6 +118,235 @@ if (F) {
 }
 
 
+#' Generate k-dimensional blobs around specified centers
+#' (Helper function replacing the original 2D gen_toy_covar)
+#'
+#' @param n Number of points to generate.
+#' @param centers A list of k-dimensional numeric vectors representing cluster centers.
+#' @param k Dimensionality.
+#' @param sd Standard deviation for the blobs (assumed spherical).
+#' @return A tibble with k columns (X1, ..., Xk).
+#'
+gen_toy_covar_k <- function(n, centers, k, sd) {
+  n_centers <- length(centers)
+  # Return empty tibble with correct structure if n=0 or no centers
+  if (n <= 0 || n_centers == 0) {
+    col_names <- paste0("X", 1:k)
+    named_list <- setNames(replicate(k, numeric(), simplify = FALSE), col_names)
+    return(tibble(!!!named_list))
+  }
+
+  # Check center dimensions
+  if (!all(sapply(centers, length) == k)) {
+    stop("All centers must have dimension k.")
+  }
+
+  # Assign points to centers roughly evenly
+  assignments <- sample(1:n_centers, size = n, replace = TRUE)
+  counts <- table(factor(assignments, levels = 1:n_centers))
+
+  # Generate points for each center using multivariate normal
+  all_points_list <- vector("list", n_centers)
+  cov_matrix <- diag(sd^2, k) # Simple spherical covariance
+
+  for (i in 1:n_centers) {
+    count_i <- as.integer(counts[i]) # Get count for center i
+    if (!is.na(count_i) && count_i > 0) {
+      center_vec <- centers[[i]]
+      points <- mvtnorm::rmvnorm(count_i, mean = center_vec, sigma = cov_matrix)
+      # Ensure points is a matrix even if count_i is 1
+      if(count_i == 1) points <- matrix(points, nrow=1)
+
+      # Add column names to the matrix before converting to tibble
+      colnames(points) <- paste0("X", 1:k)
+
+      # Now convert to tibble with proper names
+      all_points_list[[i]] <- as_tibble(points)
+    }
+  }
+
+  # Then remove the rename operation later since columns are already named
+  df <- bind_rows(all_points_list)
+
+  return(df)
+}
+
+
+#' Generate k-dimensional toy data (generalized version)
+#'
+#' @param nc Number of control units.
+#' @param nt Number of treated units.
+#' @param k Dimensionality of the feature space.
+#' @param f0_sd Standard deviation of the noise term.
+#' @param f0_fun Function for baseline potential outcome Y0 (expects k-dim matrix X).
+#' @param tx_effect_fun Function for treatment effect (expects k-dim matrix X).
+#' @param ctr_dist Distance parameter influencing cluster separation.
+#' @param prop_nc_unif Proportion of control units drawn uniformly from [0,1]^k box.
+#'
+#' @return A tibble containing a k-dimensional toy dataset.
+#' @export
+#'
+gen_df_adv_k <- function(nc, nt, k, # Added k
+                         f0_sd = 0.1,
+                         # Default functions now expect matrix X
+                         f0_fun = function(X) { rep(1, nrow(X)) },
+                         tx_effect_fun = function(X) { rep(1, nrow(X)) },
+                         ctr_dist = 0.5,
+                         prop_nc_unif = 1/3
+) {
+
+  SD <- 0.1 # Base SD for blobs
+
+  # Define k-dimensional centers
+  c1 <- 0.5 - ctr_dist / 2
+  c2 <- 0.5 + ctr_dist / 2
+
+  # Tx centers: e.g., (c1, c1, ...) and (c2, c2, ...)
+  tx_centers <- list(rep(c1, k), rep(c2, k))
+
+  # Control centers: e.g., swap first dim: (c2, c1, ...) and (c1, c2, ...)
+  co_centers <- list(c(c2, rep(c1, max(0, k - 1))), c(c1, rep(c2, max(0, k - 1))))
+  # Handle k=1 case explicitly if needed (though max handles it)
+  # if (k == 1) { co_centers <- list(c(c2), c(c1)) }
+
+  # Generate treated blobs
+  dat_txblobs <- gen_toy_covar_k(nt, centers = tx_centers, k = k, sd = SD)
+  if (nrow(dat_txblobs) > 0) dat_txblobs$Z <- TRUE
+
+  # Generate control blobs
+  nc_blob <- nc - ceiling(nc * prop_nc_unif)
+  dat_coblobs <- gen_toy_covar_k(nc_blob, centers = co_centers, k = k, sd = SD)
+  if (nrow(dat_coblobs) > 0) dat_coblobs$Z <- FALSE
+
+  # Generate uniform controls in [0,1]^k
+  nc_unif <- ceiling(nc * prop_nc_unif)
+  if (nc_unif > 0) {
+    unif_matrix <- matrix(runif(nc_unif * k), ncol = k)
+    dat_conear <- as_tibble(unif_matrix)
+    colnames(dat_conear) <- paste0("X", 1:k)
+    dat_conear$Z <- FALSE
+  } else {
+    # Create an empty tibble with correct columns if nc_unif is 0
+    col_names <- paste0("X", 1:k)
+    named_list <- setNames(replicate(k, numeric(), simplify = FALSE), col_names)
+    dat_conear <- tibble(!!!named_list, Z = logical())
+  }
+
+  # Combine data
+  dat <- bind_rows(dat_txblobs, dat_coblobs, dat_conear)
+
+  # --- Crucial change for function calling ---
+  # Select the X columns into a matrix to pass to functions
+  X_matrix <- dat %>% select(all_of(paste0("X", 1:k))) %>% as.matrix()
+  # ---
+
+  # Apply functions using the prepared X_matrix
+  res <- dat %>%
+    mutate(noise = rnorm(n(), mean = 0, sd = f0_sd)) %>%
+    # Pass the matrix X_matrix to the functions
+    mutate(Y0 = f0_fun(X_matrix) + noise) %>%
+    mutate(Y1 = Y0 + tx_effect_fun(X_matrix),
+           Y = ifelse(Z, Y1, Y0)) %>%
+    # Ensure id is added correctly (use first X col name if k>=1)
+    mutate(id = 1:n(), .before = 1)
+
+  return(res)
+}
+
+
+#' Generate a toy dataset with a single treatment effect (Updated to use gen_df_adv_k)
+#'
+#' @param k Dimensionality of the feature space. Default is 2.
+#' @param nc Number of control units. Default is 500.
+#' @param nt Number of treated units. Default is 100.
+#' @param ctr_dist Distance between the two control clusters. Default is 0.5.
+#' @param prop_nc_unif Proportion of control units drawn from a uniform distribution. Default is 1/3.
+#' @param f0_sd Standard deviation for the noise in the potential outcome function f0. Default is 0.5.
+#'
+#' @return A tibble with the toy dataset
+#' @export
+#'
+gen_one_toy <- function( k = 2, # Added dimensionality parameter k, default 2
+                         nc = 500, nt = 100,
+                         ctr_dist = 0.5,
+                         prop_nc_unif = 1/3,
+                         f0_sd = 0.5 ){
+
+  # --- Input validation ---
+  if ( nc < 5 ) {
+    warning( "Very small control group in gen_one_toy!" )
+  }
+  if (!is.numeric(k) || k < 1 || floor(k) != k) {
+    stop("k must be a positive integer.")
+  }
+  # --- End Input validation ---
+
+  # --- Define k-dimensional functions ---
+  # These functions expect a matrix 'X'
+  tx_effect_fun <- function(X) {
+    if (!is.matrix(X) && !is.data.frame(X)) stop("tx_effect_fun expects a matrix/df.")
+    if (ncol(X) < k) stop(paste("tx_effect_fun requires input with at least", k, "columns."))
+    rowSums(X[, 1:k, drop = FALSE] * 3)
+  }
+
+  f0_fun <- function(X) {
+    if (!is.matrix(X) && !is.data.frame(X)) stop("f0_fun expects a matrix/df.")
+    if (ncol(X) < k) stop(paste("f0_fun requires input with at least", k, "columns."))
+    mean_vec <- rep(0.5, k)
+    sigma_mat <- matrix(0.8, nrow = k, ncol = k)
+    diag(sigma_mat) <- 1
+    densities <- mvtnorm::dmvnorm(X[, 1:k, drop=FALSE], mean = mean_vec, sigma = sigma_mat)
+    densities * 20
+  }
+  # --- End function definitions ---
+
+  # --- Call the NEW k-dimensional generator function ---
+  # Pass k explicitly now
+  gen_df_adv_k(
+    nc = nc,
+    nt = nt,
+    k = k, # Pass k
+    f0_sd = f0_sd,
+    tx_effect_fun = tx_effect_fun,
+    f0_fun = f0_fun,
+    ctr_dist = ctr_dist,
+    prop_nc_unif = prop_nc_unif
+  )
+  # --- End function call ---
+}
+
+
+#'
+#' #' Generate a toy dataset with a single treatment effect
+#' #'
+#' #' @param ctr_dist Distance between the two control clusters
+#' #'
+#' #' @return A tibble with the toy dataset
+#' #' @export
+#' #'
+#' gen_one_toy <- function( nc = 500, nt = 100,
+#'                          ctr_dist = 0.5,
+#'                          prop_nc_unif = 1/3,
+#'                          f0_sd = 0.5 ){
+#'   if ( nc < 5 ) {
+#'     warning( "Very small control group in gen_one_toy!" )
+#'   }
+#'   gen_df_adv(
+#'     nc=nc,
+#'     nt=nt,
+#'     f0_sd = f0_sd,
+#'     tx_effect_fun = function(X1, X2) {3*X1+3*X2},
+#'     f0_fun = function(x,y) {
+#'       matrix(c(x,y), ncol=2) %>%
+#'         mvtnorm::dmvnorm( mean = c(0.5,0.5),
+#'                           sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
+#'     },
+#'     ctr_dist = ctr_dist,
+#'     prop_nc_unif = prop_nc_unif
+#'   )
+#' }
+
+
 
 # canonical examples ------------------------------------------------------
 
@@ -304,31 +533,3 @@ if (F) {
 
 
 
-#' Generate a toy dataset with a single treatment effect
-#'
-#' @param ctr_dist Distance between the two control clusters
-#'
-#' @return A tibble with the toy dataset
-#' @export
-#'
-gen_one_toy <- function( nc = 500, nt = 100,
-                         ctr_dist = 0.5,
-                         prop_nc_unif = 1/3,
-                         f0_sd = 0.5 ){
-  if ( nc < 5 ) {
-    warning( "Very small control group in gen_one_toy!" )
-  }
-  gen_df_adv(
-    nc=nc,
-    nt=nt,
-    f0_sd = f0_sd,
-    tx_effect_fun = function(X1, X2) {3*X1+3*X2},
-    f0_fun = function(x,y) {
-      matrix(c(x,y), ncol=2) %>%
-        mvtnorm::dmvnorm( mean = c(0.5,0.5),
-                          sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
-    },
-    ctr_dist = ctr_dist,
-    prop_nc_unif = prop_nc_unif
-  )
-}
