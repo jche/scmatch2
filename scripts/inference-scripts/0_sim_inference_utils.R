@@ -175,6 +175,8 @@ one_iteration <- function( i,
   se_val <- ATT_estimate$SE %||% NA
   N_T_val <- ATT_estimate$N_T %||% NA
   ESS_C_val <- ATT_estimate$ESS_C %||% NA
+  V_E_val <- ATT_estimate$V_E %||% NA
+  sigma_hat_val <- ATT_estimate$sigma_hat %||% NA
 
   # Store iteration results
   rs = tibble(
@@ -185,11 +187,13 @@ one_iteration <- function( i,
     CI_lower = att_est_val - 1.96 * se_val, # Use val here
     CI_upper = att_est_val + 1.96 * se_val, # Use val here
     N_T = N_T_val,
-    ESS_C = ESS_C_val
+    ESS_C = ESS_C_val,
+    V_E = V_E_val,
+    sigma_hat = sigma_hat_val
   )
 
   # Get true ATT (based on denoised potential outcomes for treated)
-  rs$att_true <-
+  rs$SATT <-
     df_dgp %>%
     filter(Z == TRUE) %>%
     summarize(att = mean(Y1_denoised - Y0_denoised)) %>%
@@ -459,7 +463,7 @@ one_iteration_OR <- function( i,
   )
 
   # Get true ATT
-  rs$att_true <-
+  rs$SATT <-
     df_dgp_i %>%
     filter(Z ==1) %>%
     summarize(att = mean(Y1-Y0)) %>%
@@ -561,7 +565,7 @@ sim_inference_CSM_A_E_OLD <- function(dgp_name,
   # R <- 10; toy_ctr_dist=0.5; dgp_name <- "toy"; att0<-F
   covered <- CI_lower <- CI_upper <-
     covered_with_true_SE <- CI_lower_with_true_SE <- CI_upper_with_true_SE <-
-    att_true <- att_est <- att_debiased <-
+    SATT <- att_est <- att_debiased <-
     se_AE <- true_SE <-
     error <- bias <-
     N_T <- ESS_C <- numeric(R)
@@ -634,9 +638,9 @@ sim_inference_CSM_A_E_OLD <- function(dgp_name,
     ### Obtain necessary things to output
     # Get true ATT
     if (att0){
-      att_true[i] <- att <- 0
+      SATT[i] <- att <- 0
     }else{
-      att_true[i] <- att <-
+      SATT[i] <- att <-
         df_dgp_i %>%
         filter(Z & (id %in% treatment_table$id)) %>%
         summarize(att = mean(Y1-Y0)) %>%
@@ -673,7 +677,7 @@ sim_inference_CSM_A_E_OLD <- function(dgp_name,
   res_save_bayesian_boot <-
     tibble(id=1:R,
            name=dgp_name,
-           att_true = att_true,
+           SATT = SATT,
            att_est= att_est,
            lower=CI_lower,
            upper=CI_upper,

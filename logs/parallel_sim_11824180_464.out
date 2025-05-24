@@ -1,0 +1,14 @@
+Starting R script for iteration 464
+--- Starting Iteration: 464 ---
+   Processing overlap: very_low (prop_unif = 0.1 )
+      Overlap very_low took 1.44 seconds.
+   Processing overlap: low (prop_unif = 0.2 )
+      Overlap low took 1.16 seconds.
+   Processing overlap: mid (prop_unif = 0.333 )
+      Overlap mid took 1.02 seconds.
+   Processing overlap: high (prop_unif = 0.5 )
+      Overlap high took 0.99 seconds.
+   Processing overlap: very_high (prop_unif = 0.667 )
+      Overlap very_high took 0.91 seconds.
+--- Iteration 464 Complete. Results saved to: /n/holylabs/LABS/pillai_lab/Users/xmeng1/scmatch2/data/outputs/4d_bias_inference_Apr2025/estimation/results_iter_464.rds ---
+Finished R script for iteration 464

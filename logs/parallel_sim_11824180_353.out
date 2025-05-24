@@ -1,0 +1,14 @@
+Starting R script for iteration 353
+--- Starting Iteration: 353 ---
+   Processing overlap: very_low (prop_unif = 0.1 )
+      Overlap very_low took 1.66 seconds.
+   Processing overlap: low (prop_unif = 0.2 )
+      Overlap low took 1.23 seconds.
+   Processing overlap: mid (prop_unif = 0.333 )
+      Overlap mid took 1.09 seconds.
+   Processing overlap: high (prop_unif = 0.5 )
+      Overlap high took 1.17 seconds.
+   Processing overlap: very_high (prop_unif = 0.667 )
+      Overlap very_high took 1.21 seconds.
+--- Iteration 353 Complete. Results saved to: /n/holylabs/LABS/pillai_lab/Users/xmeng1/scmatch2/data/outputs/4d_bias_inference_Apr2025/estimation/results_iter_353.rds ---
+Finished R script for iteration 353
