@@ -11,7 +11,7 @@ make_bootstrap_ci(boot_mtd, use_moving_block = FALSE)
 \itemize{
 \item "Bayesian" - Uses Dirichlet distribution for weights
 \item "wild" - Uses wild bootstrap with Mammen weights
-\item "naive-resid" - Uses naive residual resampling
+\item "naive" - Uses naive residual resampling
 }}
 
 \item{use_moving_block}{Logical flag to determine if Moving Block Bootstrap should be applied.}

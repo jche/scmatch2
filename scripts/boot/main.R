@@ -29,7 +29,7 @@ boot_otsu_naive_resid <-
            I=100,
            B=100,
            mu_model="linear",
-           boot_mtd="naive-resid",
+           boot_mtd="naive",
            n_split=2)
 saveRDS(boot_otsu_wild, here("scripts/boot/output/boot_otsu_wild.rds"))
 saveRDS(boot_otsu_A_E, here("scripts/boot/output/boot_otsu_A_E.rds"))

@@ -31,7 +31,7 @@
   #         c(-1, 1),
   #         prob = c( 1/2, 1/2 ),
   #         replace = T, size = n1)
-  #     }else if (boot_mtd == "naive-resid"){
+  #     }else if (boot_mtd == "naive"){
   #       W_mat = rmultinom(1,n1, rep(1/n1,n1)) / 10
   #       W = c(W_mat)
   #     }
@@ -52,7 +52,7 @@
 #'     \item "Bayesian" - Uses Dirichlet distribution for weights
 #'     \item "wild" - Uses wild bootstrap with Mammen weights
 #'     \item "sign" - Uses random sign flipping
-#'     \item "naive-resid" - Uses naive residual resampling
+#'     \item "naive" - Uses naive residual resampling
 #'   }
 #' @param use_moving_block Logical flag to determine if Moving Block Bootstrap should be applied.
 #'
@@ -101,8 +101,8 @@ make_bootstrap <- function(boot_mtd, use_moving_block = FALSE) {
                         size = n
                       )
                     },
-                    "naive-resid" = function(n) {
-                      W_mat <- rmultinom(1, n, rep(1/n, n)) / 10
+                    "naive" = function(n) {
+                      W_mat <- rmultinom(1, n, rep(1/n, n)) / n
                       c(W_mat)
                     },
                     stop("Unknown bootstrap method:", boot_mtd)
@@ -154,7 +154,7 @@ make_bootstrap <- function(boot_mtd, use_moving_block = FALSE) {
 #'   \itemize{
 #'     \item "Bayesian" - Uses Dirichlet distribution for weights
 #'     \item "wild" - Uses wild bootstrap with Mammen weights
-#'     \item "naive-resid" - Uses naive residual resampling
+#'     \item "naive" - Uses naive residual resampling
 #'   }
 #' @param use_moving_block Logical flag to determine if Moving Block Bootstrap should be applied.
 #'

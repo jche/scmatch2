@@ -981,8 +981,8 @@ boot_CSM <- function(dgp_name,
     # Input: tilde_tau_resids: a vector of length n of
     # Output: sd, confint
     seed_addition = i * 11
-    if (boot_mtd == "Bayesian" || boot_mtd == "wild" || boot_mtd == "naive-resid"){
-      boot_ci <- make_bootstrap_ci(boot_mtd, use_moving_block=use_moving_block)  # or "wild" or "naive-resid"
+    if (boot_mtd == "Bayesian" || boot_mtd == "wild" || boot_mtd == "naive"){
+      boot_ci <- make_bootstrap_ci(boot_mtd, use_moving_block=use_moving_block)  # or "wild" or "naive"
       results <- boot_ci(
         resids = tilde_tau_resids,
         mean_est = mean_tilde_tau,

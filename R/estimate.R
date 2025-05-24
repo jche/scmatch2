@@ -217,7 +217,7 @@ get_se_AE <- function(matches,
 #' @param matches A CSM match object (R S3 object)
 #' @param outcome Name of the outcome variable (default: "Y")
 #' @param treatment Name of the treatment variable (default: "Z")
-#' @param boot_mtd The bootstrap method to use. Options are "Bayesian", "wild", or "naive-resid".
+#' @param boot_mtd The bootstrap method to use. Options are "Bayesian", "wild", or "naive".
 #' @param B Number of bootstrap samples (default: 250)
 #' @param use_moving_block Whether to use a moving block bootstrap (default: FALSE)
 #' @param seed_addition Additional seed value to ensure reproducibility (default: 11)
@@ -251,11 +251,11 @@ get_se_OR <- function(matches,
   mean_tilde_tau <- mean(tilde_tau)
   tilde_tau_resids <- tilde_tau - mean_tilde_tau
 
-  if (boot_mtd == "Bayesian" || boot_mtd == "wild" || boot_mtd == "naive-resid"){
+  if (boot_mtd == "Bayesian" || boot_mtd == "wild" || boot_mtd == "naive"){
     boot_ci <- make_bootstrap_ci(
       boot_mtd,
       use_moving_block=use_moving_block
-    )  # or "wild" or "naive-resid"
+    )  # or "wild" or "naive"
     results <- boot_ci(
       resids = tilde_tau_resids,
       mean_est = mean_tilde_tau,

@@ -302,7 +302,8 @@ test_that("get_se_OR calculates SE and related values correctly", {
       mock_matches,
       outcome = "Y",
       treatment = "Z",
-      B=100
+      boot_mtd = "wild",
+      B=250
     )
 
   expect_true("SE" %in% names(result))
