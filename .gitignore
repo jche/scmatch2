@@ -11,7 +11,7 @@
 .RData
 .DS_Store
 # User-specific files
-.Ruserdata 
+.Ruserdata
 # Example code in package build process
 *-Ex.R
 # Output files from R CMD build
@@ -35,6 +35,8 @@ vignettes/*.pdf
 .Renviron
 .Rproj.user
 .DS_Store
+# Cluster logs
+/logs/
 
 # Research paper results
 /tables
