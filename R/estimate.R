@@ -214,7 +214,7 @@ get_se_AE <- function(matches,
 #' This function estimates the standard error of the ATT using a bootstrap approach
 #' based on residuals from the OR method.
 #'
-#' @param matches A CSM match object (R S3 object)
+#' @param matches A CSM match object (R S3 object) or data frame
 #' @param outcome Name of the outcome variable (default: "Y")
 #' @param treatment Name of the treatment variable (default: "Z")
 #' @param boot_mtd The bootstrap method to use. Options are "Bayesian", "wild", or "naive".
@@ -223,24 +223,30 @@ get_se_AE <- function(matches,
 #' @param seed_addition Additional seed value to ensure reproducibility (default: 11)
 #' @param block_size Block size for bootstrap (default: NA, automatically chosen)
 #'
-#' @return A tibble with standard error (SE), bootstrap confidence intervals, and sample sizes.
+#' @return A tibble with measurement error variance (V_E), standard error (SE), bootstrap confidence intervals, and sample sizes.
 #' @export
 #'
-get_se_OR <- function(matches,
-                      outcome = "Y",
-                      treatment = "Z",
-                      boot_mtd = "wild",
-                      B = 250,
-                      use_moving_block=F,
-                      seed_addition = 11,
-                      block_size = NA){
-  # matches <- mock_matches; outcome = "Y"; treatment = "Z"; boot_mtd = "wild"
-  if ( is.csm_matches( matches ) ) {
+get_measurement_error_variance_OR <- function(matches,
+                                              outcome = "Y",
+                                              treatment = "Z",
+                                              boot_mtd = "wild",
+                                              B = 250,
+                                              use_moving_block = FALSE,
+                                              seed_addition = 11,
+                                              block_size = NA) {
+  # Convert to data frame if needed
+  if (is.csm_matches(matches)) {
     matches <- full_unit_table(matches)
   }
+
+  # Check if bias column exists, if not set bias to 0
+  if (!"bias" %in% colnames(matches)) {
+    matches$bias <- 0
+  }
+
   tmp0 <- matches %>%
-    mutate(Y_bias_corrected = Y) %>%
-    group_by(subclass, Z) %>%
+    mutate(Y_bias_corrected = !!sym(outcome) - bias) %>%
+    group_by(subclass, !!sym(treatment)) %>%
     summarize(mn = sum(Y_bias_corrected * weights), .groups = "drop")
 
   tmp <- tmp0 %>%
@@ -251,11 +257,11 @@ get_se_OR <- function(matches,
   mean_tilde_tau <- mean(tilde_tau)
   tilde_tau_resids <- tilde_tau - mean_tilde_tau
 
-  if (boot_mtd == "Bayesian" || boot_mtd == "wild" || boot_mtd == "naive"){
+  if (boot_mtd %in% c("Bayesian", "wild", "naive")) {
     boot_ci <- make_bootstrap_ci(
       boot_mtd,
-      use_moving_block=use_moving_block
-    )  # or "wild" or "naive"
+      use_moving_block = use_moving_block
+    )
     results <- boot_ci(
       resids = tilde_tau_resids,
       mean_est = mean_tilde_tau,
@@ -267,19 +273,25 @@ get_se_OR <- function(matches,
     CI_lower <- results$ci_lower
     CI_upper <- results$ci_upper
     sd_boot <- results$sd
+  } else {
+    stop("boot_mtd must be one of: 'Bayesian', 'wild', 'naive'")
   }
+
+  # Calculate sample sizes
   Ns <- calc_N_T_N_C(matches)
 
-  return( tibble(
+  # Calculate V_E equivalent (variance per unit)
+  V_E <- sd_boot^2
+
+  return(tibble(
+    V_E = V_E,
     SE = sd_boot,
-    sigma_hat = NA,
     N_T = Ns$N_T,
-    N_C_tilde = Ns$N_C_tilde,
+    ESS_C = Ns$N_C_tilde,
     CI_lower = CI_lower,
     CI_upper = CI_upper
-  ) )
+  ))
 }
-
 
 #' Estimate the measurement error variance component (V_E)
 #'
@@ -339,6 +351,12 @@ get_measurement_error_variance <- function(
 #'   "num_units": weight by number of units in the subclass
 #'   "ess_units": weight by effective sample size of units in the subclass
 #'   "uniform": weight each cluster equally
+#' @param variance_method Method for calculating measurement error variance:
+#'   "pooled": use get_measurement_error_variance (default)
+#'   "bootstrap": use get_measurement_error_variance_OR
+#' @param boot_mtd Bootstrap method when variance_method = "bootstrap" (default: "wild")
+#' @param B Number of bootstrap samples when variance_method = "bootstrap" (default: 250)
+#' @param seed_addition Additional seed for bootstrap (default: 11)
 #' @return A tibble with total variance (V), measurement error variance (V_E),
 #'   population heterogeneity variance (V_P), and other relevant statistics
 #' @export
@@ -346,7 +364,11 @@ get_total_variance <- function(
     matches,
     outcome = "Y",
     treatment = "Z",
-    var_weight_type = "ess_units") {
+    var_weight_type = "ess_units",
+    variance_method = "pooled",
+    boot_mtd = "wild",
+    B = 250,
+    seed_addition = 11) {
 
   # Convert to data frame if needed
   if (is.csm_matches(matches)) {
@@ -355,18 +377,36 @@ get_total_variance <- function(
     matches_df <- matches
   }
 
-  # Get measurement error variance estimate (V_E)
-  v_e_result <- get_measurement_error_variance(
-    matches_table = matches_df,
-    outcome = outcome,
-    treatment = treatment,
-    var_weight_type = var_weight_type
-  )
-
-  V_E <- v_e_result$V_E
-  sigma_hat_squared <- v_e_result$sigma_hat^2
-  N_T <- v_e_result$N_T
-  ESS_C <- v_e_result$ESS_C
+  # Get measurement error variance estimate (V_E) using specified method
+  if (variance_method == "pooled") {
+    v_e_result <- get_measurement_error_variance(
+      matches_table = matches_df,
+      outcome = outcome,
+      treatment = treatment,
+      var_weight_type = var_weight_type
+    )
+    V_E <- v_e_result$V_E
+    sigma_hat_squared <- v_e_result$sigma_hat^2
+    N_T <- v_e_result$N_T
+    ESS_C <- v_e_result$ESS_C
+  } else if (variance_method == "bootstrap") {
+    v_e_result <- get_measurement_error_variance_OR(
+      matches = matches_df,
+      outcome = outcome,
+      treatment = treatment,
+      boot_mtd = boot_mtd,
+      B = B,
+      seed_addition = seed_addition
+    )
+    V_E <- v_e_result$V_E
+    # For bootstrap method, we don't have sigma_hat, so we approximate
+    sigma_hat_squared <- V_E * (v_e_result$N_T + v_e_result$ESS_C) /
+      (1/v_e_result$N_T + 1/v_e_result$ESS_C)
+    N_T <- v_e_result$N_T
+    ESS_C <- v_e_result$ESS_C
+  } else {
+    stop("variance_method must be either 'pooled' or 'bootstrap'")
+  }
 
   # Calculate treatment effect estimate (tau_hat)
   att_estimate <- get_att_point_est(
@@ -399,12 +439,6 @@ get_total_variance <- function(
   # Calculate the first component of the total variance estimator
   # (Empirical squared deviations)
   squared_deviations <- sum((individual_effects$indiv_effect - att_estimate)^2) / N_T
-  # print("Individual treatment effects:" )
-  # print(individual_effects$indiv_effect)
-  # print("Average treatment effect:" )
-  # print(mean(individual_effects$indiv_effect))
-  # print("Squared deviations:" )
-  # print(squared_deviations)
 
   # Calculate the correction term for control unit weights
   control_weight_correction <- matches_df %>%
@@ -419,8 +453,7 @@ get_total_variance <- function(
       correction_term = sum((sum_weights^2 - sum_squared_weights)) / N_T
     ) %>%
     pull(correction_term)
-  # print("Control weight correction term:" )
-  # print(control_weight_correction)
+
   # Calculate the total variance (V)
   V <- squared_deviations + sigma_hat_squared * control_weight_correction
 
@@ -429,15 +462,25 @@ get_total_variance <- function(
 
   SE <- sqrt(V) * 1 / sqrt(N_T)
 
-  return(tibble(
+  result <- tibble(
     V = V,
     V_E = V_E,
     V_P = V_P,
     SE = SE,
-    sigma_hat = v_e_result$sigma_hat,
     N_T = N_T,
     ESS_C = ESS_C
-  ))
+  )
+
+  # Add sigma_hat if available (from pooled method we have, from OR method we impute)
+  if (variance_method == "pooled") {
+    result$sigma_hat <- v_e_result$sigma_hat
+  }else if (variance_method == "bootstrap") {
+    result$sigma_hat <- sqrt(sigma_hat_squared)
+  } else {
+    result$sigma_hat <- NA
+  }
+
+  return(result)
 }
 
 #' Estimate ATT with correct variance estimation
@@ -449,13 +492,23 @@ get_total_variance <- function(
 #' @param treatment Name of the treatment variable (default "Z")
 #' @param outcome Name of the outcome variable (default "Y")
 #' @param var_weight_type The way that cluster variances are averaged (default "ess_units")
+#' @param variance_method Method for calculating measurement error variance:
+#'   "pooled": use get_measurement_error_variance (default)
+#'   "bootstrap": use get_measurement_error_variance_OR
+#' @param boot_mtd Bootstrap method when variance_method = "bootstrap" (default: "wild")
+#' @param B Number of bootstrap samples when variance_method = "bootstrap" (default: 250)
+#' @param seed_addition Additional seed for bootstrap (default: 11)
 #' @return A tibble with ATT estimate, standard error, t-statistic, and variance components
 #' @export
 get_ATT_estimate <- function(
     scmatch,
     treatment = "Z",
     outcome = "Y",
-    var_weight_type = "ess_units") {
+    var_weight_type = "ess_units",
+    variance_method = "pooled",
+    boot_mtd = "wild",
+    B = 250,
+    seed_addition = 11) {
 
   # Calculate ATT point estimate
   ATT <- get_att_point_est(scmatch,
@@ -467,7 +520,11 @@ get_ATT_estimate <- function(
     matches = scmatch,
     treatment = treatment,
     outcome = outcome,
-    var_weight_type = var_weight_type
+    var_weight_type = var_weight_type,
+    variance_method = variance_method,
+    boot_mtd = boot_mtd,
+    B = B,
+    seed_addition = seed_addition
   )
 
   # Add ATT to results and calculate t-statistic

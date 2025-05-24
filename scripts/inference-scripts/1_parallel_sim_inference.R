@@ -18,6 +18,11 @@ true_sigma_base <- 0.5 # SD of noise added to potential outcomes
 prop_nc_unif_values <- c(1/10, 1/5, 1/3, 1/2, 2/3) # 5 degrees of overlap
 deg_overlap_labels <- c("very_low", "low", "mid", "high", "very_high") # Labels for overlap
 
+include_bootstrap_global <- TRUE
+boot_mtd_global <- "wild"
+B_global <- 250
+seed_addition_global <- 11
+
 # --- Output Directories ---
 # NOTE: one_iteration might handle saving internally, or might not save matches.
 # This script no longer explicitly saves match objects. Adjust if needed.
@@ -61,7 +66,7 @@ for (j in seq_along(prop_nc_unif_values)) {
   # IMPORTANT: Ensure 'one_iteration' in '0_sim_inference_utils.R' is modified accordingly.
   single_overlap_result <- tryCatch({
     one_iteration(
-      i = iteration_i, # Pass iteration number if needed by one_iteration (e.g., for internal seeding)
+      i = iteration_i,
       k = k_dim,
       nc = nc_base,
       nt = nt_base,
@@ -69,7 +74,11 @@ for (j in seq_along(prop_nc_unif_values)) {
       prop_nc_unif = prop_unif,
       scaling = scaling_base,
       true_sigma = true_sigma_base,
-      verbose = FALSE # Keep console output clean for parallel runs
+      include_bootstrap = include_bootstrap_global,
+      boot_mtd = boot_mtd_global,
+      B = B_global,
+      seed_addition = seed_addition_global,
+      verbose = FALSE
     )
   }, error = function(e) {
     warning("one_iteration failed for iteration ", iteration_i, ", overlap ", overlap_label, ": ", e$message, call. = FALSE)

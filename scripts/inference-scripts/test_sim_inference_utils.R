@@ -1,243 +1,347 @@
 source("./scripts/inference-scripts/0_sim_inference_utils.R")
-if ( FALSE ) {
-  # --- Test run of one_iteration ---
-  message("--- Testing one_iteration ---")
-  needed_libs_iter <- c("tidyverse", "mvtnorm") # Add CSM if needed globally
-  if (load_libs(needed_libs_iter)) {
-    # Assuming necessary functions (gen_one_toy, etc.) are loaded
-    # You might need to explicitly load CSM or its functions if not attached
-    # e.g. library(CSM) or source("path/to/CSM_functions.R")
+needed_libs <- c("tidyverse", "mvtnorm")
 
-    source("./scripts/inference-scripts/0_sim_inference_utils.R")
-    message("Running one_iteration with k=4...")
-    iteration_result_k4 <- one_iteration( i = 1, k = 4, nc = 350, nt = 30, R = 1, verbose=TRUE )
-    print(iteration_result_k4)
+test_that("one_iteration works with pooled inference only", {
+  skip_if_not(load_libs(needed_libs), "Required libraries not available")
 
-    iteration_result_k4 <- one_iteration( i = 1, k = 4, nc = 500, scaling = 8, toy_ctr_dist = 0.5, R = 1, verbose=TRUE )
-    print(iteration_result_k4)
+  # Run with pooled inference only
+  result <- one_iteration(
+    i = 1,
+    k = 2,
+    nc = 100,
+    nt = 25,
+    include_bootstrap = FALSE,
+    R = 1,
+    verbose = FALSE
+  )
 
-    message("\nRunning one_iteration with k=2...")
-    source("./scripts/inference-scripts/0_sim_inference_utils.R")
-    iteration_result_k2 <- one_iteration( i = 1, k = 2, nc = 100, nt = 25, R = 1, verbose=TRUE )
-    print(iteration_result_k2)
-  } else {
-    message("Skipping one_iteration test due to missing packages.")
+  # Check structure
+  expect_true(is.data.frame(result))
+  expect_equal(nrow(result), 1)  # Only pooled method
+  expect_true("inference_method" %in% names(result))
+  expect_equal(result$inference_method, "pooled")
+
+  # Check required columns
+  required_cols <- c("runID", "k", "inference_method", "att_est", "SE",
+                     "CI_lower", "CI_upper", "N_T", "ESS_C", "V_E", "V_P",
+                     "SATT", "bias")
+  expect_true(all(required_cols %in% names(result)))
+
+  # Check that bootstrap-specific columns are NA for pooled method
+  expect_true(is.na(result$boot_mtd))
+  expect_true(is.na(result$B))
+
+  # Check that sigma_hat is available for pooled method
+  expect_false(is.na(result$sigma_hat))
+})
+
+test_that("one_iteration works with both pooled and bootstrap inference", {
+  skip_if_not(load_libs(needed_libs), "Required libraries not available")
+
+  # Run with both methods
+  result <- one_iteration(
+    i = 1,
+    k = 2,
+    nc = 100,
+    nt = 25,
+    include_bootstrap = TRUE,
+    boot_mtd = "wild",
+    B = 50,  # Small B for faster testing
+    R = 1,
+    verbose = FALSE
+  )
+
+  # Check structure
+  expect_true(is.data.frame(result))
+  expect_equal(nrow(result), 2)  # Both pooled and bootstrap
+  expect_true(all(c("pooled", "bootstrap") %in% result$inference_method))
+
+  # Check that both rows have the same basic info
+  expect_equal(length(unique(result$runID)), 1)
+  expect_equal(length(unique(result$k)), 1)
+  expect_equal(length(unique(result$SATT)), 1)
+  expect_equal(length(unique(result$bias)), 1)
+
+  # Check bootstrap-specific columns
+  bootstrap_row <- result[result$inference_method == "bootstrap", ]
+  expect_equal(bootstrap_row$boot_mtd, "wild")
+  expect_equal(bootstrap_row$B, 50)
+
+  pooled_row <- result[result$inference_method == "pooled", ]
+  expect_true(is.na(pooled_row$boot_mtd))
+  expect_true(is.na(pooled_row$B))
+
+  # ATT estimates should be the same (point estimate doesn't change)
+  if (!is.na(bootstrap_row$att_est) && !is.na(pooled_row$att_est)) {
+    expect_equal(bootstrap_row$att_est, pooled_row$att_est, tolerance = 1e-10)
   }
-}
+})
 
-if ( FALSE ) {
-  # --- Test the save_match feature ---
-  message("--- Testing save_match ---")
-  needed_libs_iter <- c("tidyverse", "mvtnorm") # Add CSM if needed globally
-  if (load_libs(needed_libs_iter)) {
-    source("./scripts/inference-scripts/0_sim_inference_utils.R")
-    iteration_result_k4 <- one_iteration( i = 1, k = 4, nc = 350, nt = 30, R = 1,
-                                          save_match = TRUE, path_to_save_match = "./data/outputs/4d_bias_inference_Apr2025/test",
-                                          verbose=TRUE )
-  } else {
-    message("Skipping one_iteration test due to missing packages.")
+test_that("one_iteration works with different bootstrap methods", {
+  skip_if_not(load_libs(needed_libs), "Required libraries not available")
+
+  bootstrap_methods <- c("wild", "Bayesian", "naive")
+
+  for (method in bootstrap_methods) {
+    result <- one_iteration(
+      i = 1,
+      k = 2,
+      nc = 50,
+      nt = 15,
+      include_bootstrap = TRUE,
+      boot_mtd = method,
+      B = 25,  # Small B for faster testing
+      R = 1,
+      verbose = FALSE
+    )
+
+    expect_true(is.data.frame(result))
+    expect_equal(nrow(result), 2)
+
+    bootstrap_row <- result[result$inference_method == "bootstrap", ]
+    expect_equal(bootstrap_row$boot_mtd, method)
+
+    # Check that we get finite results (or NA if estimation failed)
+    expect_true(is.finite(bootstrap_row$att_est) || is.na(bootstrap_row$att_est))
+    expect_true(is.finite(bootstrap_row$SE) || is.na(bootstrap_row$SE))
   }
-}
+})
 
+test_that("one_iteration handles different dimensionalities", {
+  skip_if_not(load_libs(needed_libs), "Required libraries not available")
 
+  dimensions <- c(1, 2, 4)
 
+  for (k_val in dimensions) {
+    result <- one_iteration(
+      i = 1,
+      k = k_val,
+      nc = 80,
+      nt = 20,
+      include_bootstrap = TRUE,
+      B = 25,
+      R = 1,
+      verbose = FALSE
+    )
 
+    expect_true(is.data.frame(result))
+    expect_equal(nrow(result), 2)
+    expect_equal(unique(result$k), k_val)
 
+    # Both methods should have the same sample sizes
+    expect_equal(length(unique(result$N_T)), 1)
+    expect_equal(length(unique(result$ESS_C)), 1)
+  }
+})
+
+test_that("one_iteration saves match objects correctly", {
+  skip_if_not(load_libs(needed_libs), "Required libraries not available")
+
+  # Create temporary directory
+  temp_dir <- tempdir()
+  save_path <- file.path(temp_dir, "test_matches")
+  dir.create(save_path, showWarnings = FALSE, recursive = TRUE)
+
+  # Run with save_match = TRUE
+  result <- one_iteration(
+    i = 999,  # Use unique iteration number
+    k = 2,
+    nc = 50,
+    nt = 15,
+    save_match = TRUE,
+    path_to_save_match = save_path,
+    include_bootstrap = FALSE,
+    R = 1,
+    verbose = FALSE
+  )
+
+  # Check that file was created
+  expected_files <- list.files(save_path, pattern = "match_iter_999.*\\.rds$")
+  expect_true(length(expected_files) > 0)
+
+  # Check that saved object can be loaded
+  if (length(expected_files) > 0) {
+    saved_match <- readRDS(file.path(save_path, expected_files[1]))
+    expect_true(!is.null(saved_match))
+  }
+
+  # Clean up
+  unlink(save_path, recursive = TRUE)
+})
+
+test_that("one_iteration handles missing data gracefully", {
+  skip_if_not(load_libs(needed_libs), "Required libraries not available")
+
+  # Test with very small sample that might cause matching to fail
+  result <- suppressWarnings(
+    one_iteration(
+      i = 1,
+      k = 6,  # High dimensionality with small sample
+      nc = 10,
+      nt = 3,
+      include_bootstrap = TRUE,
+      B = 10,
+      R = 1,
+      verbose = FALSE
+    )
+  )
+
+  expect_true(is.data.frame(result))
+  # Should still return results even if estimation fails (with NAs)
+  expect_equal(nrow(result), 2)  # Both methods attempted
+  expect_true(all(c("pooled", "bootstrap") %in% result$inference_method))
+})
+
+test_that("one_iteration reproducibility with seed", {
+  skip_if_not(load_libs(needed_libs), "Required libraries not available")
+
+  # Run twice with same seed_addition
+  set.seed(123)
+  result1 <- one_iteration(
+    i = 1,
+    k = 2,
+    nc = 50,
+    nt = 15,
+    include_bootstrap = TRUE,
+    boot_mtd = "wild",
+    B = 25,
+    seed_addition = 42,
+    R = 1,
+    verbose = FALSE
+  )
+
+  set.seed(123)
+  result2 <- one_iteration(
+    i = 1,
+    k = 2,
+    nc = 50,
+    nt = 15,
+    include_bootstrap = TRUE,
+    boot_mtd = "wild",
+    B = 25,
+    seed_addition = 42,
+    R = 1,
+    verbose = FALSE
+  )
+
+  # Bootstrap results should be identical with same seed
+  bootstrap1 <- result1[result1$inference_method == "bootstrap", ]
+  bootstrap2 <- result2[result2$inference_method == "bootstrap", ]
+
+  if (!is.na(bootstrap1$SE) && !is.na(bootstrap2$SE)) {
+    expect_equal(bootstrap1$SE, bootstrap2$SE, tolerance = 1e-10)
+    expect_equal(bootstrap1$CI_lower, bootstrap2$CI_lower, tolerance = 1e-10)
+    expect_equal(bootstrap1$CI_upper, bootstrap2$CI_upper, tolerance = 1e-10)
+  }
+})
+
+test_that("one_iteration column consistency", {
+  skip_if_not(load_libs(needed_libs), "Required libraries not available")
+
+  result <- one_iteration(
+    i = 1,
+    k = 3,
+    nc = 100,
+    nt = 25,
+    include_bootstrap = TRUE,
+    R = 1,
+    verbose = FALSE
+  )
+
+  # Check that all expected columns are present
+  expected_cols <- c(
+    "runID", "k", "inference_method", "boot_mtd", "B",
+    "att_est", "SE", "CI_lower", "CI_upper",
+    "N_T", "ESS_C", "V_E", "V_P", "sigma_hat",
+    "SATT", "bias"
+  )
+
+  expect_true(all(expected_cols %in% names(result)))
+
+  # Check column types
+  expect_true(is.numeric(result$runID))
+  expect_true(is.numeric(result$k))
+  expect_true(is.character(result$inference_method))
+  expect_true(is.numeric(result$att_est))
+  expect_true(is.numeric(result$SE))
+  expect_true(is.numeric(result$SATT))
+})
+
+# Integration test that mimics the actual usage
+test_that("Integration test: Full workflow", {
+  skip_if_not(load_libs(needed_libs), "Required libraries not available")
+
+  # Test multiple iterations (small scale)
+  results_list <- list()
+
+  for (i in 1:2) {
+    results_list[[i]] <- one_iteration(
+      i = i,
+      k = 2,
+      nc = 80,
+      nt = 20,
+      include_bootstrap = TRUE,
+      boot_mtd = "wild",
+      B = 30,
+      R = 2,
+      verbose = FALSE
+    )
+  }
+
+  # Combine results
+  all_results <- bind_rows(results_list)
+
+  expect_equal(nrow(all_results), 4)  # 2 iterations × 2 methods
+  expect_equal(length(unique(all_results$runID)), 2)
+  expect_true(all(c("pooled", "bootstrap") %in% all_results$inference_method))
+
+  # Check that we can separate and analyze results by method
+  pooled_results <- all_results %>% filter(inference_method == "pooled")
+  bootstrap_results <- all_results %>% filter(inference_method == "bootstrap")
+
+  expect_equal(nrow(pooled_results), 2)
+  expect_equal(nrow(bootstrap_results), 2)
+})
 
 
 # if ( FALSE ) {
-#   # --- Example of running the full simulation for k=6 ---
-#   message("\n--- Running full simulation example (k=6) ---")
-#   needed_libs_sim <- c("tidyverse", "mvtnorm", "purrr") # Add CSM, furrr, future if needed
-#   if (load_libs(needed_libs_sim)) {
-#     # Set parallel = TRUE only if furrr and future are loaded and desired
-#     use_parallel <- F
-#     if (use_parallel) {
-#       if (!requireNamespace("furrr", quietly = TRUE) || !requireNamespace("future", quietly = TRUE)) {
-#         message("Packages 'furrr' and 'future' needed for parallel=TRUE. Running sequentially.")
-#         use_parallel <- FALSE
-#       } else {
-#         library(furrr)
-#         library(future)
-#       }
-#     }
+#   # --- Test run of one_iteration ---
+#   message("--- Testing one_iteration ---")
+#   needed_libs_iter <- c("tidyverse", "mvtnorm") # Add CSM if needed globally
+#   if (load_libs(needed_libs_iter)) {
+#     # Assuming necessary functions (gen_one_toy, etc.) are loaded
+#     # You might need to explicitly load CSM or its functions if not attached
+#     # e.g. library(CSM) or source("path/to/CSM_functions.R")
 #
-#     # Ensure source files for data generation, matching, inference are loaded
-#     # source("path/to/gen_toy_covar_k.R") etc.
 #     source("./scripts/inference-scripts/0_sim_inference_utils.R")
-#     globals <- list(
-#       gen_one_toy = gen_one_toy,
-#       gen_toy_covar_k = gen_toy_covar_k,
-#       gen_df_adv_k = gen_df_adv_k,
-#       `%||%` = `%||%`
-#       # Add other custom functions used by gen_one_toy
-#     )
+#     message("Running one_iteration with k=4...")
+#     iteration_result_k4 <- one_iteration( i = 1, k = 4, nc = 350, nt = 30, R = 1, verbose=TRUE )
+#     print(iteration_result_k4)
 #
-#     results_k4 <- sim_inference_CSM_A_E( R = 2, # Smaller R for testing
-#                                          k = 4,
-#                                          nc = 500, # Smaller N for faster testing
-#                                          nt = 75,
-#                                          toy_ctr_dist = 0.5,
-#                                          prop_nc_unif = 1/3,
-#                                          # scaling = 10, # Adjust as needed
-#                                          true_sigma = 0.5,
-#                                          seed = 456,
-#                                          parallel = use_parallel )
-#     print(head(results_k4))
-#     print(summary(results_k4))
+#     iteration_result_k4 <- one_iteration( i = 1, k = 4, nc = 500, scaling = 8, toy_ctr_dist = 0.5, R = 1, verbose=TRUE )
+#     print(iteration_result_k4)
 #
-#     # Example analysis (check coverage, bias)
-#     if (requireNamespace("ggplot2", quietly = TRUE) && nrow(results_k4)>0) {
-#       library(ggplot2)
-#       results_k4 %>%
-#         mutate(covered = (att_true >= CI_lower) & (att_true <= CI_upper)) %>%
-#         summarize(k = first(k),
-#                   R = n(),
-#                   coverage = mean(covered, na.rm = TRUE),
-#                   avg_bias_est = mean(att_est - att_true, na.rm = TRUE),
-#                   avg_est_att = mean(att_est, na.rm=TRUE),
-#                   avg_true_att = mean(att_true, na.rm=TRUE),
-#                   avg_calc_bias = mean(bias, na.rm=TRUE), # Avg estimated bias post-matching
-#                   avg_se = mean(se_AE, na.rm = TRUE),
-#                   sd_att = sd(att_est, na.rm = TRUE), # Monte Carlo SD
-#                   rmse = sqrt(mean( (att_est - att_true)^2, na.rm=TRUE))
-#         ) -> sim_summary
-#
-#       print(sim_summary)
-#
-#       # Plot estimates vs true value
-#       p1 <- ggplot(results_k4, aes(x = att_true, y = att_est)) +
-#         geom_point(alpha = 0.5) +
-#         geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
-#         labs(title = paste("ATT Estimates vs True ATT (k=", unique(results_k4$k), ")"),
-#              x = "True ATT", y = "Estimated ATT") +
-#         theme_bw()
-#       print(p1)
-#
-#       # Plot distribution of estimates
-#       p2 <- ggplot(results_k4, aes(x=att_est)) +
-#         geom_histogram(aes(y=after_stat(density)), bins=15, fill="lightblue", color="black", alpha=0.7) +
-#         geom_vline(aes(xintercept=mean(att_true, na.rm=TRUE)), color="red", linetype="dashed", size=1) +
-#         geom_density(color="blue", size=1) +
-#         labs(title=paste("Distribution of ATT Estimates (k=", unique(results_k4$k), ")"),
-#              x="Estimated ATT", y="Density",
-#              caption = paste("Red line = Avg True ATT =", round(mean(results_k4$att_true, na.rm=TRUE), 3))) +
-#         theme_bw()
-#       print(p2)
-#
-#     }
+#     message("\nRunning one_iteration with k=2...")
+#     source("./scripts/inference-scripts/0_sim_inference_utils.R")
+#     iteration_result_k2 <- one_iteration( i = 1, k = 2, nc = 100, nt = 25, R = 1, verbose=TRUE )
+#     print(iteration_result_k2)
 #   } else {
-#     message("Skipping full simulation example due to missing packages.")
+#     message("Skipping one_iteration test due to missing packages.")
 #   }
 # }
 #
-#
 # if ( FALSE ) {
-#   # --- Original diagnostic code block, updated ---
-#   message("\n--- Running Diagnostic Code Block ---")
-#   needed_libs_diag <- c("tidyverse", "mvtnorm", "ggplot2") # Add CSM if needed
-#   if (load_libs(needed_libs_diag)) {
-#
-#     # Ensure source files for data generation, matching, inference are loaded
-#     # library(CSM) or source("path/to/CSM_functions.R") etc.
-#
-#     k_dim <- 4 # Set dimension for diagnostics
-#     nc_diag <- 500
-#     nt_diag <- 125
-#     message(paste("Generating diagnostic data (k=", k_dim, ")...", sep=""))
-#
-#     # Generate denoised data
-#     df_dgp <- gen_one_toy( k = k_dim,
-#                            nc = nc_diag,
-#                            nt = nt_diag,
-#                            ctr_dist=0.5,
-#                            prop_nc_unif=1, # High overlap case
-#                            f0_sd = 0) %>% # Generate denoised data
-#       rename(Y0_denoised = Y0, Y1_denoised = Y1) %>%
-#       mutate(Y_denoised = ifelse(Z, Y1_denoised, Y0_denoised)) %>%
-#       select(-any_of("noise"))
-#
-#
-#     # Summary of one dimension (e.g., X2 if k>=2)
-#     if (k_dim >= 2) {
-#       message("\nSummary of X2:")
-#       print(summary( df_dgp$X2 ))
-#     }
-#
-#     # Plot Y0 vs X1 colored by Treatment
-#     p_diag1 <- ggplot( df_dgp, aes( X1, Y0_denoised, col=as.factor(Z) ) ) +
-#       geom_point( alpha=0.2 ) +
-#       geom_smooth( se=FALSE, method="loess", span=0.8 ) +
-#       labs(title=paste("Y0 (denoised) vs X1 by Treatment (k=", k_dim,")", sep=""),
-#            color="Treatment (Z)") +
-#       theme_bw()
-#     print(p_diag1)
-#
-#     # Check true treatment effect summary (denoised)
-#     message("\nSummary of True Tx Effect (Y1_denoised - Y0_denoised):")
-#     print(summary( df_dgp$Y1_denoised - df_dgp$Y0_denoised ))
-#
-#
-#     scaling_diag <- 50
-#     true_sigma_diag <- 0.5
-#
-#     # Add in the noise to set variation
-#     df_dgp_i <- df_dgp %>%
-#       mutate(noise = rnorm(n(), mean=0, sd=true_sigma_diag)) %>%
-#       mutate(Y0 = Y0_denoised + noise,
-#              Y1 = Y1_denoised + noise,
-#              Y = ifelse(Z, Y1, Y0))
-#     message("\nSummary of noisy data (df_dgp_i):")
-#     print(head(df_dgp_i))
-#
-#
-#     # Plot first two dimensions colored by treatment (if k >= 2)
-#     if (k_dim >= 2) {
-#       p_diag2 <- ggplot( df_dgp_i, aes( X1, X2, col=as.factor(Z) ) ) +
-#         geom_point(alpha=0.5) +
-#         labs(title=paste("X1 vs X2 by Treatment (k=",k_dim,")", sep=""),
-#              color="Treatment (Z)") +
-#         theme_bw()
-#       print(p_diag2)
-#     }
-#
-#     message("\nPerforming matching (k=", k_dim, ")...", sep="")
-#     ### Perform matching
-#     # CRITICAL ASSUMPTION: get_cal_matches handles k covariates correctly
-#     mtch <- tryCatch(get_cal_matches(
-#       df_dgp_i,
-#       metric = "maximum",
-#       scaling = scaling_diag,
-#       caliper = 1,
-#       rad_method = "adaptive-5nn",
-#       est_method = "scm"
-#       # Add covariate specification here if needed:
-#       # , covariates = paste0("X", 1:k_dim)
-#     ), error = function(e) { message("Matching failed: ", e$message); NULL})
-#
-#     if (!is.null(mtch)) {
-#       print(mtch) # Print matching summary
-#
-#       # Can add plots using result_table or full_unit_table if needed and available
-#
-#       message("\nPerforming inference...")
-#       ### Perform inference using the A-E method
-#       ATT_estimate <- tryCatch(get_ATT_estimate( mtch ),
-#                                error = function(e) { message("Inference failed: ", e$message); NULL})
-#       print(ATT_estimate)
-#
-#       # Calculate results tibble for this single run (using one_iteration logic)
-#       # Needs the full one_iteration code or refactoring to avoid repetition
-#       # message("\nCalculating results for this run...")
-#       # rs_diag <- one_iteration(i=1, k=k_dim, nc=nc_diag, nt=nt_diag, ...) # Use params from above
-#       # print(rs_diag)
-#
-#     } else {
-#       message("Skipping inference and further analysis as matching failed.")
-#     }
-#
+#   # --- Test the save_match feature ---
+#   message("--- Testing save_match ---")
+#   needed_libs_iter <- c("tidyverse", "mvtnorm") # Add CSM if needed globally
+#   if (load_libs(needed_libs_iter)) {
+#     source("./scripts/inference-scripts/0_sim_inference_utils.R")
+#     iteration_result_k4 <- one_iteration( i = 1, k = 4, nc = 350, nt = 30, R = 1,
+#                                           save_match = TRUE,
+#                                           path_to_save_match = "./data/outputs/4d_bias_inference_Apr2025/test",
+#                                           verbose=TRUE )
 #   } else {
-#     message("Skipping diagnostic block due to missing packages.")
+#     message("Skipping one_iteration test due to missing packages.")
 #   }
 # }
 #

@@ -315,3 +315,65 @@ test_that("get_se_OR calculates SE and related values correctly", {
 })
 
 
+
+test_that("get_total_variance works with both variance methods", {
+  mock_matches <- readRDS("./tests/testthat/data/1d_DGP-A_M-10_N1-10_i-1.rds")
+  # Test with pooled method
+  result_pooled <- get_total_variance(
+    matches = mock_matches,
+    outcome = "Y",
+    treatment = "Z",
+    variance_method = "pooled"
+  )
+
+  expect_true(is.data.frame(result_pooled))
+  expect_true(all(c("V", "V_E", "V_P", "SE", "N_T", "ESS_C") %in% names(result_pooled)))
+  expect_true(result_pooled$V > 0)
+  expect_true(result_pooled$SE > 0)
+  expect_true("sigma_hat" %in% names(result_pooled))
+
+  # Test with bootstrap method
+  result_bootstrap <- get_total_variance(
+    matches = mock_matches,
+    variance_method = "bootstrap",
+    boot_mtd = "wild",
+    B = 50
+  )
+
+  expect_true(is.data.frame(result_bootstrap))
+  expect_true(all(c("V", "V_E", "V_P", "SE", "N_T", "ESS_C") %in% names(result_bootstrap)))
+  expect_true(result_bootstrap$V > 0)
+  expect_true(result_bootstrap$SE > 0)
+
+  # Test error handling
+  expect_error(
+    get_total_variance(mock_matches, variance_method = "invalid"),
+    "variance_method must be either"
+  )
+})
+
+# Run integration test ---------
+# load_all()
+test_that("Integration test: Complete workflow", {
+  mock_matches <- readRDS("./tests/testthat/data/1d_DGP-A_M-10_N1-10_i-1.rds")
+
+  # Test complete workflow with both methods
+  att_pooled <- get_ATT_estimate(
+    scmatch = mock_matches,
+    variance_method = "pooled"
+  )
+
+  att_bootstrap <- get_ATT_estimate(
+    scmatch = mock_matches,
+    variance_method = "bootstrap",
+    boot_mtd = "wild",
+    B = 100
+  )
+
+  # Both should produce valid results
+  expect_true(is.finite(att_pooled$ATT))
+  expect_true(is.finite(att_bootstrap$ATT))
+  expect_true(att_pooled$SE > 0)
+  expect_true(att_bootstrap$SE > 0)
+
+})
