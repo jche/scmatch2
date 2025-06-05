@@ -459,6 +459,10 @@ get_total_variance <- function(
 
   # Calculate population heterogeneity variance (V_P)
   V_P <- V - N_T * V_E
+  if (variance_method == "bootstrap"){
+    V = N_T * V_E
+    V_P = 0
+  }
 
   SE <- sqrt(V) * 1 / sqrt(N_T)
 
