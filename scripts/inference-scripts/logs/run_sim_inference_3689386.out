@@ -37,7 +37,7 @@ dbl (12): runID, att_est, se_AE, CI_lower, CI_upper, N_T, N_C_tilde, true_SE...
 
 ℹ Use `spec()` to retrieve the full column specification for this data.
 ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
-Results saved to /n/holylabs/LABS/pillai_lab/Users/xmeng1/scmatch2/data/outputs/OR-overlap-by-prop-unif/OR_toy_low_mid_high_R=500.csv 
+Results saved to /n/holylabs/pillai_lab/Users/xmeng1/scmatch2/data/outputs/OR-overlap-by-prop-unif/OR_toy_low_mid_high_R=500.csv 
 Warning message:
 In file.remove(FNAME) :
-  cannot remove file '/n/holylabs/LABS/pillai_lab/Users/xmeng1/scmatch2/data/outputs/OR-overlap-by-prop-unif/OR_toy_low_mid_high_R=500.csv', reason 'No such file or directory'
+  cannot remove file '/n/holylabs/pillai_lab/Users/xmeng1/scmatch2/data/outputs/OR-overlap-by-prop-unif/OR_toy_low_mid_high_R=500.csv', reason 'No such file or directory'

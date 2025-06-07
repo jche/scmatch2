@@ -15,4 +15,4 @@ rstudio_singularity_image="/n/singularity_images/informatics/ifxrstudio/ifxrstud
 singularity_command="singularity exec --cleanenv --env R_LIBS_USER=${my_packages} ${rstudio_singularity_image}"
 
 # Run the R script
-$singularity_command Rscript -e "source('/n/holylabs/LABS/pillai_lab/Users/xmeng1/scmatch2/scripts/inference-scripts/1_sim_inference_main.R')"
+$singularity_command Rscript -e "source('/n/holylabs/pillai_lab/Users/xmeng1/scmatch2/scripts/inference-scripts/1_sim_inference_main.R')"
