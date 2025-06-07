@@ -11,7 +11,7 @@
 # --- Environment Setup ---
 my_packages=${HOME}/R/ifxrstudio/RELEASE_3_18 # Adjust R library path if different
 rstudio_singularity_image="/n/singularity_images/informatics/ifxrstudio/ifxrstudio:RELEASE_3_18.sif" # Adjust Singularity image path if different
-project_dir="/n/holylabs/LABS/pillai_lab/Users/xmeng1/scmatch2/"
+project_dir="/n/holylabs/pillai_lab/Users/xmeng1/scmatch2/"
 r_script_path="${project_dir}/scripts/inference-scripts/1_parallel_sim_inference.R" # Path to the new R script
 
 # Create logs directory if it doesn't exist

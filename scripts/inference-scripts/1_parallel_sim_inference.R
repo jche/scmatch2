@@ -21,7 +21,6 @@ deg_overlap_labels <- c("very_low", "low", "mid", "high", "very_high") # Labels 
 include_bootstrap_global <- TRUE
 boot_mtd_global <- "wild"
 B_global <- 250
-seed_addition_global <- 11
 
 # --- Output Directories ---
 # NOTE: one_iteration might handle saving internally, or might not save matches.
@@ -77,7 +76,7 @@ for (j in seq_along(prop_nc_unif_values)) {
       include_bootstrap = include_bootstrap_global,
       boot_mtd = boot_mtd_global,
       B = B_global,
-      seed_addition = seed_addition_global,
+      seed_addition = iteration_i,
       verbose = FALSE
     )
   }, error = function(e) {

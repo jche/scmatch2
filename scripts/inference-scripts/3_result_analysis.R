@@ -8,10 +8,15 @@ library(latex2exp)
 # Read the combined results file
 results <- read_csv("data/outputs/4d_bias_inference_Apr2025/combined_results.csv")
 
+tmp <- results %>%
+  mutate(ATT = k * 1.5) %>%
+  filter(deg_overlap == "high", inference_method=="pooled")
+
+
 # Function to compute coverage rates
-compute_coverage <- results %>%
+results_summarized <- results %>%
     mutate(ATT = k * 1.5) %>%
-    group_by(deg_overlap) %>%
+    group_by(deg_overlap, inference_method) %>%
     summarize(
       n_iterations = n(),
       mean_SATT = mean(SATT, na.rm = TRUE),
@@ -20,8 +25,8 @@ compute_coverage <- results %>%
       mean_SE = mean(SE, na.rm = TRUE),
       true_sd = sd(att_est - bias - ATT, na.rm = TRUE),
       est_sd = mean(SE, na.rm = TRUE),
-      true_sd_E = mean(true_sigma * sqrt(1/nt + 1 / ESS_C) , na.rm = TRUE) ,
-      true_sd_E_ver_2 = sd(att_est - SATT, na.rm = TRUE),
+      true_sd_E_ver_2 = mean(true_sigma * sqrt(1/nt + 1 / ESS_C) , na.rm = TRUE) ,
+      true_sd_E = sd(att_est - SATT, na.rm = TRUE),
       est_sd_E = mean(sigma_hat * sqrt(1/nt + 1 / ESS_C) , na.rm = TRUE) ,
       # est_sd_E_ver_2 = mean(sqrt(V_E), na.rm = TRUE) , # Exactly same as est_sd_E
       coverage_rate = mean((CI_lower - bias <= ATT) & (ATT <= CI_upper - bias), na.rm = TRUE),
@@ -34,16 +39,23 @@ compute_coverage <- results %>%
       # Mean effective sample size of controls
       mean_ESS_C = mean(ESS_C, na.rm = TRUE),
       # Number of treated units
-      mean_N_T = mean(N_T, na.rm = TRUE)
+      mean_N_T = mean(N_T, na.rm = TRUE),
+      # Mean overlap statistics
+      mean_avg_shared_controls = mean(avg_shared_controls, na.rm = TRUE),
+      mean_p75_shared_controls = mean(p75_shared_controls, na.rm = TRUE),
+      mean_avg_shared_treated = mean(avg_shared_treated, na.rm = TRUE),
+      mean_p75_shared_treated = mean(p75_shared_treated, na.rm = TRUE),
+      .groups = 'drop'
     )
 
 # coverage_with_bias_correction <- compute_coverage(results, use_bias_correction = TRUE)
 # coverage_without_bias_correction <- compute_coverage(results, use_bias_correction = FALSE)
 
 # 1. Summary table with all metrics
-summary_table <- compute_coverage %>%
-  select(
+summary_table <- results_summarized %>%
+  dplyr::select(
     deg_overlap,
+    inference_method,
     n_iterations,
     mean_SATT,
     mean_att_est,
@@ -51,15 +63,16 @@ summary_table <- compute_coverage %>%
     true_sd,
     est_sd,
     true_sd_E,
-    true_sd_E_ver_2,
     est_sd_E,
-    mean_V_over_nT,
-    true_var,
     coverage_rate,
     coverage_rate_wo_bias_correction,
     avg_CI_width,
     mean_ESS_C,
-    mean_N_T
+    mean_N_T,
+    mean_avg_shared_controls,
+    mean_p75_shared_controls,
+    mean_avg_shared_treated,
+    mean_p75_shared_treated
   )
 
 print(kable(summary_table,

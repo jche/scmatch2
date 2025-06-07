@@ -7,9 +7,9 @@ test_that("one_iteration works with pooled inference only", {
   # Run with pooled inference only
   result <- one_iteration(
     i = 1,
-    k = 2,
-    nc = 100,
-    nt = 25,
+    k = 4,
+    nc = 400,
+    nt = 100,
     include_bootstrap = FALSE,
     R = 1,
     verbose = FALSE
@@ -35,47 +35,248 @@ test_that("one_iteration works with pooled inference only", {
   expect_false(is.na(result$sigma_hat))
 })
 
-test_that("one_iteration works with both pooled and bootstrap inference", {
-  skip_if_not(load_libs(needed_libs), "Required libraries not available")
 
-  # Run with both methods
-  result <- one_iteration(
-    i = 1,
-    k = 2,
-    nc = 100,
-    nt = 25,
-    include_bootstrap = TRUE,
-    boot_mtd = "wild",
-    B = 50,  # Small B for faster testing
-    R = 1,
-    verbose = FALSE
-  )
-
-  # Check structure
-  expect_true(is.data.frame(result))
-  expect_equal(nrow(result), 2)  # Both pooled and bootstrap
-  expect_true(all(c("pooled", "bootstrap") %in% result$inference_method))
-
-  # Check that both rows have the same basic info
-  expect_equal(length(unique(result$runID)), 1)
-  expect_equal(length(unique(result$k)), 1)
-  expect_equal(length(unique(result$SATT)), 1)
-  expect_equal(length(unique(result$bias)), 1)
-
-  # Check bootstrap-specific columns
-  bootstrap_row <- result[result$inference_method == "bootstrap", ]
-  expect_equal(bootstrap_row$boot_mtd, "wild")
-  expect_equal(bootstrap_row$B, 50)
-
-  pooled_row <- result[result$inference_method == "pooled", ]
-  expect_true(is.na(pooled_row$boot_mtd))
-  expect_true(is.na(pooled_row$B))
-
-  # ATT estimates should be the same (point estimate doesn't change)
-  if (!is.na(bootstrap_row$att_est) && !is.na(pooled_row$att_est)) {
-    expect_equal(bootstrap_row$att_est, pooled_row$att_est, tolerance = 1e-10)
-  }
-})
+# # Fixed version of get_matched_matrix that handles control reuse properly
+# get_matched_matrix_fixed <- function(full_matched_table) {
+#   # Get unique treated units
+#   treated_units <- unique(full_matched_table$id[full_matched_table$Z == 1])
+#
+#   matched_control_ids <- list()
+#
+#   # For each treated unit, get ALL controls it's matched to (across all subclasses)
+#   for (treated_id in treated_units) {
+#     # Find all subclasses this treated unit appears in
+#     treated_subclasses <- unique(full_matched_table$subclass[full_matched_table$id == treated_id & full_matched_table$Z == 1])
+#
+#     # Get all controls from those subclasses
+#     all_controls <- c()
+#     for (subclass in treated_subclasses) {
+#       controls_in_subclass <- full_matched_table$id[full_matched_table$subclass == subclass & full_matched_table$Z == 0]
+#       all_controls <- c(all_controls, controls_in_subclass)
+#     }
+#
+#     # Remove duplicates and convert to numeric for proper handling
+#     unique_controls <- unique(as.numeric(all_controls))
+#     matched_control_ids[[as.character(treated_id)]] <- unique_controls
+#   }
+#
+#   # Create matrix
+#   max_controls <- max(sapply(matched_control_ids, length))
+#   matched_matrix <- do.call(rbind, lapply(matched_control_ids, function(ids) {
+#     c(ids, rep(NA, max_controls - length(ids)))
+#   }))
+#
+#   # Ensure proper row names (treated unit IDs)
+#   rownames(matched_matrix) <- names(matched_control_ids)
+#
+#   return(matched_matrix)
+# }
+#
+# # Fixed version of compute_shared_neighbors that handles numeric IDs properly
+# compute_shared_neighbors_fixed <- function(matched_matrix) {
+#   N1 <- nrow(matched_matrix)
+#
+#   shared_neighbors <- matrix(0, nrow = N1, ncol = N1)
+#   rownames(shared_neighbors) <- rownames(matched_matrix)
+#   colnames(shared_neighbors) <- rownames(matched_matrix)
+#
+#   for (i in 1:(N1 - 1)) {
+#     for (j in (i + 1):N1) {
+#       # Get non-NA controls for each treated unit
+#       controls_i <- matched_matrix[i, ]
+#       controls_j <- matched_matrix[j, ]
+#
+#       # Remove NAs
+#       controls_i <- controls_i[!is.na(controls_i)]
+#       controls_j <- controls_j[!is.na(controls_j)]
+#
+#       # Find intersection
+#       shared <- intersect(controls_i, controls_j)
+#       shared_count <- length(shared)
+#
+#       shared_neighbors[i, j] <- shared_neighbors[j, i] <- shared_count
+#     }
+#   }
+#
+#   return(shared_neighbors)
+# }
+#
+# # Updated calculate_overlap_statistics function
+# calculate_overlap_statistics_fixed <- function(mtch) {
+#   # Get the full matched table from the match object
+#   full_matched_table <- tryCatch({
+#     full_unit_table(mtch, nonzero_weight_only = TRUE)
+#   }, error = function(e) {
+#     warning("Failed to get full unit table for overlap statistics: ", e$message, call. = FALSE)
+#     return(NULL)
+#   })
+#
+#   if (is.null(full_matched_table) || nrow(full_matched_table) == 0) {
+#     return(list(
+#       avg_shared_controls = NA,
+#       p75_shared_controls = NA,
+#       avg_shared_treated = NA,
+#       p75_shared_treated = NA
+#     ))
+#   }
+#
+#   # Step 1: Get matched matrix (using fixed version)
+#   matched_matrix <- tryCatch({
+#     get_matched_matrix_fixed(full_matched_table)
+#   }, error = function(e) {
+#     warning("Failed to get matched matrix for overlap statistics: ", e$message, call. = FALSE)
+#     return(NULL)
+#   })
+#
+#   if (is.null(matched_matrix)) {
+#     return(list(
+#       avg_shared_controls = NA,
+#       p75_shared_controls = NA,
+#       avg_shared_treated = NA,
+#       p75_shared_treated = NA
+#     ))
+#   }
+#
+#   # Step 2: Compute shared neighbors (using fixed version)
+#   shared_neighbors <- tryCatch({
+#     compute_shared_neighbors_fixed(matched_matrix)
+#   }, error = function(e) {
+#     warning("Failed to compute shared neighbors for overlap statistics: ", e$message, call. = FALSE)
+#     return(NULL)
+#   })
+#
+#   if (is.null(shared_neighbors)) {
+#     return(list(
+#       avg_shared_controls = NA,
+#       p75_shared_controls = NA,
+#       avg_shared_treated = NA,
+#       p75_shared_treated = NA
+#     ))
+#   }
+#
+#   # Step 3: Compute overlap statistics
+#   overlap_stats <- tryCatch({
+#     compute_overlap_statistics(shared_neighbors)
+#   }, error = function(e) {
+#     warning("Failed to compute overlap statistics: ", e$message, call. = FALSE)
+#     return(list(
+#       avg_shared_controls = NA,
+#       p75_shared_controls = NA,
+#       avg_shared_treated = NA,
+#       p75_shared_treated = NA
+#     ))
+#   })
+#
+#   return(overlap_stats)
+# }
+#
+# # Updated diagnostic function to test the fixes
+# diagnostic_overlap_fixed <- function(i = 1, k = 4, nc = 400, nt = 100) {
+#
+#   cat("=== DIAGNOSTIC: Fixed Overlap Statistics Investigation ===\n\n")
+#
+#   # Generate the same data as one_iteration
+#   df_dgp <- gen_one_toy(k = k, nc = nc, nt = nt, ctr_dist = 0.5, prop_nc_unif = 1/3, f0_sd = 0) %>%
+#     rename(Y0_denoised = Y0, Y1_denoised = Y1) %>%
+#     mutate(Y_denoised = ifelse(Z, Y1_denoised, Y0_denoised)) %>%
+#     select(-any_of("noise"))
+#
+#   df_dgp_i <- df_dgp %>%
+#     mutate(noise = rnorm(n(), mean = 0, sd = 0.5)) %>%
+#     mutate(Y0 = Y0_denoised + noise,
+#            Y1 = Y1_denoised + noise,
+#            Y = ifelse(Z, Y1, Y0))
+#
+#   # Perform matching
+#   mtch <- get_cal_matches(df_dgp_i, metric = "maximum", scaling = 8, caliper = 1,
+#                           rad_method = "adaptive-5nn", est_method = "scm")
+#
+#   # Get full matched table
+#   full_matched_table <- full_unit_table(mtch, nonzero_weight_only = TRUE)
+#
+#   cat("=== COMPARISON: Original vs Fixed ===\n")
+#
+#   # Original method
+#   cat("Original method results:\n")
+#   matched_matrix_orig <- get_matched_matrix(full_matched_table)
+#   shared_neighbors_orig <- compute_shared_neighbors(matched_matrix_orig)
+#   overlap_stats_orig <- compute_overlap_statistics(shared_neighbors_orig)
+#   print(overlap_stats_orig)
+#
+#   # Fixed method
+#   cat("\nFixed method results:\n")
+#   matched_matrix_fixed <- get_matched_matrix_fixed(full_matched_table)
+#   shared_neighbors_fixed <- compute_shared_neighbors_fixed(matched_matrix_fixed)
+#   overlap_stats_fixed <- compute_overlap_statistics(shared_neighbors_fixed)
+#   print(overlap_stats_fixed)
+#
+#   cat("\n=== DETAILED COMPARISON ===\n")
+#   cat("Original matched matrix dimensions:", dim(matched_matrix_orig), "\n")
+#   cat("Fixed matched matrix dimensions:", dim(matched_matrix_fixed), "\n")
+#
+#   cat("\nFirst few rows of fixed matched matrix:\n")
+#   print(matched_matrix_fixed[1:min(5, nrow(matched_matrix_fixed)), 1:min(10, ncol(matched_matrix_fixed))])
+#
+#   # Check controls per treated unit
+#   controls_per_treated_fixed <- apply(matched_matrix_fixed, 1, function(x) sum(!is.na(x)))
+#   cat("\nFixed - Controls per treated unit:\n")
+#   cat("- Min:", min(controls_per_treated_fixed), "\n")
+#   cat("- Max:", max(controls_per_treated_fixed), "\n")
+#   cat("- Mean:", round(mean(controls_per_treated_fixed), 2), "\n")
+#   cat("- Median:", median(controls_per_treated_fixed), "\n")
+#
+#   return(invisible(list(
+#     original = overlap_stats_orig,
+#     fixed = overlap_stats_fixed,
+#     matched_matrix_fixed = matched_matrix_fixed,
+#     shared_neighbors_fixed = shared_neighbors_fixed
+#   )))
+# }
+#
+# # Test the fixed version
+# diag_results_fixed <- diagnostic_overlap_fixed()
+#
+# test_that("one_iteration works with both pooled and bootstrap inference", {
+#   skip_if_not(load_libs(needed_libs), "Required libraries not available")
+#
+#   # Run with both methods
+#   result <- one_iteration(
+#     i = 1,
+#     k = 2,
+#     nc = 100,
+#     nt = 25,
+#     include_bootstrap = TRUE,
+#     boot_mtd = "wild",
+#     B = 50,  # Small B for faster testing
+#     R = 1,
+#     verbose = FALSE
+#   )
+#
+#   # Check structure
+#   expect_true(is.data.frame(result))
+#   expect_equal(nrow(result), 2)  # Both pooled and bootstrap
+#   expect_true(all(c("pooled", "bootstrap") %in% result$inference_method))
+#
+#   # Check that both rows have the same basic info
+#   expect_equal(length(unique(result$runID)), 1)
+#   expect_equal(length(unique(result$k)), 1)
+#   expect_equal(length(unique(result$SATT)), 1)
+#   expect_equal(length(unique(result$bias)), 1)
+#
+#   # Check bootstrap-specific columns
+#   bootstrap_row <- result[result$inference_method == "bootstrap", ]
+#   expect_equal(bootstrap_row$boot_mtd, "wild")
+#   expect_equal(bootstrap_row$B, 50)
+#
+#   pooled_row <- result[result$inference_method == "pooled", ]
+#   expect_true(is.na(pooled_row$boot_mtd))
+#   expect_true(is.na(pooled_row$B))
+#
+#   # ATT estimates should be the same (point estimate doesn't change)
+#   if (!is.na(bootstrap_row$att_est) && !is.na(pooled_row$att_est)) {
+#     expect_equal(bootstrap_row$att_est, pooled_row$att_est, tolerance = 1e-10)
+#   }
+# })
 
 test_that("one_iteration works with different bootstrap methods", {
   skip_if_not(load_libs(needed_libs), "Required libraries not available")

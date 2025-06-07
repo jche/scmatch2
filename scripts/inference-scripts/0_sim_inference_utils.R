@@ -32,10 +32,9 @@ save_res_to_csv<- function(curr_res,
 #' @param verbose Print progress message (logical).
 #' @param R Total number of iterations (for verbose printing).
 #'
-#' @return A tibble with results for one iteration, including both pooled and bootstrap results (if requested).
-#' @importFrom stats rnorm weighted.mean reformulate
+#' @return A tibble with results for one iteration, including both pooled and bootstrap results (if requested), plus overlap statistics.
+#' @importFrom stats rnorm weighted.mean reformulate quantile
 #' @importFrom dplyr %>% rename mutate select filter summarize pull group_by last first any_of n tibble bind_rows
-#' @importFrom rlang `%||%`
 
 one_iteration <- function( i,
                            k = 2,
@@ -132,6 +131,28 @@ one_iteration <- function( i,
     }
   }
 
+  ### Calculate overlap statistics
+  overlap_stats <- list(
+    avg_shared_controls = NA,
+    p75_shared_controls = NA,
+    avg_shared_treated = NA,
+    p75_shared_treated = NA
+  )
+
+  if (!is.null(mtch)) {
+    overlap_stats <- tryCatch({
+      calculate_overlap_statistics(mtch)
+    }, error = function(e) {
+      warning("Overlap statistics calculation failed in iteration ", i, ": ", e$message, call. = FALSE)
+      list(
+        avg_shared_controls = NA,
+        p75_shared_controls = NA,
+        avg_shared_treated = NA,
+        p75_shared_treated = NA
+      )
+    })
+  }
+
   ### Perform inference - both pooled and bootstrap (if requested)
   results_list <- list()
 
@@ -187,7 +208,12 @@ one_iteration <- function( i,
       ESS_C = ESS_C_val,
       V_E = V_E_val,
       V_P = V_P_val,
-      sigma_hat = sigma_hat_val
+      sigma_hat = sigma_hat_val,
+      # Add overlap statistics
+      avg_shared_controls = overlap_stats$avg_shared_controls,
+      p75_shared_controls = overlap_stats$p75_shared_controls,
+      avg_shared_treated = overlap_stats$avg_shared_treated,
+      p75_shared_treated = overlap_stats$p75_shared_treated
     )
   }
 
@@ -200,7 +226,11 @@ one_iteration <- function( i,
       runID = i, k = k, inference_method = "pooled",
       boot_mtd = NA_character_, B = NA_integer_,
       att_est = NA, SE = NA, CI_lower = NA, CI_upper = NA,
-      N_T = NA, ESS_C = NA, V_E = NA, V_P = NA, sigma_hat = NA
+      N_T = NA, ESS_C = NA, V_E = NA, V_P = NA, sigma_hat = NA,
+      avg_shared_controls = overlap_stats$avg_shared_controls,
+      p75_shared_controls = overlap_stats$p75_shared_controls,
+      avg_shared_treated = overlap_stats$avg_shared_treated,
+      p75_shared_treated = overlap_stats$p75_shared_treated
     )
   }
 
@@ -214,7 +244,11 @@ one_iteration <- function( i,
         runID = i, k = k, inference_method = "bootstrap",
         boot_mtd = boot_mtd, B = B,
         att_est = NA, SE = NA, CI_lower = NA, CI_upper = NA,
-        N_T = NA, ESS_C = NA, V_E = NA, V_P = NA, sigma_hat = NA
+        N_T = NA, ESS_C = NA, V_E = NA, V_P = NA, sigma_hat = NA,
+        avg_shared_controls = overlap_stats$avg_shared_controls,
+        p75_shared_controls = overlap_stats$p75_shared_controls,
+        avg_shared_treated = overlap_stats$avg_shared_treated,
+        p75_shared_treated = overlap_stats$p75_shared_treated
       )
     }
   }
@@ -263,6 +297,232 @@ one_iteration <- function( i,
   rs$bias <- bias_val
 
   return(rs)
+}
+#' Get Matched Matrix
+#'
+#' Converts a full matched table into a matrix where each row corresponds to a treated unit
+#' and each column contains the IDs of matched control units. Missing values (if any) are filled with `NA`.
+#' Fixed version that properly handles control reuse across subclasses.
+#'
+#' @param full_matched_table A data frame containing the matched data. Must include the columns:
+#' \itemize{
+#'   \item{\code{id}: Unique identifiers for each unit.}
+#'   \item{\code{Z}: Indicator for treated (\code{1}) or control (\code{0}) units.}
+#'   \item{\code{subclass}: Subclass assignments for matching.}
+#' }
+#'
+#' @return A matrix where:
+#' \item{Rows}{Represent treated units (indexed by their IDs).}
+#' \item{Columns}{Contain IDs of matched control units for each treated unit. Missing matches are filled with \code{NA}.}
+#'
+#' @examples
+#' # Example full matched table
+#' full_matched_table <- data.frame(
+#'   id = 1:6,
+#'   Z = c(1, 0, 1, 0, 0, 1),
+#'   subclass = c(1, 1, 2, 2, 2, 3)
+#' )
+#' get_matched_matrix(full_matched_table)
+#'
+#' @export
+get_matched_matrix <- function(full_matched_table) {
+  # Get unique treated units
+  treated_units <- unique(full_matched_table$id[full_matched_table$Z == 1])
+
+  matched_control_ids <- list()
+
+  # For each treated unit, get ALL controls it's matched to (across all subclasses)
+  for (treated_id in treated_units) {
+    # Find all subclasses this treated unit appears in
+    treated_subclasses <- unique(full_matched_table$subclass[full_matched_table$id == treated_id & full_matched_table$Z == 1])
+
+    # Get all controls from those subclasses
+    all_controls <- c()
+    for (subclass in treated_subclasses) {
+      controls_in_subclass <- full_matched_table$id[full_matched_table$subclass == subclass & full_matched_table$Z == 0]
+      all_controls <- c(all_controls, controls_in_subclass)
+    }
+
+    # Remove duplicates - this is the key fix!
+    # Convert to numeric if possible for proper handling
+    if (all(grepl("^[0-9]+$", all_controls))) {
+      unique_controls <- unique(as.numeric(all_controls))
+    } else {
+      unique_controls <- unique(all_controls)
+    }
+
+    matched_control_ids[[as.character(treated_id)]] <- unique_controls
+  }
+
+  # Create matrix
+  max_controls <- max(sapply(matched_control_ids, length))
+  matched_matrix <- do.call(rbind, lapply(matched_control_ids, function(ids) {
+    c(ids, rep(NA, max_controls - length(ids)))
+  }))
+
+  # Ensure proper row names (treated unit IDs)
+  rownames(matched_matrix) <- names(matched_control_ids)
+
+  return(matched_matrix)
+}
+
+#' Compute Shared Neighbors
+#'
+#' Computes the number of shared control neighbors between each pair of treated units
+#' based on a given matched matrix. Fixed version that properly handles numeric IDs and NA values.
+#'
+#' @param matched_matrix A matrix where:
+#' \item{Rows}{Represent treated units.}
+#' \item{Columns}{Contain IDs of matched control units. Missing values should be \code{NA}.}
+#'
+#' @return A symmetric matrix of dimensions \code{N1 x N1}, where \code{N1} is the number of treated units.
+#' Each entry \code{[i, j]} represents the count of shared control neighbors between treated units \code{i} and \code{j}.
+#'
+#' @examples
+#' # Example matched matrix
+#' matched_matrix <- matrix(
+#'   c(2, 3, NA, 3, 4, 5, NA, NA, 5, 6, 7, 8),
+#'   nrow = 4, byrow = TRUE
+#' )
+#' compute_shared_neighbors(matched_matrix)
+#'
+#' @export
+compute_shared_neighbors <- function(matched_matrix) {
+  N1 <- nrow(matched_matrix)
+
+  # Initialize with zeros (not FALSE as in original)
+  shared_neighbors <- matrix(0, nrow = N1, ncol = N1)
+  rownames(shared_neighbors) <- rownames(matched_matrix)
+  colnames(shared_neighbors) <- rownames(matched_matrix)
+
+  for (i in 1:(N1 - 1)) {
+    for (j in (i + 1):N1) {
+      # Get non-NA controls for each treated unit
+      controls_i <- matched_matrix[i, ]
+      controls_j <- matched_matrix[j, ]
+
+      # Remove NAs before computing intersection
+      controls_i <- controls_i[!is.na(controls_i)]
+      controls_j <- controls_j[!is.na(controls_j)]
+
+      # Find intersection
+      shared <- intersect(controls_i, controls_j)
+      shared_count <- length(shared)
+
+      shared_neighbors[i, j] <- shared_neighbors[j, i] <- shared_count
+    }
+  }
+
+  return(shared_neighbors)
+}
+
+#' Compute Overlap Statistics
+#'
+#' Computes summary statistics for the overlap of shared neighbors in a matrix.
+#' The function calculates the median, 75th percentile, and maximum for the number of shared treated
+#' and control neighbors across rows.
+#'
+#' @param shared_neighbors A numeric matrix of dimensions \eqn{N1 \times N1}, where each entry represents
+#' the number of shared neighbors between treated units i and j.
+#'
+#' @return A list containing the following components:
+#' \item{avg_shared_controls}{Median number of shared control neighbors across rows.}
+#' \item{p75_shared_controls}{75th percentile of the number of shared control neighbors across rows.}
+#' \item{max_shared_controls}{Maximum number of shared control neighbors across rows.}
+#' \item{avg_shared_treated}{Median number of shared treated neighbors across rows.}
+#' \item{p75_shared_treated}{75th percentile of the number of shared treated neighbors across rows.}
+#' \item{max_shared_treated}{Maximum number of shared treated neighbors across rows.}
+#'
+#' @examples
+#' # Example matrix with shared neighbors
+#' shared_neighbors <- matrix(c(0, 1, 2, 1, 0, 1, 2, 1, 0), nrow = 3, byrow = TRUE)
+#' compute_overlap_statistics(shared_neighbors)
+#'
+#' @export
+compute_overlap_statistics <- function(shared_neighbors) {
+  N1 <- nrow(shared_neighbors)
+
+  shared_neighbors_binary <- shared_neighbors > 0
+  n_shared_treated_vec <- rowSums(shared_neighbors_binary)
+  n_shared_controls_vec <- rowSums(shared_neighbors)
+
+  list(
+    avg_shared_controls = median(n_shared_controls_vec),
+    p75_shared_controls = quantile(n_shared_controls_vec, probs = 0.75),
+    max_shared_controls = max(n_shared_controls_vec),
+    avg_shared_treated = median(n_shared_treated_vec),
+    p75_shared_treated = quantile(n_shared_treated_vec, probs = 0.75),
+    max_shared_treated = max(n_shared_treated_vec)
+  )
+}
+
+# Helper function to calculate overlap statistics following the 3-step process
+calculate_overlap_statistics <- function(mtch) {
+  # Get the full matched table from the match object
+  full_matched_table <- tryCatch({
+    full_unit_table(mtch, nonzero_weight_only = TRUE)
+  }, error = function(e) {
+    warning("Failed to get full unit table for overlap statistics: ", e$message, call. = FALSE)
+    return(NULL)
+  })
+
+  if (is.null(full_matched_table) || nrow(full_matched_table) == 0) {
+    return(list(
+      avg_shared_controls = NA,
+      p75_shared_controls = NA,
+      avg_shared_treated = NA,
+      p75_shared_treated = NA
+    ))
+  }
+
+  # Step 1: Get matched matrix (now uses fixed version)
+  matched_matrix <- tryCatch({
+    get_matched_matrix(full_matched_table)
+  }, error = function(e) {
+    warning("Failed to get matched matrix for overlap statistics: ", e$message, call. = FALSE)
+    return(NULL)
+  })
+
+  if (is.null(matched_matrix)) {
+    return(list(
+      avg_shared_controls = NA,
+      p75_shared_controls = NA,
+      avg_shared_treated = NA,
+      p75_shared_treated = NA
+    ))
+  }
+
+  # Step 2: Compute shared neighbors (now uses fixed version)
+  shared_neighbors <- tryCatch({
+    compute_shared_neighbors(matched_matrix)
+  }, error = function(e) {
+    warning("Failed to compute shared neighbors for overlap statistics: ", e$message, call. = FALSE)
+    return(NULL)
+  })
+
+  if (is.null(shared_neighbors)) {
+    return(list(
+      avg_shared_controls = NA,
+      p75_shared_controls = NA,
+      avg_shared_treated = NA,
+      p75_shared_treated = NA
+    ))
+  }
+
+  # Step 3: Compute overlap statistics (unchanged)
+  overlap_stats <- tryCatch({
+    compute_overlap_statistics(shared_neighbors)
+  }, error = function(e) {
+    warning("Failed to compute overlap statistics: ", e$message, call. = FALSE)
+    return(list(
+      avg_shared_controls = NA,
+      p75_shared_controls = NA,
+      avg_shared_treated = NA,
+      p75_shared_treated = NA
+    ))
+  })
+
+  return(overlap_stats)
 }
 
 # Utility function for safe requireNamespace/library loading
