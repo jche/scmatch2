@@ -1,0 +1,14 @@
+Starting R script for iteration 405
+--- Starting Iteration: 405 ---
+   Processing overlap: very_low (prop_unif = 0.1 )
+      Overlap very_low took 4.45 seconds.
+   Processing overlap: low (prop_unif = 0.2 )
+      Overlap low took 2.62 seconds.
+   Processing overlap: mid (prop_unif = 0.333 )
+      Overlap mid took 2.12 seconds.
+   Processing overlap: high (prop_unif = 0.5 )
+      Overlap high took 2.54 seconds.
+   Processing overlap: very_high (prop_unif = 0.667 )
+      Overlap very_high took 2.28 seconds.
+--- Iteration 405 Complete. Results saved to: /homes2/xmeng/scmatch2/data/outputs/inf_toy/individual/results_iter_405.rds ---
+Finished R script for iteration 405

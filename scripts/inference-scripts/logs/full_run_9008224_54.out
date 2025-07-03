@@ -1,0 +1,14 @@
+Starting R script for iteration 54
+--- Starting Iteration: 54 ---
+   Processing overlap: very_low (prop_unif = 0.1 )
+      Overlap very_low took 2.25 seconds.
+   Processing overlap: low (prop_unif = 0.2 )
+      Overlap low took 1.99 seconds.
+   Processing overlap: mid (prop_unif = 0.333 )
+      Overlap mid took 1.8 seconds.
+   Processing overlap: high (prop_unif = 0.5 )
+      Overlap high took 1.79 seconds.
+   Processing overlap: very_high (prop_unif = 0.667 )
+      Overlap very_high took 1.91 seconds.
+--- Iteration 54 Complete. Results saved to: /homes2/xmeng/scmatch2/data/outputs/inf_toy/individual/results_iter_54.rds ---
+Finished R script for iteration 54

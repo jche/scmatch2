@@ -1,0 +1,14 @@
+Starting R script for iteration 245
+--- Starting Iteration: 245 ---
+   Processing overlap: very_low (prop_unif = 0.1 )
+      Overlap very_low took 2.55 seconds.
+   Processing overlap: low (prop_unif = 0.2 )
+      Overlap low took 2.27 seconds.
+   Processing overlap: mid (prop_unif = 0.333 )
+      Overlap mid took 1.96 seconds.
+   Processing overlap: high (prop_unif = 0.5 )
+      Overlap high took 1.88 seconds.
+   Processing overlap: very_high (prop_unif = 0.667 )
+      Overlap very_high took 1.87 seconds.
+--- Iteration 245 Complete. Results saved to: /homes2/xmeng/scmatch2/data/outputs/inf_toy/individual/results_iter_245.rds ---
+Finished R script for iteration 245
