@@ -37,6 +37,7 @@ vignettes/*.pdf
 .DS_Store
 # Cluster logs
 /logs/
+/scripts/inference-scripts/logs/
 
 # Research paper results
 /tables
