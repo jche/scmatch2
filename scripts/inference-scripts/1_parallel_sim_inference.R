@@ -1,39 +1,35 @@
-# Load necessary libraries
 library(tidyverse)
 require(mvtnorm)
-# Assuming 'load_all()' loads the necessary custom functions like gen_one_toy, get_cal_matches, get_ATT_estimate
-# If CSM is a package, use library(CSM) instead of load_all()
-devtools::load_all() # Uncomment or replace with library(CSM) if needed
+devtools::load_all()
 
-# Source the utility functions, including the assumed modified 'one_iteration'
-source(here::here("scripts/inference-scripts/0_sim_inference_utils.R")) # Ensure this path is correct
+source(here::here("scripts/inference-scripts/0_sim_inference_utils.R"))
 
-# --- Simulation Parameters (Set Globally) ---
-k_dim <- 4 # Covariate dimension as requested
-nc_base <- 500 # Number of control units
-nt_base <- 100 # Number of treated units
-toy_ctr_dist_base <- 0.5 # Control cluster distance
-scaling_base <- 8 # Scaling parameter for matching
-true_sigma_base <- 0.5 # SD of noise added to potential outcomes
-prop_nc_unif_values <- c(1/10, 1/5, 1/3, 1/2, 2/3) # 5 degrees of overlap
-deg_overlap_labels <- c("very_low", "low", "mid", "high", "very_high") # Labels for overlap
+# --- Simulation Parameters ---
+# --- Main parameters: n, degree of freedom, error distribution ---
+nc <- 500
+nc_to_nt <- 5 / 1
+nt <- nc / nc_to_nt
 
+prop_nc_unif_values <- c(1/10, 1/5, 1/3, 1/2, 2/3)
+deg_overlap_labels <- c("very_low", "low", "mid", "high", "very_high")
+
+# --- Supporting parameters: Fix them ---
+k_dim <- 4
+toy_ctr_dist_base <- 0.5
+scaling_base <- 8
+true_sigma_base <- 0.5
 include_bootstrap_global <- TRUE
 boot_mtd_global <- "wild"
 B_global <- 250
 
 # --- Output Directories ---
-# NOTE: one_iteration might handle saving internally, or might not save matches.
-# This script no longer explicitly saves match objects. Adjust if needed.
-output_dir_base <- here::here("data/outputs/4d_bias_inference_Apr2025")
-# match_dir <- file.path(output_dir_base, "match") # Removed, assuming one_iteration handles or skips
-estimation_dir <- file.path(output_dir_base, "estimation")
+# output_dir_base <- here::here("data/outputs/4d_bias_inference_Apr2025")
+# individual_dir <- file.path(output_dir_base, "estimation")
+paths <- get_sim_paths()
+individual_dir <- paths$individual_dir
 
-# Create directories if they don't exist
-# dir.create(match_dir, showWarnings = FALSE, recursive = TRUE) # Removed
-dir.create(estimation_dir, showWarnings = FALSE, recursive = TRUE)
+dir.create(individual_dir, showWarnings = FALSE, recursive = TRUE)
 
-# --- Get Iteration Number from Command Line ---
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) == 0) {
   stop("No iteration number supplied. Usage: Rscript parallel_sim_inference.R <iteration_number>", call. = FALSE)
@@ -47,10 +43,8 @@ if (length(args) == 0) {
 cat("--- Starting Iteration:", iteration_i, "---\n")
 set.seed(123 + iteration_i * 10) # Ensure reproducibility for each iteration
 
-# --- Store results for this iteration ---
 iteration_results_list <- list()
 
-# --- Loop Over Degrees of Overlap ---
 for (j in seq_along(prop_nc_unif_values)) {
   prop_unif <- prop_nc_unif_values[j]
   overlap_label <- deg_overlap_labels[j]
@@ -59,16 +53,12 @@ for (j in seq_along(prop_nc_unif_values)) {
   start_time <- Sys.time()
 
   # --- Call one_iteration Function ---
-  # Assumes one_iteration performs data generation, matching, inference,
-  # and returns a tibble including columns: SATT, bias, att_est, SE, CI_lower, CI_upper, N_T, ESS_C etc.
-  # It also needs to accept all the relevant parameters.
-  # IMPORTANT: Ensure 'one_iteration' in '0_sim_inference_utils.R' is modified accordingly.
   single_overlap_result <- tryCatch({
     one_iteration(
       i = iteration_i,
       k = k_dim,
-      nc = nc_base,
-      nt = nt_base,
+      nc = nc,
+      nt = nt,
       toy_ctr_dist = toy_ctr_dist_base,
       prop_nc_unif = prop_unif,
       scaling = scaling_base,
@@ -87,8 +77,8 @@ for (j in seq_along(prop_nc_unif_values)) {
       k = k_dim,
       deg_overlap = overlap_label, # Add overlap label here
       prop_nc_unif = prop_unif,   # Add prop_unif here
-      nc = nc_base,               # Add nc here
-      nt = nt_base,               # Add nt here
+      nc = nc,               # Add nc here
+      nt = nt,               # Add nt here
       toy_ctr_dist = toy_ctr_dist_base, # Add toy_ctr_dist here
       scaling = scaling_base,         # Add scaling here
       true_sigma = true_sigma_base,   # Add true_sigma here
@@ -124,8 +114,8 @@ for (j in seq_along(prop_nc_unif_values)) {
         time_secs = duration, # Add the calculated duration
         # Add other parameters if not returned by one_iteration
         k = if (!"k" %in% names(.)) k_dim else k,
-        nc = if (!"nc" %in% names(.)) nc_base else nc,
-        nt = if (!"nt" %in% names(.)) nt_base else nt,
+        nc = if (!"nc" %in% names(.)) nc else nc,
+        nt = if (!"nt" %in% names(.)) nt else nt,
         toy_ctr_dist = if (!"toy_ctr_dist" %in% names(.)) toy_ctr_dist_base else toy_ctr_dist,
         scaling = if (!"scaling" %in% names(.)) scaling_base else scaling,
         true_sigma = if (!"true_sigma" %in% names(.)) true_sigma_base else true_sigma,
@@ -143,14 +133,13 @@ for (j in seq_along(prop_nc_unif_values)) {
 } # End loop over overlap degrees
 
 # --- Combine and Save Results for Iteration i ---
-# Filter out NULLs in case an error occurred before assignment
 valid_results <- Filter(Negate(is.null), iteration_results_list)
 
 if (length(valid_results) > 0) {
   final_results_tibble <- bind_rows(valid_results)
 
   estimation_filename <- paste0("results_iter_", iteration_i, ".rds")
-  estimation_filepath <- file.path(estimation_dir, estimation_filename)
+  estimation_filepath <- file.path(individual_dir, estimation_filename)
 
   tryCatch({
     saveRDS(final_results_tibble, file = estimation_filepath)
@@ -160,7 +149,6 @@ if (length(valid_results) > 0) {
   })
 } else {
   cat("--- Iteration", iteration_i, "Failed: No valid results generated. ---\n")
-  # Optionally save an empty file or log the failure more formally
 }
 
 # Clean exit

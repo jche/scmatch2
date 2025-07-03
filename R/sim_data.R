@@ -244,9 +244,18 @@ gen_df_adv_k <- function(nc, nt, k, # Added k
   res <- dat %>%
     mutate(noise = rnorm(n(), mean = 0, sd = f0_sd)) %>%
     # Pass the matrix X_matrix to the functions
-    mutate(Y0 = f0_fun(X_matrix) + noise) %>%
-    mutate(Y1 = Y0 + tx_effect_fun(X_matrix),
-           Y = ifelse(Z, Y1, Y0)) %>%
+    mutate(
+      Y0_denoised = f0_fun(X_matrix),
+      Y0 = f0_fun(X_matrix) + noise
+    ) %>%
+    mutate(
+      Y1_denoised = Y0_denoised + tx_effect_fun(X_matrix),
+      Y1 = Y0 + tx_effect_fun(X_matrix)
+    ) %>%
+    mutate(
+      Y = ifelse(Z, Y1, Y0),
+      Y_denoised = ifelse(Z, Y1_denoised, Y0_denoised)
+    ) %>%
     # Ensure id is added correctly (use first X col name if k>=1)
     mutate(id = 1:n(), .before = 1)
 

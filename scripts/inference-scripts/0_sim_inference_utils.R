@@ -1,18 +1,5 @@
 
 
-#' Save results to file, possibly appending them if file exists.
-save_res_to_csv<- function(curr_res,
-                           FNAME) {
-
-  if (file.exists(FNAME)) {
-    write_csv(curr_res, FNAME, append=TRUE)
-  } else {
-    write_csv(curr_res, FNAME)
-  }
-
-} # save_res_to_csv
-
-
 #' Run one iteration of the simulation
 #'
 #' @param i Iteration number (integer).
@@ -20,6 +7,7 @@ save_res_to_csv<- function(curr_res,
 #' @param toy_ctr_dist Control cluster distance for gen_one_toy (numeric).
 #' @param scaling Scaling parameter for get_cal_matches (numeric).
 #' @param true_sigma SD of the noise added to potential outcomes (numeric).
+#' @param noise_fun Noise function specification (function of (covar, treatment variable))
 #' @param prop_nc_unif Proportion of uniform controls for gen_one_toy (numeric).
 #' @param nc Number of control units (integer).
 #' @param nt Number of treated units (integer, passed to gen_one_toy).
@@ -41,6 +29,7 @@ one_iteration <- function( i,
                            toy_ctr_dist = 0.5,
                            scaling = 8,
                            true_sigma = 0.5,
+                           noise_fun = NULL,
                            prop_nc_unif = 1/3,
                            nc = 500,
                            nt = 100,
@@ -53,14 +42,14 @@ one_iteration <- function( i,
                            verbose = TRUE,
                            R = NA ) {
 
-  # Verbose output
-  if( verbose ) {
-    if (!is.na(R) && R > 0 && (i %% 10 == 0 || (i == R)) ) {
-      cat("iteration", i, " (k=", k, ")\n", sep="")
-    } else if (is.na(R) && i %% 10 == 0) {
-      cat("iteration", i, " (k=", k, ")\n", sep="")
-    }
-  }
+  # # Verbose output
+  # if( verbose ) {
+  #   if (!is.na(R) && R > 0 && (i %% 10 == 0 || (i == R)) ) {
+  #     cat("iteration", i, " (k=", k, ")\n", sep="")
+  #   } else if (is.na(R) && i %% 10 == 0) {
+  #     cat("iteration", i, " (k=", k, ")\n", sep="")
+  #   }
+  # }
 
   ### Make the data using k dimensions
   df_dgp <-
@@ -69,17 +58,18 @@ one_iteration <- function( i,
                  nt = nt,
                  ctr_dist=toy_ctr_dist,
                  prop_nc_unif=prop_nc_unif,
-                 f0_sd = 0) %>%
-    rename(Y0_denoised = Y0, Y1_denoised = Y1) %>%
-    mutate(Y_denoised = ifelse(Z, Y1_denoised, Y0_denoised)) %>%
-    select(-any_of("noise"))
+                 f0_sd = 0 # (optional) set noise level to zero
+                 )
 
   ## Add in the desired noise level for this iteration
   df_dgp_i <- df_dgp %>%
-    mutate(noise = rnorm(n(), mean=0, sd=true_sigma)) %>%
+    mutate(noise = if (!is.null(noise_fun)) noise_fun(select(., starts_with("X")), Z) else rnorm(n(), 0, true_sigma)) %>%
+    # mutate(noise = rnorm(n(), mean=0, sd=true_sigma)) %>%
     mutate(Y0 = Y0_denoised + noise,
            Y1 = Y1_denoised + noise,
            Y = ifelse(Z, Y1, Y0))
+
+
 
   ### Perform matching
   mtch <- tryCatch(
@@ -227,10 +217,10 @@ one_iteration <- function( i,
       boot_mtd = NA_character_, B = NA_integer_,
       att_est = NA, SE = NA, CI_lower = NA, CI_upper = NA,
       N_T = NA, ESS_C = NA, V_E = NA, V_P = NA, sigma_hat = NA,
-      avg_shared_controls = overlap_stats$avg_shared_controls,
-      p75_shared_controls = overlap_stats$p75_shared_controls,
-      avg_shared_treated = overlap_stats$avg_shared_treated,
-      p75_shared_treated = overlap_stats$p75_shared_treated
+      avg_shared_controls = NA,
+      p75_shared_controls = NA,
+      avg_shared_treated = NA,
+      p75_shared_treated = NA
     )
   }
 
@@ -245,10 +235,10 @@ one_iteration <- function( i,
         boot_mtd = boot_mtd, B = B,
         att_est = NA, SE = NA, CI_lower = NA, CI_upper = NA,
         N_T = NA, ESS_C = NA, V_E = NA, V_P = NA, sigma_hat = NA,
-        avg_shared_controls = overlap_stats$avg_shared_controls,
-        p75_shared_controls = overlap_stats$p75_shared_controls,
-        avg_shared_treated = overlap_stats$avg_shared_treated,
-        p75_shared_treated = overlap_stats$p75_shared_treated
+        avg_shared_controls = NA,
+        p75_shared_controls = NA,
+        avg_shared_treated = NA,
+        p75_shared_treated = NA
       )
     }
   }
@@ -567,462 +557,162 @@ MCSE_bias <- function(x){
 
 
 
-#' #' Run a simulation study for CSM A-E inference
-#' #'
-#' #' @param R Number of Monte Carlo replications (integer).
-#' #' @param k Dimensionality of covariates (integer, default 2).
-#' #' @param toy_ctr_dist Control cluster distance for gen_one_toy (numeric).
-#' #' @param prop_nc_unif Proportion of uniform controls for gen_one_toy (numeric).
-#' #' @param scaling Scaling parameter for get_cal_matches (numeric).
-#' #' @param true_sigma SD of the noise added to potential outcomes (numeric).
-#' #' @param nc Number of control units (integer).
-#' #' @param nt Number of treated units (integer).
-#' #' @param seed Random seed to set for reproducibility (integer or NULL).
-#' #' @param parallel Use parallel processing (logical or integer specifying workers).
-#' #'
-#' #' @return A tibble containing results from R iterations.
-#' #' @export
-#' #'
-#' sim_inference_CSM_A_E <- function(R=100,
-#'                                   k = 2, # <<< Added k parameter
-#'                                   toy_ctr_dist=0.5,
-#'                                   prop_nc_unif = 1/3,
-#'                                   scaling = 8,
-#'                                   true_sigma = 0.5,
-#'                                   nc = 500,
-#'                                   nt = 100, # <<< Make nt explicit
-#'                                   seed = NULL,
-#'                                   parallel = FALSE ) {
-#'
-#'   # Input checks
-#'   stopifnot(is.numeric(R), length(R) == 1, R >= 1)
-#'   stopifnot(is.numeric(k), length(k) == 1, k >= 1)
-#'   # ... add other checks as needed
-#'
-#'   if ( !is.null(seed) ) {
-#'     set.seed(seed)
-#'     message(paste("Setting seed to", seed))
-#'   } else {
-#'     warning( "Seed not set for sim_inference_CSM_A_E run.", call. = FALSE )
-#'   }
-#'
-#'   # Prepare arguments list common to both parallel and sequential execution
-#'   args_list <- list(
-#'     k = k, # <<< Pass k
-#'     toy_ctr_dist = toy_ctr_dist,
-#'     prop_nc_unif = prop_nc_unif,
-#'     scaling = scaling,
-#'     true_sigma = true_sigma,
-#'     nc = nc,
-#'     nt = nt, # <<< Pass nt
-#'     R = R # Pass R for verbose progress in one_iteration
-#'   )
-#'
-#'   run_start_time <- Sys.time()
-#'
-#'   if ( identical(parallel, TRUE) || is.numeric(parallel) && parallel > 0) {
-#'     # --- Parallel Execution ---
-#'     if (!requireNamespace("furrr", quietly = TRUE) || !requireNamespace("future", quietly = TRUE)) {
-#'       stop("Packages 'furrr' and 'future' are required for parallel execution.")
-#'     }
-#'     library(furrr)
-#'     library(future)
-#'
-#'     # Determine number of workers
-#'     if (is.numeric(parallel)) {
-#'       workers <- max(1, as.integer(parallel))
-#'     } else {
-#'       workers <- max(1, future::availableCores() - 1) # Default: N_cores - 1
-#'     }
-#'     plan(multisession, workers = workers)
-#'     message(paste("Running", R, "iterations (k=", k,") in parallel on ", workers, " workers...", sep=""))
-#'
-#'
-#'     # Use furrr_options(seed = TRUE) for automatic seedling based on main seed
-#'     results = future_map_dfr( 1:R,
-#'                               .f = one_iteration,
-#'                               # Explicitly list each argument instead of using !!!args_list
-#'                               k = k,
-#'                               toy_ctr_dist = toy_ctr_dist,
-#'                               prop_nc_unif = prop_nc_unif,
-#'                               scaling = scaling,
-#'                               true_sigma = true_sigma,
-#'                               nc = nc,
-#'                               nt = nt,
-#'                               R = R,
-#'                               # Other arguments
-#'                               verbose = FALSE,
-#'                               .options = furrr_options(
-#'                                 seed = TRUE,
-#'                                 scheduling = 1,
-#'                                 globals = globals
-#'                               ),
-#'                               .progress = TRUE )
-#'
-#'     # Shut down workers after use
-#'     plan(sequential)
-#'     message("Parallel execution finished.")
-#'
-#'   } else {
-#'     # --- Sequential Execution ---
-#'     if (!requireNamespace("purrr", quietly = TRUE)) {
-#'       stop("Package 'purrr' is required for sequential execution with map_df.")
-#'     }
-#'     library(purrr)
-#'     message(paste("Running", R, "iterations (k=", k, ") sequentially...", sep=""))
-#'
-#'     # Check if progress package is available for the progress bar
-#'     use_progress <- requireNamespace("progress", quietly = TRUE)
-#'
-#'     results <- map_df( 1:R,
-#'                        .f = one_iteration,
-#'                        k = k,
-#'                        toy_ctr_dist = toy_ctr_dist,
-#'                        prop_nc_unif = prop_nc_unif,
-#'                        scaling = scaling,
-#'                        true_sigma = true_sigma,
-#'                        nc = nc,
-#'                        nt = nt,
-#'                        R = R,
-#'                        verbose = TRUE,
-#'                        .progress = use_progress ) # Show progress bar if available
-#'     message("Sequential execution finished.")
-#'   }
-#'
-#'   run_end_time <- Sys.time()
-#'   message(paste("Total simulation time:", round(difftime(run_end_time, run_start_time, units="secs"), 2), "seconds"))
-#'
-#'   return(results)
-#' }
-#'
-#'
-#' # --- Updated Testing / Example Blocks ---
-#'
+#' Save results to file, possibly appending them if file exists.
+save_res_to_csv<- function(curr_res,
+                           FNAME) {
 
-#'
-#'
-#'
-#'
-#' one_iteration_OR <- function( i,
-#'                            toy_ctr_dist=0.5,
-#'                            scaling = 8,
-#'                            true_sigma = 0.5,
-#'                            prop_nc_unif = 1/3,
-#'                            nc = 500,
-#'                            verbose = TRUE ) {
-#'   # i <- 1
-#'   if( verbose ) {
-#'     if ( i %% 10 == 0 || (i == R) ) {
-#'       cat("iteration", i, "\n" )
-#'     }
-#'   }
-#'
-#'   ### Make the data
-#'   df_dgp <-
-#'     gen_one_toy( nc = nc,
-#'                  ctr_dist=toy_ctr_dist,
-#'                  prop_nc_unif=prop_nc_unif) %>%
-#'     mutate(Y0_denoised = Y0 - noise,
-#'            Y1_denoised = Y1 - noise,
-#'            Y_denoised = Y - noise)
-#'
-#'   ## Add in the noise to set variation
-#'   df_dgp_i <- df_dgp %>%
-#'     mutate(noise = rnorm(n(), mean=0, sd=true_sigma)) %>%
-#'     mutate(Y0 = Y0_denoised + noise,
-#'            Y1 = Y1_denoised + noise,
-#'            Y = Y_denoised + noise)
-#'
-#'
-#'   ### Perform matching
-#'   mtch <- get_cal_matches(
-#'     df_dgp_i,
-#'     metric = "maximum",
-#'     scaling = scaling,
-#'     caliper = 1,
-#'     # rad_method = "adaptive",
-#'     rad_method = "adaptive-5nn",
-#'     est_method = "scm"
-#'   )
-#'
-#'   # ### Perform inference using the A-E method
-#'   # ATT_estimate <- get_ATT_estimate( mtch )
-#'
-#'   ### Perform inference using the OR method
-#'   get_ATT_estimate_OR <- function( scmatch, treatment = "Z", outcome = "Y" ) {
-#'
-#'     ATT = get_att_point_est( scmatch, treatment = treatment, outcome = outcome )
-#'     se = get_se_OR( scmatch, treatment = treatment, outcome = outcome )
-#'     # se = get_se_AE( scmatch, treatment = treatment, outcome = outcome )
-#'     se$ATT = ATT
-#'
-#'     se %>% relocate( ATT ) %>%
-#'       mutate(  t = ATT/SE )
-#'   }
-#'   ATT_estimate <- get_ATT_estimate_OR( mtch )
-#'
-#'
-#'   rs = tibble(
-#'     runID = i,
-#'     att_est = ATT_estimate$ATT,
-#'     se_AE = ATT_estimate$SE,
-#'     CI_lower = att_est -1.96 *  se_AE,
-#'     CI_upper = att_est + 1.96 * se_AE,
-#'     N_T = ATT_estimate$N_T,
-#'     ESS_C = ATT_estimate$ESS_C,
-#'     true_SE = true_sigma * sqrt(1 / N_T + 1 / ESS_C),
-#'     CI_lower_with_true_SE = att_est - 1.96 * true_SE,
-#'     CI_upper_with_true_SE = att_est + 1.96 * true_SE
-#'   )
-#'
-#'   # Get true ATT
-#'   rs$SATT <-
-#'     df_dgp_i %>%
-#'     filter(Z ==1) %>%
-#'     summarize(att = mean(Y1-Y0)) %>%
-#'     pull(att)
-#'
-#'   # Calculate true post-match bias, given the covariates.
-#'   full_units <- full_unit_table(mtch, nonzero_weight_only = TRUE )
-#'   rs$bias <- full_units %>%
-#'     group_by(Z) %>%
-#'     summarize(mn = sum(Y0_denoised*weights) / sum(weights)) %>%
-#'     summarize(bias = last(mn) - first(mn)) %>%
-#'     pull(bias)
-#'
-#'   rs
-#'
-#' }
-#'
-#' # simulation inference using Otsu and Rai boostrap variance
-#' #' Run a simulation to check inference on the
-#' #' A-E inference method
-#' #'
-#' #' @param dgp_name Name of the DGP
-#' #' @param att0 True ATT
-#' #' @param R Number of MC runs
-#' #' @param toy_ctr_dist distance between centers in the to
-#' #'
-#' #' @return
-#' #' @export
-#' #'
-#' #' @examples
-#' sim_inference_CSM_OR <- function(R=100,
-#'                                   toy_ctr_dist=0.5,
-#'                                   prop_nc_unif = 1/3,
-#'                                   scaling = 8,
-#'                                   true_sigma = 0.5,
-#'                                   nc = 500,
-#'                                   seed = NULL, parallel = FALSE ) {
-#'   ### Example run inputs
-#'   # R <- 10; toy_ctr_dist=0.5; dgp_name <- "toy"; att0<-F
-#'
-#'   if ( is.null(seed) ) {
-#'     warning( "Setting seed within sim_inference_CSM_A_E", call. = FALSE )
-#'     set.seed(123)
-#'   }
-#'
-#'   if ( parallel ) {
-#'     library( furrr )
-#'     library( future )
-#'     # plan(multisession, workers = parallel::detectCores() - 1 )
-#'     plan(multisession, workers = min(4, parallel::detectCores() - 1))
-#'     results = future_map_dfr( 1:R,
-#'                               .f = one_iteration_OR,
-#'                               toy_ctr_dist = toy_ctr_dist,
-#'                               prop_nc_unif = prop_nc_unif,
-#'                               scaling = scaling,
-#'                               true_sigma = true_sigma,
-#'                               nc = nc,
-#'                               verbose = FALSE,
-#'                               .options = furrr_options(seed = NULL),
-#'                               .progress = TRUE )
-#'   } else {
-#'     results <- map_df( 1:R, one_iteration_OR,
-#'                        toy_ctr_dist = toy_ctr_dist,
-#'                        prop_nc_unif = prop_nc_unif,
-#'                        scaling = scaling,
-#'                        true_sigma = true_sigma,
-#'                        nc = nc,
-#'                        .progress = TRUE )
-#'   }
-#'
-#'
-#'   return(results)
-#' }
-#'
-#'
-#'
-#' # OLD VERSION ----
-#'
-#'
-#' #' Run a simulation to check inference on the
-#' #' A-E inference method
-#' #'
-#' #' @param dgp_name Name of the DGP
-#' #' @param att0 True ATT
-#' #' @param R Number of MC runs
-#' #' @param toy_ctr_dist distance between centers in the to
-#' #'
-#' #' @return
-#' #' @export
-#' #'
-#' #' @examples
-#' sim_inference_CSM_A_E_OLD <- function(dgp_name,
-#'                                       att0,
-#'                                       R=100,
-#'                                       toy_ctr_dist=0.5,
-#'                                       prop_nc_unif = 1/3,
-#'                                       seed = NULL) {
-#'   ### Example run inputs
-#'   # R <- 10; toy_ctr_dist=0.5; dgp_name <- "toy"; att0<-F
-#'   covered <- CI_lower <- CI_upper <-
-#'     covered_with_true_SE <- CI_lower_with_true_SE <- CI_upper_with_true_SE <-
-#'     SATT <- att_est <- att_debiased <-
-#'     se_AE <- true_SE <-
-#'     error <- bias <-
-#'     N_T <- ESS_C <- numeric(R)
-#'
-#'   if ( is.null(seed) ) {
-#'     set.seed(123)
-#'     ### Generate one dataset
-#'     df_dgp <-
-#'       gen_one_toy(ctr_dist=toy_ctr_dist,
-#'                   prop_nc_unif=prop_nc_unif) %>%
-#'       mutate(Y0_denoised = Y0 - noise,
-#'              Y1_denoised = Y1 - noise,
-#'              Y_denoised = Y - noise)
-#'   }
-#'   scaling <- 8
-#'
-#'   for (i in 1:R){
-#'     # i <- 1
-#'     print(i)
-#'
-#'     if ( !is.null(seed) ) {
-#'       set.seed(seed[i])
-#'       ### Generate one dataset
-#'       df_dgp <-
-#'         gen_one_toy(ctr_dist=toy_ctr_dist,
-#'                     prop_nc_unif=prop_nc_unif) %>%
-#'         mutate(Y0_denoised = Y0 - noise,
-#'                Y1_denoised = Y1 - noise,
-#'                Y_denoised = Y - noise)
-#'     }
-#'
-#'     ## Re-generate the noises
-#'     true_sigma <- 0.5
-#'     df_dgp_i <- df_dgp %>%
-#'       mutate(noise = rnorm(n(), mean=0, sd=true_sigma)) %>%
-#'       mutate(Y0 = Y0_denoised + noise,
-#'              Y1 = Y1_denoised + noise,
-#'              Y = Y_denoised + noise)
-#'
-#'     ### Perform matching
-#'     mtch <- get_cal_matches(
-#'       df_dgp_i,
-#'       metric = "maximum",
-#'       scaling = scaling,
-#'       caliper = 1,
-#'       # rad_method = "adaptive",
-#'       rad_method = "adaptive-5nn",
-#'       est_method = "scm"
-#'     )
-#'
-#'     ### Perform inference using the A-E method
-#'     ATT_estimate <- get_ATT_estimate( mtch )
-#'     att_est[i] <- ATT_estimate$ATT
-#'     se_AE[i] = ATT_estimate$SE
-#'     CI_lower[i] = att_est[i] -1.96 *  se_AE[i]
-#'     CI_upper[i] = att_est[i] + 1.96 * se_AE[i]
-#'
-#'     N_T[i] <- ATT_estimate$N_T
-#'     ESS_C[i] <- ATT_estimate$ESS_C
-#'     true_SE[i] = true_sigma *
-#'       sqrt(1 / N_T[i] +1 / ESS_C[i])
-#'     CI_lower_with_true_SE[i] =
-#'       att_est[i] - 1.96 * true_SE[i]
-#'     CI_upper_with_true_SE[i] =
-#'       att_est[i] + 1.96 * true_SE[i]
-#'
-#'     treatment_table <- mtch$treatment_table
-#'
-#'
-#'     ### Obtain necessary things to output
-#'     # Get true ATT
-#'     if (att0){
-#'       SATT[i] <- att <- 0
-#'     }else{
-#'       SATT[i] <- att <-
-#'         df_dgp_i %>%
-#'         filter(Z & (id %in% treatment_table$id)) %>%
-#'         summarize(att = mean(Y1-Y0)) %>%
-#'         pull(att)
-#'     }
-#'
-#'     covered[i] = (CI_lower[i] < att) & (att < CI_upper[i])
-#'     covered_with_true_SE[i] =
-#'       (CI_lower_with_true_SE[i] < att) &
-#'       (att < CI_upper_with_true_SE[i])
-#'
-#'     # Get error and bias
-#'     full_units <- full_unit_table(mtch, nonzero_weight_only = TRUE )
-#'     error[i] <- full_units %>%
-#'       group_by(Z) %>%
-#'       summarize(mn = sum(noise*weights) / sum(weights)) %>%
-#'       summarize(est = last(mn) - first(mn)) %>%
-#'       pull(est)
-#'
-#'     bias[i] <- full_units %>%
-#'       group_by(Z) %>%
-#'       summarize(mn = sum(Y0_denoised*weights) / sum(weights)) %>%
-#'       summarize(est = last(mn) - first(mn)) %>%
-#'       pull(est)
-#'
-#'     print(paste0("att_est is ", signif(att_est[i],3),
-#'                  "; LB is ", signif(CI_lower[i],3),
-#'                  "; UB is ", signif(CI_upper[i],3)))
-#'     print(paste0("A-E s.e. is ", se_AE[i]))
-#'     print(paste0("Covered is ", covered[i]))
-#'
-#'   }
-#'
-#'   res_save_bayesian_boot <-
-#'     tibble(id=1:R,
-#'            name=dgp_name,
-#'            SATT = SATT,
-#'            att_est= att_est,
-#'            lower=CI_lower,
-#'            upper=CI_upper,
-#'            covered=covered,
-#'            se_AE=se_AE,
-#'            error=error,
-#'            bias=bias,
-#'            true_SE = true_SE,
-#'            lower_with_true_SE=CI_lower_with_true_SE,
-#'            upper_with_true_SE=CI_upper_with_true_SE,
-#'            covered_with_true_SE=covered_with_true_SE,
-#'            N_T = N_T,
-#'            ESS_C = ESS_C)
-#'
-#'   return(res_save_bayesian_boot)
-#' }
-#'
-#'
-#'
-#'
-#' # Testing ----
-#'
-#' if ( FALSE ) {
-#'
-#'   R = 3
-#'   toy_naive_low <-
-#'     sim_inference_CSM_A_E(
-#'       dgp_name="toy",
-#'       att0=F,
-#'       R=R,
-#'       prop_nc_unif = 1/3,
-#'       seed = c(123 + 1:R * 2)
-#'     )
-#'
-#' }
+  if (file.exists(FNAME)) {
+    write_csv(curr_res, FNAME, append=TRUE)
+  } else {
+    write_csv(curr_res, FNAME)
+  }
+
+} # save_res_to_csv
+
+
+get_sim_paths <- function() {
+  output_dir_base <- here::here("data/outputs/inf_toy")
+  list(
+    output_dir_base = output_dir_base,
+    individual_dir = file.path(output_dir_base, "individual"),
+    summary_csv = file.path(output_dir_base, "summary_table.csv"),
+    combined_csv = file.path(output_dir_base, "combined_results.csv")
+  )
+}
+
+
+# --- Collection Script for 4D Bias Inference Simulation Results ---
+# This script reads all result files from simulation iterations and combines them
+# into a single stacked CSV file.
+collect_results_to_csv <- function(){
+  library(tidyverse)
+  library(here)
+
+  # --- Configuration ---
+  # # Base directory (same as in the simulation script)
+  # output_dir_base <- here::here("data/outputs/4d_bias_inference_Apr2025")
+  # individual_dir <- file.path(output_dir_base, "estimation")
+  # combined_csv_file <- file.path(output_dir_base, "combined_results.csv")
+  paths <- get_sim_paths()
+  output_dir_base <- paths$output_dir_base
+  individual_dir <- paths$individual_dir
+  combined_csv_file <- paths$combined_csv
+
+
+  # --- Get list of all result files ---
+  cat("Looking for result files in:", individual_dir, "\n")
+
+  result_files <- list.files(
+    path = individual_dir,
+    pattern = "^results_iter_\\d+\\.rds$",
+    full.names = TRUE
+  )
+
+  num_files <- length(result_files)
+
+  if (num_files == 0) {
+    stop("No result files found in the directory. Check path and file pattern.", call. = FALSE)
+  } else {
+    cat("Found", num_files, "result files.\n")
+  }
+
+  # --- Read and combine all results ---
+  cat("Reading and combining result files...\n")
+
+  # Progress tracking
+  total_files <- length(result_files)
+  progress_step <- max(1, floor(total_files / 10))  # Report progress at 10% increments
+
+  # Read all files and combine into a single dataframe
+  combined_results <- tibble()
+  failed_files <- character()
+
+  for (i in seq_along(result_files)) {
+    file_path <- result_files[i]
+
+    # Report progress
+    if (i %% progress_step == 0 || i == total_files) {
+      percent_done <- round(i / total_files * 100)
+      cat(sprintf("  Progress: %d%% (%d/%d files)\n", percent_done, i, total_files))
+    }
+
+    # Try to read the file
+    result <- tryCatch({
+      readRDS(file_path)
+    }, error = function(e) {
+      file_name <- basename(file_path)
+      warning("Failed to read file: ", file_name, " - ", e$message, call. = FALSE)
+      failed_files <- c(failed_files, file_name)
+      return(NULL)
+    })
+
+    # If successful, add to combined results
+    if (!is.null(result)) {
+      combined_results <- bind_rows(combined_results, result)
+    }
+  }
+
+  # --- Report on the combined dataset ---
+  if (nrow(combined_results) == 0) {
+    stop("No valid results were found. Check if files are properly formatted.", call. = FALSE)
+  } else {
+    cat("\nSuccessfully combined", nrow(combined_results), "rows from",
+        total_files - length(failed_files), "files.\n")
+
+    if (length(failed_files) > 0) {
+      cat("Failed to read", length(failed_files), "files.\n")
+    }
+
+    # Summary of iterations and overlap degrees
+    iterations <- length(unique(combined_results$runID))
+    overlap_degrees <- unique(combined_results$deg_overlap)
+
+    cat("Dataset contains", iterations, "iterations across",
+        length(overlap_degrees), "overlap degrees:",
+        paste(overlap_degrees, collapse=", "), "\n")
+  }
+
+  # --- Save combined results to CSV ---
+  cat("Saving combined results to:", combined_csv_file, "\n")
+
+  tryCatch({
+    write_csv(combined_results, combined_csv_file)
+    cat("Combined results successfully saved.\n")
+  }, error = function(e) {
+    stop("Failed to save the combined CSV file: ", e$message, call. = FALSE)
+  })
+
+  # # --- Create a summary statistics file ---
+  # summary_file <- file.path(output_dir_base, "results_summary.csv")
+  # cat("Generating summary statistics...\n")
+  #
+  # # Calculate summary statistics by overlap degree
+  # summary_stats <- combined_results %>%
+  #   mutate(ATT = 1.5 * k) %>%
+  #   group_by(deg_overlap) %>%
+  #   summarize(
+  #     n_iterations = n_distinct(runID),
+  #     mean_bias = mean(bias, na.rm = TRUE),
+  #     sd_bias = sd(bias, na.rm = TRUE),
+  #     mean_SATT = mean(SATT, na.rm = TRUE),
+  #     mean_att_est = mean(att_est, na.rm = TRUE),
+  #     mean_SE = mean(SE, na.rm = TRUE),
+  #     coverage_rate = mean(CI_lower <= ATT & ATT <= CI_upper, na.rm = TRUE),
+  #     coverage_rate_debiased = mean(CI_lower - bias <= ATT & ATT <= CI_upper-bias, na.rm = TRUE),
+  #     mean_ESS_C = mean(ESS_C, na.rm = TRUE),
+  #     mean_V_E = mean(V_E,na_rm=T),
+  #     mean_sigma_hat = mean(sigma_hat, na.rm = TRUE),
+  #     median_time_secs = median(time_secs, na.rm = TRUE),
+  #     success_rate = mean(status == "Success", na.rm = TRUE)
+  #   )
+  #
+  # # Save summary statistics
+  # tryCatch({
+  #   write_csv(summary_stats, summary_file)
+  #   cat("Summary statistics saved to:", summary_file, "\n")
+  # }, error = function(e) {
+  #   warning("Failed to save summary statistics: ", e$message, call. = FALSE)
+  # })
+
+  cat("\nCollection process complete.\n")
+}
