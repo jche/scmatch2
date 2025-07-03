@@ -8,7 +8,11 @@ get_ATT_estimate(
   scmatch,
   treatment = "Z",
   outcome = "Y",
-  var_weight_type = "ess_units"
+  var_weight_type = "ess_units",
+  variance_method = "pooled",
+  boot_mtd = "wild",
+  B = 250,
+  seed_addition = 11
 )
 }
 \arguments{
@@ -19,6 +23,16 @@ get_ATT_estimate(
 \item{outcome}{Name of the outcome variable (default "Y")}
 
 \item{var_weight_type}{The way that cluster variances are averaged (default "ess_units")}
+
+\item{variance_method}{Method for calculating measurement error variance:
+"pooled": use get_measurement_error_variance (default)
+"bootstrap": use get_measurement_error_variance_OR}
+
+\item{boot_mtd}{Bootstrap method when variance_method = "bootstrap" (default: "wild")}
+
+\item{B}{Number of bootstrap samples when variance_method = "bootstrap" (default: 250)}
+
+\item{seed_addition}{Additional seed for bootstrap (default: 11)}
 }
 \value{
 A tibble with ATT estimate, standard error, t-statistic, and variance components

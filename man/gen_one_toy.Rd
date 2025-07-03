@@ -2,9 +2,10 @@
 % Please edit documentation in R/sim_data.R
 \name{gen_one_toy}
 \alias{gen_one_toy}
-\title{Generate a toy dataset with a single treatment effect}
+\title{Generate a toy dataset with a single treatment effect (Updated to use gen_df_adv_k)}
 \usage{
 gen_one_toy(
+  k = 2,
   nc = 500,
   nt = 100,
   ctr_dist = 0.5,
@@ -13,11 +14,21 @@ gen_one_toy(
 )
 }
 \arguments{
-\item{ctr_dist}{Distance between the two control clusters}
+\item{k}{Dimensionality of the feature space. Default is 2.}
+
+\item{nc}{Number of control units. Default is 500.}
+
+\item{nt}{Number of treated units. Default is 100.}
+
+\item{ctr_dist}{Distance between the two control clusters. Default is 0.5.}
+
+\item{prop_nc_unif}{Proportion of control units drawn from a uniform distribution. Default is 1/3.}
+
+\item{f0_sd}{Standard deviation for the noise in the potential outcome function f0. Default is 0.5.}
 }
 \value{
 A tibble with the toy dataset
 }
 \description{
-Generate a toy dataset with a single treatment effect
+Generate a toy dataset with a single treatment effect (Updated to use gen_df_adv_k)
 }
