@@ -1,4 +1,4 @@
-source("R/bootstrap.R")
+# source("R/bootstrap.R")
 
 test_that("Bayesian bootstrap standard errors match theoretical expectations for Gaussian data", {
   set.seed(42)

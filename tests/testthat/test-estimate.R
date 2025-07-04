@@ -257,8 +257,8 @@ test_that("get_se_AE_table handles different outcome variables", {
 
 
 
-# Test get_se_OR ---------
-test_that("get_se_OR calculates SE and related values correctly", {
+# Test get_measurement_error_variance_OR ---------
+test_that("get_measurement_error_variance_OR calculates SE and related values correctly", {
   mock_matches <- data.frame(
     subclass = rep(1:3, each = 3),
     Z = c(0, 0, 1,
@@ -276,7 +276,7 @@ test_that("get_se_OR calculates SE and related values correctly", {
   )
   # load_all()
   result <-
-    get_se_OR(
+    get_measurement_error_variance_OR(
       mock_matches,
       outcome = "Y",
       treatment = "Z"
@@ -293,12 +293,13 @@ test_that("get_se_OR calculates SE and related values correctly", {
 
 
 
-test_that("get_se_OR calculates SE and related values correctly", {
+test_that("get_measurement_error_variance_OR calculates SE and related values correctly", {
   ## want to have a real dataset because we will perform match
-  mock_matches <- readRDS("./tests/testthat/data/1d_DGP-A_M-10_N1-10_i-1.rds")
+  mock_matches <- readRDS(here::here("data/1d_DGP-A_M-10_N1-10_i-1.rds"))
+  # mock_matches <- readRDS(here::here("tests/testthat/data/1d_DGP-A_M-10_N1-10_i-1.rds"))
   # load_all()
   result <-
-    get_se_OR(
+    get_measurement_error_variance_OR(
       mock_matches,
       outcome = "Y",
       treatment = "Z",
@@ -317,7 +318,8 @@ test_that("get_se_OR calculates SE and related values correctly", {
 
 
 test_that("get_total_variance works with both variance methods", {
-  mock_matches <- readRDS("./tests/testthat/data/1d_DGP-A_M-10_N1-10_i-1.rds")
+  mock_matches <- readRDS(here::here("data/1d_DGP-A_M-10_N1-10_i-1.rds"))
+  # mock_matches <- readRDS(here::here("tests/testthat/data/1d_DGP-A_M-10_N1-10_i-1.rds"))
   # Test with pooled method
   result_pooled <- get_total_variance(
     matches = mock_matches,
@@ -355,7 +357,8 @@ test_that("get_total_variance works with both variance methods", {
 # Run integration test ---------
 # load_all()
 test_that("Integration test: Complete workflow", {
-  mock_matches <- readRDS("./tests/testthat/data/1d_DGP-A_M-10_N1-10_i-1.rds")
+  mock_matches <- readRDS(here::here("data/1d_DGP-A_M-10_N1-10_i-1.rds"))
+  # mock_matches <- readRDS(here::here("tests/testthat/data/1d_DGP-A_M-10_N1-10_i-1.rds"))
 
   # Test complete workflow with both methods
   att_pooled <- get_ATT_estimate(
