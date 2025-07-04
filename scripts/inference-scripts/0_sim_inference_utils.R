@@ -1,4 +1,122 @@
+sim_master <- function(iteration, N, overlap_label, error_label, k = 4, grid_id = 1, ...) {
+  iteration_results_list <- list()
 
+  # Set overlap level
+  prop_nc_unif_values <- c(
+    very_low = 2/3,
+    low = 1/2,
+    mid = 1/3,
+    high = 1/5,
+    very_high = 1/10
+  )
+  prop_nc_unif <- prop_nc_unif_values[[overlap_label]]
+
+  # Choose error function
+  hetero_fun <- switch(error_label,
+                       homoskedastic = function(X, Z) rep(0.5, nrow(X)),
+                       covariate_dep = function(X, Z) 0.25 + 0.5 * sqrt(rowSums((X - colMeans(X))^2)),
+                       treatment_dep = function(X, Z) ifelse(Z == 1, 0.75, 0.25)
+                       # location_dep  = function(X, Z) {
+                       #   d <- density(X[,1])$y[findInterval(X[,1], density(X[,1])$x)]
+                       #   0.25 + (1 - d/max(d)) * 0.75
+                       # }
+  )
+
+  # Wrapper to generate noise
+  noise_fun <- function(X, Z) hetero_fun(X, Z) * rnorm(nrow(X))
+
+  # Set
+  nt = round(N / 6)
+  nc = N - nt
+
+  start_time <- Sys.time()
+
+  # --- Call one_iteration Function ---
+  result <- tryCatch({
+    one_iteration(
+      i = iteration,
+      k = k_dim,
+      nc = nc,
+      nt = nt,
+      prop_nc_unif = prop_nc_unif,
+      # true_sigma = true_sigma_base,
+      true_sigma = NULL,  # handled by noise_fun
+      noise_fun = noise_fun,  # needs to be added to one_iteration
+      # supporting parameters
+      toy_ctr_dist = toy_ctr_dist_base,
+      scaling = scaling_base,
+      include_bootstrap = include_bootstrap_global,
+      boot_mtd = boot_mtd_global,
+      B = B_global,
+      seed_addition = iteration,
+      verbose = FALSE
+    )
+  }, error = function(e) {
+    warning("one_iteration failed for iteration ", iteration, ", overlap ", overlap_label, ": ", e$message, call. = FALSE)
+    log_path <- file.path("/homes2/xmeng/scmatch2/scripts/inference-scripts/logs", sprintf("error_iter%d_grid%d.txt", iteration, grid_id))
+    dir.create("logs", showWarnings = FALSE, recursive = TRUE)
+
+    writeLines(c(
+      sprintf("Timestamp: %s", Sys.time()),
+      sprintf("Iteration: %d", iteration),
+      sprintf("Grid ID: %d", grid_id),
+      sprintf("N: %d, Overlap: %s, Error: %s", N, overlap_label, error_label),
+      "Error message:",
+      conditionMessage(e),
+      "Traceback:",
+      paste(capture.output(traceback()), collapse = "\n")
+    ), con = log_path)
+
+    return(tibble(
+      runID = iteration, # Assuming one_iteration would add this, but add here for consistency
+      k = k_dim,
+      # deg_overlap = overlap_label, # no need to add here because can add sepeareatly below
+      # prop_nc_unif = prop_nc_unif,
+      N = N,
+      nc = nc,
+      nt = nt,
+      error_label = error_label,
+      toy_ctr_dist = toy_ctr_dist_base, # Add toy_ctr_dist here
+      scaling = scaling_base,         # Add scaling here
+      # true_sigma = true_sigma_base,   # Add true_sigma here
+      SATT = NA_real_,            # Placeholder for Sample ATT
+      att_est = NA_real_,
+      SE = NA_real_,
+      CI_lower = NA_real_,
+      CI_upper = NA_real_,
+      bias = NA_real_,            # Placeholder for bias
+      N_T = NA_integer_,
+      ESS_C = NA_real_,
+      V_E = NA_real_,
+      sigma_hat = NA_real_,
+      status = "Iteration Failed" # Add a status column
+      # Add other columns returned by one_iteration as NA if needed
+    ))
+  }
+  )
+
+  # --- Record Time and Store Results ---
+  end_time <- Sys.time()
+  duration <- as.numeric(difftime(end_time, start_time, units = "secs"))
+  # cat("      Overlap", overlap_label, "took", round(duration, 2), "seconds.\n")
+
+
+  # -- Annotate metadata
+  result %>%
+    dplyr::mutate(
+      runID = iteration,
+      gridID = grid_id,
+      deg_overlap = overlap_label,
+      error_label = error_label,
+      prop_nc_unif = prop_nc_unif,
+      N = N,
+      nc = nc,
+      nt = nt,
+      time_secs = duration,
+      status = ifelse("status" %in% names(.), status, "Success")
+    )
+
+}
 
 #' Run one iteration of the simulation
 #'

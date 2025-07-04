@@ -2,6 +2,28 @@ source(here::here("scripts/inference-scripts/0_sim_inference_utils.R"))
 needed_libs <- c("tidyverse", "mvtnorm")
 devtools::load_all()
 
+test_that("sim_master should work",{
+  source(here::here("scripts/inference-scripts/0_sim_inference_utils.R"))
+  result <- sim_master(
+    iteration = 3,
+    N = 600,
+    overlap_label = "very_low",
+    error_label = "homoskedastic",
+    grid_id = 1
+  )
+
+  # Check structure
+  expect_true(is.data.frame(result))
+  expect_equal(nrow(result), 2)
+  expect_true("inference_method" %in% names(result))
+
+  # Check required columns
+  required_cols <- c("runID", "k", "inference_method", "att_est", "SE",
+                     "CI_lower", "CI_upper", "N_T", "ESS_C", "V_E", "V_P",
+                     "SATT", "bias")
+  expect_true(all(required_cols %in% names(result)))
+})
+
 test_that("one_iteration works with pooled inference only", {
   skip_if_not(load_libs(needed_libs), "Required libraries not available")
 
