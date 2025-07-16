@@ -20,8 +20,9 @@ tmp <- results %>%
 
 # Function to compute coverage rates
 diagnostic_table <- results %>%
-    mutate(ATT = k * 1.5) %>%
-    group_by(deg_overlap, inference_method) %>%
+    mutate(ATT = k * 1.5, true_sigma=0.5) %>%
+    group_by(deg_overlap, inference_method, error_label, N) %>%
+    filter(!is.na(error_label)) %>%
     summarize(
       n_iterations = n(),
       mean_SATT = mean(SATT, na.rm = TRUE),
@@ -57,11 +58,27 @@ diagnostic_table <- results %>%
 main_table <- diagnostic_table %>%
   mutate(control_reuse = round(mean_avg_shared_controls, 1)) %>%
   select(deg_overlap,
+         error_label,
+         N,
          inference_method,
          coverage_rate,
          est_sd,
          control_reuse
          )
+
+ggplot(main_table %>% filter(inference_method == "pooled"),
+       aes(as.factor(N), deg_overlap, fill = !!sym("coverage_rate"))) +
+  geom_tile() +
+  facet_wrap(~ error_label) +
+  scale_fill_viridis_c(option = "A", direction = -1) +
+  theme_minimal()
+
+ggplot(main_table %>% filter(inference_method == "bootstrap"),
+       aes(as.factor(N), deg_overlap, fill = !!sym("coverage_rate"))) +
+  geom_tile() +
+  facet_wrap(~ error_label) +
+  scale_fill_viridis_c(option = "A", direction = -1) +
+  theme_minimal()
 
 print(kable(main_table,
             caption = "Che et al. DGP: Coverage Performance Across Overlap Scenarios",

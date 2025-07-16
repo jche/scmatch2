@@ -16,10 +16,6 @@ sim_master <- function(iteration, N, overlap_label, error_label, k = 4, grid_id 
                        homoskedastic = function(X, Z) rep(0.5, nrow(X)),
                        covariate_dep = function(X, Z) 0.25 + 0.5 * sqrt(rowSums((X - colMeans(X))^2)),
                        treatment_dep = function(X, Z) ifelse(Z == 1, 0.75, 0.25)
-                       # location_dep  = function(X, Z) {
-                       #   d <- density(X[,1])$y[findInterval(X[,1], density(X[,1])$x)]
-                       #   0.25 + (1 - d/max(d)) * 0.75
-                       # }
   )
 
   # Wrapper to generate noise
@@ -61,11 +57,13 @@ sim_master <- function(iteration, N, overlap_label, error_label, k = 4, grid_id 
       sprintf("Iteration: %d", iteration),
       sprintf("Grid ID: %d", grid_id),
       sprintf("N: %d, Overlap: %s, Error: %s", N, overlap_label, error_label),
+      sprintf("R library path is: %s", .libPaths()),
       "Error message:",
       conditionMessage(e),
       "Traceback:",
       paste(capture.output(traceback()), collapse = "\n")
     ), con = log_path)
+
 
     return(tibble(
       runID = iteration, # Assuming one_iteration would add this, but add here for consistency

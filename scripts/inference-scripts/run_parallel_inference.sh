@@ -5,7 +5,7 @@
 #SBATCH -c 60                   # Number of CPU cores per task
 #SBATCH --mem=24G              # Memory per task (e.g., 4GB); adjust as needed
 #SBATCH -t 01:00:00            # Max runtime per task (HH:MM:SS); adjust as needed
-#SBATCH --array=1-2          # Job array: run tasks 1 through 500 (adjust range as needed)
+#SBATCH --array=1-500          # Job array: run tasks 1 through 500 (adjust range as needed)
 
 project_dir="/homes2/xmeng/scmatch2/"
 r_script_path="${project_dir}/scripts/inference-scripts/1_parallel_sim_inference.R"
