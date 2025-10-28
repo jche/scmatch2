@@ -582,3 +582,119 @@ if (FALSE) {
 
 }
 
+
+#' Estimate ATT using Causal Forests (grf package)
+#'
+#' @param d A data frame with treatment Z, outcome Y, and covariates
+#' @param covs A character vector of covariate names
+#'
+#' @return Estimated ATT
+#' @export
+get_att_causal_forest <- function(d, covs) {
+  if (!requireNamespace("grf", quietly = TRUE)) {
+    stop("Package 'grf' is needed for this function. Please install it with: install.packages('grf')",
+         call. = FALSE)
+  }
+
+  # Fit causal forest
+  cf <- grf::causal_forest(
+    X = as.matrix(d[, covs]),
+    Y = d$Y,
+    W = as.numeric(d$Z),
+    num.trees = 2000
+  )
+
+  # Get average treatment effect on the treated
+  # Predict CATE for all units
+  tau_hat <- predict(cf)$predictions
+
+  # Average over treated units only
+  att <- mean(tau_hat[d$Z == 1])
+
+  return(att)
+}
+
+
+#' Estimate ATT using TWANG (Toolkit for Weighting and Analysis of Nonequivalent Groups)
+#'
+#' @param d A data frame with treatment Z, outcome Y, and covariates
+#' @param form A formula for the propensity score model
+#'
+#' @return Estimated ATT
+#' @export
+get_att_twang <- function(d, form) {
+  if (!requireNamespace("twang", quietly = TRUE)) {
+    stop("Package 'twang' is needed for this function. Please install it with: install.packages('twang')",
+         call. = FALSE)
+  }
+
+  # Fit propensity score model using GBM
+  ps_fit <- twang::ps(
+    formula = form,
+    data = d,
+    estimand = "ATT",
+    stop.method = "es.mean",
+    n.trees = 5000,
+    verbose = FALSE
+  )
+
+  # Get weights
+  weights <- twang::get.weights(ps_fit, stop.method = "es.mean")
+
+  # Calculate weighted ATT
+  d_weighted <- d %>%
+    dplyr::mutate(wt = weights)
+
+  att <- d_weighted %>%
+    dplyr::group_by(Z) %>%
+    dplyr::summarize(Y_wtd = weighted.mean(Y, wt)) %>%
+    dplyr::summarize(att = diff(Y_wtd)) %>%
+    dplyr::pull(att)
+
+  return(att)
+}
+
+
+#' Estimate ATT using Kernel Balancing (kbal package)
+#'
+#' @param d A data frame with treatment Z, outcome Y, and covariates
+#' @param covs A character vector of covariate names
+#'
+#' @return Estimated ATT
+#' @export
+get_att_kbal <- function(d, covs) {
+  if (!requireNamespace("kbal", quietly = TRUE)) {
+    stop("Package 'kbal' is needed for this function. Please install it with: install.packages('kbal')",
+         call. = FALSE)
+  }
+
+  # Prepare data
+  X <- as.matrix(d[, covs])
+  Z <- as.numeric(d$Z)
+  Y <- d$Y
+
+  # Fit kernel balancing
+  # For ATT, we weight control units to match treated units
+  kbal_fit <- kbal::kbal(
+    allx = X,
+    treatment = Z,
+    method = "ebal"  # can also try "kernel" for pure kernel balancing
+  )
+
+  # Get weights
+  weights <- rep(1, nrow(d))
+  weights[Z == 0] <- kbal_fit$w  # Control unit weights
+
+  # Calculate weighted ATT
+  d_weighted <- d %>%
+    dplyr::mutate(wt = weights)
+
+  att <- d_weighted %>%
+    dplyr::group_by(Z) %>%
+    dplyr::summarize(Y_wtd = weighted.mean(Y, wt)) %>%
+    dplyr::summarize(att = diff(Y_wtd)) %>%
+    dplyr::pull(att)
+
+  return(att)
+}
+
