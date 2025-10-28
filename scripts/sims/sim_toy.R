@@ -11,8 +11,8 @@ require(tictoc)
 library(CSM)
 
 
-USE_PARALLEL = F
-# USE_PARALLEL = T
+# USE_PARALLEL = F
+USE_PARALLEL = T
 if (USE_PARALLEL) {
   library(foreach)
   library(doParallel)
@@ -48,28 +48,26 @@ form1 <- as.formula("Y ~ X1+X2")
 form2 <- as.formula("Y ~ X1*X2")
 
 # Create the new subdirectory for iteration results
-dir.create("data/outputs/sim_toy_results/toy_comprehensive_run",
+dir.create("data/outputs/sim_toy_results/toy_comprehensive_run2",
            showWarnings = FALSE, recursive = TRUE)
+
 source(here::here("R/wrappers.R"))
 source(here::here("R/utils.R"))
 
 # repeatedly run for all combinations of pars
 res <- foreach(
-  i=1:40,
+  # i=1:40,
+  i=41:60,
   .packages = c("tidyverse",
                 "mvtnorm", "optweight", "dbarts", "tmle", "AIPW", "tictoc",
                 "aciccomp2016","here","CSM"),
   .combine=rbind) %dopar% {
-    # source("R/distance.R")
-    # source("R/sc.R")
-    # source("R/matching.R")
-    # source("R/estimate.R")
-    # source("R/sim_data.R")
-    # source("R/wrappers.R")
-    # source("R/utils.R")
 
-    # for (i in 1:250) {
+    # Set seed for reproducibility
+    set.seed(1000 + i)
 
+    # Start timing
+    start_time <- Sys.time()
     tic()
 
     nc <- 500
@@ -89,23 +87,16 @@ res <- foreach(
 
     num_bins <- 6
 
+    # MODIFIED: Changed from num_bins to 2 * num_bins
     dist_scaling <- df %>%
       summarize(across(starts_with("X"),
                        function(x) {
-                         if (is.numeric(x)) num_bins / (max(x) - min(x))
+                         if (is.numeric(x)) 2 * num_bins / (max(x) - min(x))
                          else 1000
                        }))
 
 
     # for acic simulation: drop units that don't get a within-caliper matches
-    # preds_csm <- get_cal_matches(
-    #   df = df,
-    #   metric = "maximum",
-    #   dist_scaling = dist_scaling,
-    #   cal_method = "fixed",
-    #   est_method = "average",
-    #   return = "all",
-    #   knn = 25)
     preds_csm <- get_cal_matches(
       df = df,
       metric = "maximum",
@@ -202,12 +193,20 @@ res <- foreach(
                               g.SL.library = SL.library2)
 
     # ========================================================================
+    # CALCULATE TIMING
+    # ========================================================================
+    end_time <- Sys.time()
+    elapsed_time <- as.numeric(difftime(end_time, start_time, units = "secs"))
+
+    # ========================================================================
     # ASSEMBLE RESULTS
     # ========================================================================
     cat(sprintf("Run %d: Assembling results...\n", i))
 
     res <- tibble(
       runid = i,
+      seed = 1000 + i,
+      elapsed_time_secs = elapsed_time,
       nc = nc,
       nt = nt,
       f0_sd = f0_sd,
@@ -235,15 +234,12 @@ res <- foreach(
 
     toc()
 
-    ## *** MODIFICATION START ***
     # Write to iteration-specific file in the new subdirectory
     FNAME_ITER <- here::here(
-      "data", "outputs", "sim_toy_results",
-      sprintf("toy_comprehensive_run_%03d.csv", i)
+      "data", "outputs", "sim_toy_results","toy_comprehensive_run2",
+      sprintf("run_%03d.csv", i)
     )
     write_csv(res, FNAME_ITER)
-    # *** MODIFICATION END ***
-
 
     # Return res for the rbind combine
     res
@@ -251,17 +247,21 @@ res <- foreach(
 
 stopCluster(cl)
 
-# *** ADD THIS CODE AFTER THE SCRIPT ***
-# After the simulation finishes, run this in your console to combine
-# all the iteration-specific files into one final file.
-
+# After the simulation finishes, combine all iteration files
 library(tidyverse)
-list.files("data/outputs/sim_toy_results/toy_comprehensive_run/",
-           pattern=".*\\.csv",
+list.files("data/outputs/sim_toy_results/toy_comprehensive_run2/",
+           pattern="run_.*\\.csv",
            full.names=TRUE) %>%
   map_df(read_csv) %>%
-  write_csv("data/outputs/sim_toy_results/toy_comprehensive_run.csv")
+  write_csv("data/outputs/sim_toy_results/toy_comprehensive_run2.csv")
 
+cat("\n=== Simulation Complete ===\n")
+cat("Total elapsed time summary:\n")
+res_final <- read_csv("data/outputs/sim_toy_results/toy_comprehensive_run2.csv")
+cat("Mean time per iteration:", mean(res_final$elapsed_time_secs), "seconds\n")
+cat("Total time:", sum(res_final$elapsed_time_secs), "seconds\n")
+cat("Min time:", min(res_final$elapsed_time_secs), "seconds\n")
+cat("Max time:", max(res_final$elapsed_time_secs), "seconds\n")
 
 #
 # # analyze results ---------------------------------------------------------

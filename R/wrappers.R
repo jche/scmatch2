@@ -1,4 +1,4 @@
-
+# R/wrappers.R
 # wrapper functions of other packages: an adaptive implementation of
 # wide-use basic functions for convenience
 #

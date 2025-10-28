@@ -37,5 +37,8 @@ Imports:
 Remotes:
     vdorie/aciccomp/2016
 Suggests: 
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    grf,
+    twang,
+    kbal
 Config/testthat/edition: 3

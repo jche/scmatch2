@@ -3,6 +3,41 @@
 library(tidyverse)
 source("scripts/analysis/plot_sim.R")
 
+# toy sim on sim_toy  -----------------------------------------------------------------
+res_toy <- readr::read_csv("data/outputs/sim_toy_results/toy_comprehensive_run2.csv")
+res_toy <- res_toy %>%  # rename to keep consistency as other results
+  rename(tmle2="tmle3",
+         aipw2="aipw3")
+
+org_df_toy <-
+  res_toy %>%
+  pivot_longer(diff:aipw2, names_to="method") %>%
+  summarize_bias_rmse()
+
+plot_org_df(org_df_toy,
+            title="Toy Example",
+            xlab="Value",
+            ylab="Method",
+            legend.position=c(0.75, 0.25))
+
+
+res_toy <- readr::read_csv("data/outputs/sim_toy_results/toy_spaceship7.csv")
+res_toy <- res_toy %>%  # rename to keep consistency as other results
+  rename(tmle2="tmle3",
+         aipw2="aipw3")
+
+org_df_toy <-
+  res_toy %>%
+  pivot_longer(diff:aipw2, names_to="method") %>%
+  summarize_bias_rmse()
+
+plot_org_df(org_df_toy,
+            title="Toy Example",
+            xlab="Value",
+            ylab="Method",
+            legend.position=c(0.75, 0.25))
+
+
 # toy sim -----------------------------------------------------------------
 
 res_toy <- readr::read_csv("data/outputs/sim_toy_results/toy_spaceship7.csv")
