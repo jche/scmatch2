@@ -11,8 +11,8 @@ require(tictoc)
 library(CSM)
 
 
-# USE_PARALLEL = F
-USE_PARALLEL = T
+USE_PARALLEL = F
+# USE_PARALLEL = T
 if (USE_PARALLEL) {
   library(foreach)
   library(doParallel)
@@ -50,21 +50,23 @@ form2 <- as.formula("Y ~ X1*X2")
 # Create the new subdirectory for iteration results
 dir.create("data/outputs/sim_toy_results/toy_comprehensive_run",
            showWarnings = FALSE, recursive = TRUE)
+source(here::here("R/wrappers.R"))
+source(here::here("R/utils.R"))
 
 # repeatedly run for all combinations of pars
 res <- foreach(
   i=1:40,
   .packages = c("tidyverse",
                 "mvtnorm", "optweight", "dbarts", "tmle", "AIPW", "tictoc",
-                "aciccomp2016","here"),
+                "aciccomp2016","here","CSM"),
   .combine=rbind) %dopar% {
-    source("R/distance.R")
-    source("R/sc.R")
-    source("R/matching.R")
-    source("R/estimate.R")
-    source("R/sim_data.R")
-    source("R/wrappers.R")
-    source("R/utils.R")
+    # source("R/distance.R")
+    # source("R/sc.R")
+    # source("R/matching.R")
+    # source("R/estimate.R")
+    # source("R/sim_data.R")
+    # source("R/wrappers.R")
+    # source("R/utils.R")
 
     # for (i in 1:250) {
 
@@ -96,14 +98,23 @@ res <- foreach(
 
 
     # for acic simulation: drop units that don't get a within-caliper matches
+    # preds_csm <- get_cal_matches(
+    #   df = df,
+    #   metric = "maximum",
+    #   dist_scaling = dist_scaling,
+    #   cal_method = "fixed",
+    #   est_method = "average",
+    #   return = "all",
+    #   knn = 25)
     preds_csm <- get_cal_matches(
       df = df,
       metric = "maximum",
-      dist_scaling = dist_scaling,
-      cal_method = "fixed",
+      scaling = dist_scaling,    # <-- Renamed
+      rad_method = "fixed",        # <-- Renamed
       est_method = "average",
-      return = "all",
-      knn = 25)
+      k = 25                     # <-- Renamed
+      # 'return = "all"' has been removed
+    )
     preds_cem <- get_cem_matches(
       df = df,
       num_bins = num_bins,
@@ -118,6 +129,82 @@ res <- foreach(
     df <- df %>%
       filter(!id %in% attr(preds_csm, "unmatched_units"))
 
+    my_covs <- c("X1", "X2")
+
+    # ========================================================================
+    # COMPUTE TRUE ATT
+    # ========================================================================
+    true_ATT <- df %>%
+      filter(Z) %>%
+      summarize(att = mean(Y1-Y0)) %>%
+      pull(att)
+
+    # ========================================================================
+    # COMPUTE ESTIMATES - BASELINE METHODS
+    # ========================================================================
+    cat(sprintf("Run %d: Computing baseline estimates...\n", i))
+
+    att_diff <- get_att_diff(df)
+    att_bal1 <- get_att_bal(df, zform1, c(0.01, 0.01))
+    att_bal2 <- get_att_bal(df, zform2, c(0.01, 0.01, 0.1))
+
+    # ========================================================================
+    # COMPUTE ESTIMATES - OUTCOME REGRESSION
+    # ========================================================================
+    cat(sprintf("Run %d: Computing outcome regression estimates...\n", i))
+
+    att_or_lm <- get_att_or_lm(df, form=form2)
+    att_or_bart <- get_att_or_bart(df, covs=my_covs)
+
+    # ========================================================================
+    # COMPUTE ESTIMATES - PROPENSITY SCORE
+    # ========================================================================
+    cat(sprintf("Run %d: Computing propensity score estimates...\n", i))
+
+    att_ps_lm <- get_att_ps_lm(df, zform2)
+    att_ps_bart <- get_att_ps_bart(df, covs=my_covs)
+
+    # ========================================================================
+    # COMPUTE ESTIMATES - MATCHING METHODS
+    # ========================================================================
+    cat(sprintf("Run %d: Computing matching estimates...\n", i))
+
+    att_csm_scm <- get_att_csm(df, scaling=dist_scaling,
+                               est_method="scm",
+                               rad_method = "fixed")
+    att_csm_avg <- get_att_csm(df, scaling=dist_scaling,
+                               est_method="average",
+                               rad_method = "fixed")
+    att_cem_scm <- get_att_cem(df, num_bins=num_bins,
+                               est_method="scm",
+                               estimand = "CEM-ATT")
+    att_cem_avg <- get_att_cem(df, num_bins=num_bins,
+                               est_method="average",
+                               estimand = "CEM-ATT")
+    att_onenn <- get_att_1nn(df, scaling=dist_scaling)
+
+    # ========================================================================
+    # COMPUTE ESTIMATES - DOUBLY ROBUST METHODS
+    # ========================================================================
+    cat(sprintf("Run %d: Computing doubly robust estimates...\n", i))
+
+    att_tmle1 <- get_att_tmle(df, covs=my_covs,
+                              Q.SL.library = SL.library1,
+                              g.SL.library = SL.library1)
+    att_aipw1 <- get_att_aipw(df, covs=my_covs,
+                              Q.SL.library = SL.library1,
+                              g.SL.library = SL.library1)
+    att_tmle3 <- get_att_tmle(df, covs=my_covs,
+                              Q.SL.library = SL.library3Q,
+                              g.SL.library = SL.library3g)
+    att_aipw3 <- get_att_aipw(df, covs=my_covs,
+                              Q.SL.library = SL.library2,
+                              g.SL.library = SL.library2)
+
+    # ========================================================================
+    # ASSEMBLE RESULTS
+    # ========================================================================
+    cat(sprintf("Run %d: Assembling results...\n", i))
 
     res <- tibble(
       runid = i,
@@ -127,47 +214,23 @@ res <- foreach(
       num_bins = num_bins,
       ninf = ninf,
       ninf_cem = ninf_cem,
-
-      true_ATT = df %>%
-        filter(Z) %>%
-        summarize(att = mean(Y1-Y0)) %>%
-        pull(att),
-
-      diff = get_att_diff(df),
-
-      bal1 = get_att_bal(df, zform1, c(0.01, 0.01)),
-      bal2 = get_att_bal(df, zform2, c(0.01, 0.01, 0.1)),
-
-      or_lm = get_att_or_lm(df, form=form2),
-      or_bart = get_att_or_bart(df, covs=c(X1,X2)),
-      ps_lm = get_att_ps_lm(df, zform2),
-      ps_bart = get_att_ps_bart(df, covs=c(X1,X2)),
-
-      csm_scm = get_att_csm(df, dist_scaling=dist_scaling, est_method="scm",
-                            cal_method = "fixed"),
-      csm_avg = get_att_csm(df, dist_scaling=dist_scaling, est_method="average",
-                            cal_method = "fixed"),
-      cem_scm = get_att_cem(df, num_bins=num_bins, est_method="scm",
-                            estimand = "CEM-ATT"),
-      cem_avg = get_att_cem(df, num_bins=num_bins, est_method="average",
-                            estimand = "CEM-ATT"),
-      onenn = get_att_1nn(df, dist_scaling=dist_scaling),
-
-      tmle1 = get_att_tmle(df,
-                           covs=c(X1,X2),
-                           Q.SL.library = SL.library1,
-                           g.SL.library = SL.library1),
-      aipw1 = get_att_aipw(df,
-                           covs=c(X1,X2),
-                           Q.SL.library = SL.library1,
-                           g.SL.library = SL.library1),
-
-      tmle3 = get_att_tmle(df, covs=c(X1,X2),
-                           Q.SL.library = SL.library3Q,
-                           g.SL.library = SL.library3g),
-      aipw3 = get_att_aipw(df, covs=c(X1,X2),
-                           Q.SL.library = SL.library2,
-                           g.SL.library = SL.library2)
+      true_ATT = true_ATT,
+      diff = att_diff,
+      bal1 = att_bal1,
+      bal2 = att_bal2,
+      or_lm = att_or_lm,
+      or_bart = att_or_bart,
+      ps_lm = att_ps_lm,
+      ps_bart = att_ps_bart,
+      csm_scm = att_csm_scm,
+      csm_avg = att_csm_avg,
+      cem_scm = att_cem_scm,
+      cem_avg = att_cem_avg,
+      onenn = att_onenn,
+      tmle1 = att_tmle1,
+      aipw1 = att_aipw1,
+      tmle3 = att_tmle3,
+      aipw3 = att_aipw3
     )
 
     toc()
