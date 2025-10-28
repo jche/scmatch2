@@ -1,3 +1,4 @@
+# Plotting script: scripts/figs/fig_sim_analyses.R
 # full analysis of simulation results
 library(tidyverse)
 source("scripts/analysis/plot_sim.R")
@@ -32,7 +33,7 @@ org_df_toy_total <-
       org_df_toy_cem_csm)
 
 
-plot_org_df(org_df_toy_total,
+plot_org_df(org_df_toy,
           title="Toy Example",
           xlab="Value",
           ylab="Method",
@@ -44,13 +45,13 @@ ggsave("figures/sim_toy_results.png",
 
 
 # canonical sims ----------------------------------------------------------
-res_kang <- read_csv("sim_canonical_results/kang_spaceship.csv") %>%
-  bind_rows(read_csv("sim_canonical_results/kang_spaceship2.csv")) %>%
+res_kang <- read_csv("data/outputs/sim_canonical_results/kang_spaceship.csv") %>%
+  bind_rows(read_csv("data/outputs/sim_canonical_results/kang_spaceship2.csv")) %>%
   mutate(sim = "kang")
 res_hain <-
-  read_csv("sim_canonical_results/hain_spaceship.csv") %>%
+  read_csv("data/outputs/sim_canonical_results/hain_spaceship.csv") %>%
   mutate(sim = "hain")
-res_acic <- read_csv("sim_canonical_results/acic_spaceship.csv") %>%
+res_acic <- read_csv("data/outputs/sim_canonical_results/acic_spaceship.csv") %>%
   mutate(sim = "acic")
 
 res <- list(res_kang, res_hain, res_acic) %>%
