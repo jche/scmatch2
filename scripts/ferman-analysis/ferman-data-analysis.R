@@ -1,4 +1,4 @@
-
+# scripts/ferman-analysis/ferman-data-analysis.R
 library(haven)
 library(CSM)
 library(latex2exp)
@@ -160,7 +160,7 @@ ggd_att <-
   left_join( caliper_table( ferman_scm ),
              by = c( "id", "subclass" ) ) %>%
   group_by(subclass) %>%
-  summarize(adacal = last(adacal),
+  summarize(adacal = last(na.omit(adacal)),
             tx = y2010[2] - y2010[1]) %>%
   arrange(adacal) %>%
   mutate(order = 1:n(),

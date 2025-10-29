@@ -1,4 +1,4 @@
-
+# scripts/ferman-analysis/02-core-ferman-analysis.R
 # Conduct the core analysis for prepping summary results
 
 
