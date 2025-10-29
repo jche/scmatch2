@@ -631,7 +631,7 @@ get_att_twang <- function(d, form) {
   # Fit propensity score model using GBM
   ps_fit <- twang::ps(
     formula = form,
-    data = d,
+    data = as.data.frame(d),
     estimand = "ATT",
     stop.method = "es.mean",
     n.trees = 5000,
@@ -678,7 +678,7 @@ get_att_kbal <- function(d, covs) {
   kbal_fit <- kbal::kbal(
     allx = X,
     treatment = Z,
-    method = "ebal"  # can also try "kernel" for pure kernel balancing
+    # method = "kernel"  # can also try "kernel" for pure kernel balancing
   )
 
   # Get weights

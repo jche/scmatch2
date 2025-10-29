@@ -1,3 +1,7 @@
+# Compare two simulation result datasets: comprehensive run vs spaceship7
+# Conclusion: They are similar, i.e., R = 40 is not a small number.
+# Reason: comprehensive run vs spaceship7 are basically the same run on different seeds and they have similar performance.
+
 library(tidyverse)
 source("scripts/analysis/plot_sim.R")
 
