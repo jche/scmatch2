@@ -28,7 +28,7 @@ METHODS <- c("diff", "onenn", "csm_scm", "cem_avg", "bal1", "bal2",
 #' prepared_df <- prepare_method_comparison_df(df)
 prepare_method_comparison_df <- function(df) {
   df %>%
-    pivot_longer(diff:aipw2, names_to="method") %>%
+    pivot_longer(diff:last_col(), names_to="method") %>%
     summarize_bias_rmse()
 }
 
@@ -54,8 +54,8 @@ summarize_bias_rmse <- function(df_long) {
     filter(method %in% METHODS) %>%
     group_by(method) %>%
     summarize(
-      RMSE = sqrt(mean((value-true_ATT)^2)),
-      Bias = abs(mean(value-true_ATT)),
+      RMSE = sqrt(mean((value-true_ATT)^2, na.rm=T)),
+      Bias = abs(mean(value-true_ATT, na.rm=T)),
     ) %>%
     mutate(method = fct_reorder(method, RMSE, min)) %>%
     pivot_longer(c(RMSE, Bias))
@@ -144,3 +144,17 @@ acic_plot <- function(simname,
     filter(sim == simname)
   return(RMSE_plot(df,title,ylab,xlab,legend.position))
 }
+
+acic_plot_sim_type <- function(simname,
+                      title="",
+                      ylab="",
+                      xlab="",
+                      legend.position="none") {
+  df <- res %>%
+    filter(sim_type == simname)
+  if (simname == "hainmueller"){
+    df <- df %>% select(-twang)
+  }
+  return(RMSE_plot(df,title,ylab,xlab,legend.position))
+}
+
