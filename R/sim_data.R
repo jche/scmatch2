@@ -1,7 +1,7 @@
 
 # functions for simulating data
 
-require(aciccomp2016)
+# require(aciccomp2016)
 library(mvtnorm)
 
 # toy example -------------------------------------------------------------
@@ -443,6 +443,10 @@ gen_df_acic <- function(model.trt="step",
                         te.hetero="high",
                         random.seed=1,
                         n=1000, p=10) {
+  if (!requireNamespace("aciccomp2016", quietly = TRUE)) {
+    stop("Package 'aciccomp2016' is needed for this function. Please install it with: install.packages('kbal')",
+         call. = FALSE)
+  }
   # idea: input_2016 is a 4802 x 58 df of COVARIATES
   #  - dgp_2016() outputs a dataset of POs for input_2016
   #  - see parameters_2016 for example inputs
