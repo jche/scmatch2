@@ -66,6 +66,101 @@ test_that("TWANG produces reasonable estimates", {
   cat(sprintf("Error: %.3f\n", att_twang - true_att))
 })
 
+test_that("TWANG works with actual simulation DGP", {
+  skip_if_not_installed("twang")
+
+  set.seed(1001)  # Same as first iteration
+
+  # Use the ACTUAL DGP from sim_toy_new_methods.R
+  nc <- 500
+  nt <- 100
+  f0_sd <- 0.5
+
+  df <- gen_df_adv(
+    nc = nc,
+    nt = nt,
+    f0_sd = f0_sd,
+    tx_effect_fun = function(X1, X2) {3 * X1 + 3 * X2},
+    f0_fun = function(x, y) {
+      matrix(c(x, y), ncol = 2) %>%
+        mvtnorm::dmvnorm(
+          mean = c(0.5, 0.5),
+          sigma = matrix(c(1, 0.8, 0.8, 1), nrow = 2)
+        ) * 20
+    }
+  )
+
+  num_bins <- 6
+  dist_scaling <- df %>%
+    summarize(across(
+      starts_with("X"),
+      function(x) {
+        if (is.numeric(x)) 2 * num_bins / (max(x) - min(x))
+        else 1000
+      }
+    ))
+
+  # Apply same filtering
+  preds_csm <- get_cal_matches(
+    df = df,
+    metric = "maximum",
+    scaling = dist_scaling,
+    rad_method = "fixed",
+    est_method = "average",
+    k = 25
+  )
+
+  df <- df %>%
+    filter(!id %in% attr(preds_csm, "unmatched_units"))
+
+  # Calculate true ATT
+  true_att <- df %>%
+    filter(Z == 1) %>%
+    summarize(att = mean(Y1 - Y0)) %>%
+    pull(att)
+
+  # Test different formulas
+  cat("\n=== Testing TWANG with actual DGP ===\n")
+
+  # Simple additive
+  att_twang1 <- get_att_twang(df, form = as.formula("Z ~ X1 + X2"))
+  cat(sprintf("Formula: Z ~ X1 + X2\n"))
+  cat(sprintf("  True ATT: %.3f\n", true_att))
+  cat(sprintf("  Estimated ATT: %.3f\n", att_twang1))
+  cat(sprintf("  Is NA: %s\n", is.na(att_twang1)))
+
+  # # With interaction
+  # att_twang2 <- get_att_twang(df, form = as.formula("Z ~ X1 * X2"))
+  # cat(sprintf("\nFormula: Z ~ X1 * X2\n"))
+  # cat(sprintf("  True ATT: %.3f\n", true_att))
+  # cat(sprintf("  Estimated ATT: %.3f\n", att_twang2))
+  # cat(sprintf("  Is NA: %s\n", is.na(att_twang2)))
+
+  # # Check propensity score distribution
+  # cat("\n=== Checking propensity score ===\n")
+  # d_test <- as.data.frame(df)
+  # d_test$Z <- as.numeric(d_test$Z)
+  #
+  # ps_fit <- twang::ps(
+  #   formula = as.formula("Z ~ X1 + X2"),
+  #   data = d_test,
+  #   estimand = "ATT",
+  #   stop.method = "es.mean",
+  #   n.trees = 5000,
+  #   verbose = TRUE  # Turn on verbose to see what's happening
+  # )
+  #
+  # cat("PS fit summary:\n")
+  # print(summary(ps_fit$ps))
+
+  # weights <- twang::get.weights(ps_fit, stop.method = "es.mean")
+  # cat("\nWeights summary:\n")
+  # print(summary(weights))
+  # cat("Any NA weights:", any(is.na(weights)), "\n")
+
+  # # At least one should work
+  # expect_true(!is.na(att_twang1) || !is.na(att_twang2))
+})
 
 test_that("Kbal produces reasonable estimates", {
   skip_if_not_installed("kbal")
@@ -99,6 +194,42 @@ test_that("Kbal produces reasonable estimates", {
   cat(sprintf("Estimated ATT: %.3f\n", att_kbal))
   cat(sprintf("Error: %.3f\n", att_kbal - true_att))
 })
+
+
+test_that("Kbal with fixed K=30 produces reasonable estimates", {
+  skip_if_not_installed("kbal")
+  set.seed(789)
+
+  # Generate simple DGP
+  n <- 500
+  df <- tibble(
+    X1 = runif(n),
+    X2 = runif(n),
+    Z = rbinom(n, 1, 0.3),
+    Y0 = X1 + X2 + rnorm(n, 0, 1),
+    Y1 = Y0 + 1.8,  # Constant treatment effect
+    Y = ifelse(Z, Y1, Y0)
+  )
+
+  true_att <- df %>%
+    filter(Z == 1) %>%
+    summarize(att = mean(Y1 - Y0)) %>%
+    pull(att)
+
+  # Test with fixed K = 30
+  att_kbal_k30 <- get_att_kbal(df, covs = c("X1", "X2"), numdims = 30)
+
+  expect_true(abs(att_kbal_k30 - true_att) < 0.5)
+  expect_type(att_kbal_k30, "double")
+  expect_length(att_kbal_k30, 1)
+
+  cat("\nKbal Test (K=30):\n")
+  cat(sprintf("True ATT: %.3f\n", true_att))
+  cat(sprintf("Estimated ATT (K=30): %.3f\n", att_kbal_k30))
+  cat(sprintf("Error: %.3f\n", att_kbal_k30 - true_att))
+})
+
+
 
 test_that("get_att_point_est works well",{
   test_matched_weighted_df <-

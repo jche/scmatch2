@@ -6,7 +6,8 @@ METHODS <- c("diff", "onenn", "csm_scm", "cem_avg", "bal1", "bal2",
              "or_lm", "ps_lm",
              "or_bart", "ps_bart",
              "aipw1", "tmle1",
-             "aipw2", "tmle2")
+             "aipw2", "tmle2",
+             "causal_forest", "twang", "kbal")
 
 #' Prepare Method Comparison Data Frame
 #'

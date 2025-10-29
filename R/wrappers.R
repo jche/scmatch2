@@ -614,7 +614,6 @@ get_att_causal_forest <- function(d, covs) {
   return(att)
 }
 
-
 #' Estimate ATT using TWANG (Toolkit for Weighting and Analysis of Nonequivalent Groups)
 #'
 #' @param d A data frame with treatment Z, outcome Y, and covariates
@@ -628,18 +627,66 @@ get_att_twang <- function(d, form) {
          call. = FALSE)
   }
 
+  # CRITICAL: Convert tibble to proper data.frame (twang doesn't support tibbles)
+  # Use as.data.frame() with stringsAsFactors to ensure proper conversion
+  d <- as.data.frame(d, stringsAsFactors = FALSE)
+
+  # Remove tibble class completely if it exists
+  class(d) <- "data.frame"
+
+  # CRITICAL: Ensure Z is numeric 0/1 (not logical TRUE/FALSE)
+  if (is.logical(d$Z)) {
+    d$Z <- as.integer(d$Z)  # TRUE -> 1, FALSE -> 0
+  } else if (is.factor(d$Z)) {
+    d$Z <- as.integer(as.character(d$Z))
+  } else {
+    d$Z <- as.numeric(d$Z)
+  }
+
+  # Double check Z is 0/1
+  if (!all(d$Z %in% c(0, 1))) {
+    warning("Treatment variable Z must be 0/1 after conversion")
+    return(NA_real_)
+  }
+
+  # Check that we have both treatment and control units
+  if (length(unique(d$Z)) < 2) {
+    warning("Only one treatment group present")
+    return(NA_real_)
+  }
+
   # Fit propensity score model using GBM
-  ps_fit <- twang::ps(
-    formula = form,
-    data = as.data.frame(d),
-    estimand = "ATT",
-    stop.method = "es.mean",
-    n.trees = 5000,
-    verbose = FALSE
-  )
+  ps_fit <- tryCatch({
+    twang::ps(
+      formula = form,
+      data = d,
+      estimand = "ATT",
+      stop.method = "es.mean",
+      n.trees = 5000,
+      interaction.depth = 3,
+      verbose = FALSE
+    )
+  }, error = function(e) {
+    warning(paste("twang::ps failed:", e$message))
+    return(NULL)
+  })
+
+  if (is.null(ps_fit)) {
+    return(NA_real_)
+  }
 
   # Get weights
-  weights <- twang::get.weights(ps_fit, stop.method = "es.mean")
+  weights <- tryCatch({
+    twang::get.weights(ps_fit, stop.method = "es.mean")
+  }, error = function(e) {
+    warning(paste("get.weights failed:", e$message))
+    return(NULL)
+  })
+
+  if (is.null(weights) || any(is.na(weights))) {
+    warning("Weights contain NA values")
+    return(NA_real_)
+  }
 
   # Calculate weighted ATT
   d_weighted <- d %>%
@@ -647,22 +694,22 @@ get_att_twang <- function(d, form) {
 
   att <- d_weighted %>%
     dplyr::group_by(Z) %>%
-    dplyr::summarize(Y_wtd = weighted.mean(Y, wt)) %>%
+    dplyr::summarize(Y_wtd = weighted.mean(Y, wt), .groups = "drop") %>%
     dplyr::summarize(att = diff(Y_wtd)) %>%
     dplyr::pull(att)
 
   return(att)
 }
 
-
 #' Estimate ATT using Kernel Balancing (kbal package)
 #'
 #' @param d A data frame with treatment Z, outcome Y, and covariates
 #' @param covs A character vector of covariate names
+#' @param numdims Fixed number of dimensions to use (default: NULL for auto-selection)
 #'
 #' @return Estimated ATT
 #' @export
-get_att_kbal <- function(d, covs) {
+get_att_kbal <- function(d, covs, numdims = NULL) {
   if (!requireNamespace("kbal", quietly = TRUE)) {
     stop("Package 'kbal' is needed for this function. Please install it with: install.packages('kbal')",
          call. = FALSE)
@@ -674,16 +721,16 @@ get_att_kbal <- function(d, covs) {
   Y <- d$Y
 
   # Fit kernel balancing
-  # For ATT, we weight control units to match treated units
   kbal_fit <- kbal::kbal(
     allx = X,
     treatment = Z,
-    # method = "kernel"  # can also try "kernel" for pure kernel balancing
+    numdims = numdims,
+    printprogress = FALSE  # Optional: suppress the long output
   )
 
-  # Get weights
-  weights <- rep(1, nrow(d))
-  weights[Z == 0] <- kbal_fit$w  # Control unit weights
+  # kbal returns weights for ALL units (length = nrow(d))
+  # For ATT: treated units have weight 1, control units get kbal weights
+  weights <- ifelse(Z == 1, 1, kbal_fit$w)
 
   # Calculate weighted ATT
   d_weighted <- d %>%
@@ -697,4 +744,3 @@ get_att_kbal <- function(d, covs) {
 
   return(att)
 }
-
