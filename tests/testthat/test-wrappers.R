@@ -1,4 +1,16 @@
 # tests/testthat/test-wrappers.R
+# library(testthat)
+# devtools::load_all()
+source(here::here("scripts/wrappers.R"))
+
+test_that("twang returns numeric for hainmueller", {
+  set.seed(123)
+  df <- gen_df_hain(nc=250, nt=50, sigma_e="n100", outcome="nl2", sigma_y=1, ATE=0)
+  est <- get_att_twang(df, form = as.formula("Z ~ X1+X2+X3+X4+X5+X6"))
+  expect_true(is.numeric(est) && length(est) == 1)
+  expect_false(is.na(est))
+})
+
 
 test_that("Causal Forest produces reasonable estimates", {
   skip_if_not_installed("grf")

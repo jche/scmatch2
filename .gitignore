@@ -47,3 +47,7 @@ vignettes/*.pdf
 /scripts/more-inference-applications/
 /scripts/replication_code_wang_zubizarreta_mabw/
 /figures
+
+# Ongoing work
+bootstrap_failure_matching.png
+scipts/AI08-failure-bootstrap.R

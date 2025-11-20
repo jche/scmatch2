@@ -1,5 +1,5 @@
 
-# Kang and Schafer simulation
+# ACIC simulation
 
 require(tidyverse)
 require(mvtnorm)
@@ -16,7 +16,7 @@ source("R/sc.R")
 source("R/matching.R")
 source("R/estimate.R")
 source("R/sim_data.R")
-source("R/wrappers.R")
+source("scripts/wrappers.R")
 source("R/utils.R")
 
 # parallelize
@@ -26,6 +26,7 @@ if (T) {
   cores=detectCores()
   cl <- makeCluster(cores[1]-1, outfile="") #not to overload your computer
   registerDoParallel(cl)
+  # registerDoSEQ()   # sequential, for easier debugging
 }
 
 # set superlearner libraries
@@ -43,6 +44,7 @@ SL.library2 <- c("SL.glm", #"SL.gam",
 SL.library3Q <- c("SL.glm", "tmle.SL.dbarts2", "SL.glmnet")   # default tmle Q.SL.library
 SL.library3g <-  c("SL.glm", "tmle.SL.dbarts.k.5", "SL.gam")  # default tmle g.SL.library
 
+tic()
 
 
 # run simulations ---------------------------------------------------------
@@ -50,7 +52,7 @@ SL.library3g <-  c("SL.glm", "tmle.SL.dbarts.k.5", "SL.gam")  # default tmle g.S
 # repeatedly run for all combinations of pars
 # for (i in 1:100) {
 res <- foreach(
-  i=1:100, 
+  i=sample(1:100000, 100),    # random seeds
   .packages = c("tidyverse", 
                 "mvtnorm", "optweight", "dbarts", "tmle", "AIPW", "tictoc",
                 "aciccomp2016"),
@@ -60,12 +62,25 @@ res <- foreach(
     source("R/matching.R")
     source("R/estimate.R")
     source("R/sim_data.R")
-    source("R/wrappers.R")
+    source("scripts/wrappers.R")
     source("R/utils.R")
     
   n <- 1000
+  p <- 10
+  model.trt = "step"
+  model.rsp = "step"
   
-  df <- gen_df_kang(n = n)
+  df <- gen_df_acic(
+    model.trt=model.trt, 
+    root.trt=0.35, 
+    overlap.trt="full",
+    model.rsp=model.rsp, 
+    alignment=0.75, 
+    te.hetero="high",
+    random.seed=i,        # NOTE: set random seed!
+    n=n, 
+    p=p
+  )
   
   covs <- df %>% 
     select(starts_with("X")) %>% 
@@ -111,9 +126,15 @@ res <- foreach(
   res <- tibble(
     runid = i,
     n = n,
+    p = p,
+    model.trt = model.trt,
+    model.rsp = model.rsp,
     ninf = ninf,
     ninf_cem = ninf_cem,
-    true_ATT = 0,
+    true_ATT = df %>% 
+      filter(Z) %>%
+      summarize(att = mean(Y1-Y0)) %>%
+      pull(att),
     
     diff = get_att_diff(df),
     
@@ -142,7 +163,7 @@ res <- foreach(
     aipw1 = get_att_aipw(df, covs=covs,
                          Q.SL.library = SL.library1,
                          g.SL.library = SL.library1),
-    
+
     tmle2 = get_att_tmle(df, covs=covs,
                          Q.SL.library = SL.library3Q,
                          g.SL.library = SL.library3g),
@@ -153,18 +174,18 @@ res <- foreach(
   
   toc()
   
-  # res %>% 
-  #   pivot_longer(-c(runid:true_ATT))
+  res %>% 
+    pivot_longer(-c(runid:true_ATT))
   
-  FNAME <- "sim_canonical_results/kang_spaceship.csv"
+  FNAME <- "sim_canonical_results/acic_spaceship.csv"
   if (file.exists(FNAME)) {
     write_csv(res, FNAME, append=T)
   } else {
     write_csv(res, FNAME)
   }
-  
-  res
-}
+  }
+
+toc()
 
 
 # analyze results ---------------------------------------------------------
@@ -177,7 +198,7 @@ res <- foreach(
 #  - now, cem_scm slightly better than lm models
 
 
-total_res <- read_csv("sim_canonical_results/kang_spaceship.csv")
+total_res <- read_csv("sim_canonical_results/acic_spaceship.csv")
 
 total_res %>% 
   ggplot() +

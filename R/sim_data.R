@@ -444,72 +444,57 @@ gen_df_acic <- function(model.trt="step",
                         random.seed=1,
                         n=1000, p=10) {
   if (!requireNamespace("aciccomp2016", quietly = TRUE)) {
-    stop("Package 'aciccomp2016' is needed for this function. Please install it with: install.packages('kbal')",
-         call. = FALSE)
+    stop("Package 'aciccomp2016' is needed for this function. Please install it.")
   }
-  # idea: input_2016 is a 4802 x 58 df of COVARIATES
-  #  - dgp_2016() outputs a dataset of POs for input_2016
-  #  - see parameters_2016 for example inputs
-
-  # rows:
-  #  - model.trt: tx assignment model (linear, polynomial, step)
-  #  - root.trt: percentage of tx units (any #; 0.35, 0.65)
-  #  - overlap.trt: overlap between tx/co (one-term, full)
-  #  - model.rsp: outcome model (linear, exponential, step)
-  #  - alignment: prop of tx assignment covs used in response fxn (any #; 0, 0.25, 0.75)
-  #  - te.hetero: tx-effect heterogeneity (none, med, high)
-
-  # NOTE: for some god-forsaken reason, subsetting rows breaks things
-  #  - i.e., it makes the browser() functionality start running...
-  #  - the browser() call is from newDiscreteBaseFunction(),
-  #    where numLevels <= 1...?
 
   set.seed(random.seed)
 
-  # only subset numeric columns
-  numeric_cols <- input_2016 %>%
-    summarize(across(everything(), ~length(unique(.)))) %>%
-    pivot_longer(everything()) %>%
-    filter(value >= 20) %>%
-    pull(name)
-  base_df <- input_2016[,numeric_cols]
+  # Use namespaced dataset from aciccomp2016
+  base_data <- aciccomp2016::input_2016
+
+  # keep only numeric-like columns (>= 20 unique values), then select p of them
+  numeric_cols <- base_data %>%
+    dplyr::summarize(dplyr::across(dplyr::everything(), ~ length(unique(.)))) %>%
+    tidyr::pivot_longer(dplyr::everything()) %>%
+    dplyr::filter(.data$value >= 20) %>%
+    dplyr::pull(.data$name)
+
+  base_df <- base_data[, numeric_cols]
 
   if (n > nrow(base_df)) {
-    error(glue("n too large; needs to be <= {nrow(base_df)}"))
+    stop(glue::glue("n too large; needs to be <= {nrow(base_df)}"))
   }
   if (p > ncol(base_df)) {
-    error(glue("p too large; needs to be <= {ncol(base_df)}"))
+    stop(glue::glue("p too large; needs to be <= {ncol(base_df)}"))
   }
-  base_df <- base_df[,1:p] %>%
-    sample_n(n, replace=F)
 
-  # # NECESSARY: ensure that there aren't any factor levels without entries
-  # base_df$x_2 <- as.factor(as.character(base_df$x_2))
+  base_df <- base_df[, 1:p] %>% dplyr::sample_n(n, replace = FALSE)
 
-  # base_df %>%
-  #   summarize(across(everything(), ~length(unique(.))))
-  # browser()
-  df <-
-    dgp_2016(base_df,
-             parameters = list(
-               model.trt = model.trt,
-               root.trt = root.trt,
-               overlap.trt = overlap.trt,
-               model.rsp = model.rsp,
-               alignment = alignment,
-               te.hetero = te.hetero),
-             random.seed = random.seed)
+  # Generate potential outcomes using namespaced generator
+  df <- aciccomp2016::dgp_2016(
+    base_df,
+    parameters = list(
+      model.trt   = model.trt,
+      root.trt    = root.trt,
+      overlap.trt = overlap.trt,
+      model.rsp   = model.rsp,
+      alignment   = alignment,
+      te.hetero   = te.hetero
+    ),
+    random.seed = random.seed
+  )
 
-  df <- bind_cols(base_df, df) %>%
-    rename_with(.cols = everything(), toupper) %>%
-    rename_with(.cols = everything(), ~str_remove(., "_")) %>%
-    rename_with(.cols = everything(), ~str_remove(., "\\.")) %>%
-    mutate(id = 1:n(), .before=X1,
-           Z = Z==1) %>%
-    as_tibble()
+  df <- dplyr::bind_cols(base_df, df) %>%
+    dplyr::rename_with(.cols = dplyr::everything(), toupper) %>%
+    dplyr::rename_with(.cols = dplyr::everything(), ~ stringr::str_remove(., "_")) %>%
+    dplyr::rename_with(.cols = dplyr::everything(), ~ stringr::str_remove(., "\\.")) %>%
+    dplyr::mutate(id = 1:n(), .before = X1,
+                  Z = Z == 1) %>%
+    tibble::as_tibble()
 
   return(df)
 }
+
 
 gen_df_kang <- function(n=1000) {
   as_tibble(rmvnorm(n, mean=rep(0,4), sigma=diag(4))) %>%

@@ -51,7 +51,7 @@ form2 <- as.formula("Y ~ X1*X2")
 dir.create("data/outputs/sim_toy_results/toy_comprehensive_run2",
            showWarnings = FALSE, recursive = TRUE)
 
-source(here::here("R/wrappers.R"))
+source(here::here("scripts/wrappers.R"))
 source(here::here("R/utils.R"))
 
 # repeatedly run for all combinations of pars

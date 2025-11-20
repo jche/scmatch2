@@ -12,7 +12,7 @@ collect_sim_results <- function(sim_type, n_expected = 100) {
   cat(sprintf("\n=== Collecting %s results ===\n", toupper(sim_type)))
 
   # Directory with iteration results
-  results_dir <- file.path("data", "outputs", "sim_slurm", sim_type)
+  results_dir <- file.path("data", "outputs", "sims", sim_type)
 
   if (!dir.exists(results_dir)) {
     stop(sprintf("Results directory not found: %s", results_dir))
@@ -50,7 +50,7 @@ collect_sim_results <- function(sim_type, n_expected = 100) {
   }
 
   # Save combined results
-  output_file <- file.path("data", "outputs", "sim_slurm",
+  output_file <- file.path("data", "outputs", "sims",
                            paste0(sim_type, "_combined.csv"))
   write_csv(results, output_file)
 

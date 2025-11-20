@@ -1,4 +1,4 @@
-# R/wrappers.R
+# scripts/wrappers.R
 # wrapper functions of other packages: an adaptive implementation of
 # wide-use basic functions for convenience
 #
@@ -542,7 +542,6 @@ run_all_methods <- function( df, skip_slow = TRUE, num_bins = 5, extrapolate = T
                  csm, cem, one_nn) )
 }
 
-# test these --------------------------------------------------------------
 
 if (FALSE) {
   require(tidyverse)
@@ -614,92 +613,102 @@ get_att_causal_forest <- function(d, covs) {
   return(att)
 }
 
-#' Estimate ATT using TWANG (Toolkit for Weighting and Analysis of Nonequivalent Groups)
+#' Estimate ATT using TWANG (robust to logical/character covariates)
 #'
-#' @param d A data frame with treatment Z, outcome Y, and covariates
-#' @param form A formula for the propensity score model
-#'
-#' @return Estimated ATT
-#' @export
-get_att_twang <- function(d, form) {
+#' @param d Data.frame with Y, Z, and covariates
+#' @param form Propensity formula (e.g., Z ~ X1+X2+...)
+#' @param stop.method TWANG stop method (default "es.mean")
+#' @param n.trees GBM trees (default 5000)
+#' @param interaction.depth GBM depth (default 3)
+#' @param estimand "ATT" (default)
+#' @return numeric(1) ATT or NA_real_ on failure
+get_att_twang <- function(
+    d, form,
+    stop.method = "es.mean",
+    n.trees = 5000L,
+    interaction.depth = 3L,
+    estimand = "ATT"
+) {
   if (!requireNamespace("twang", quietly = TRUE)) {
-    stop("Package 'twang' is needed for this function. Please install it with: install.packages('twang')",
-         call. = FALSE)
+    stop("Package 'twang' is needed. Install with install.packages('twang')", call. = FALSE)
   }
 
-  # CRITICAL: Convert tibble to proper data.frame (twang doesn't support tibbles)
-  # Use as.data.frame() with stringsAsFactors to ensure proper conversion
+  # Ensure base type is data.frame (not tibble)
   d <- as.data.frame(d, stringsAsFactors = FALSE)
 
-  # Remove tibble class completely if it exists
-  class(d) <- "data.frame"
+  # Ensure outcome is numeric
+  if (!is.numeric(d$Y)) d$Y <- as.numeric(d$Y)
 
-  # CRITICAL: Ensure Z is numeric 0/1 (not logical TRUE/FALSE)
+  # Ensure Z is 0/1 numeric
   if (is.logical(d$Z)) {
-    d$Z <- as.integer(d$Z)  # TRUE -> 1, FALSE -> 0
+    d$Z <- as.integer(d$Z)
   } else if (is.factor(d$Z)) {
     d$Z <- as.integer(as.character(d$Z))
   } else {
     d$Z <- as.numeric(d$Z)
   }
-
-  # Double check Z is 0/1
   if (!all(d$Z %in% c(0, 1))) {
     warning("Treatment variable Z must be 0/1 after conversion")
     return(NA_real_)
   }
-
-  # Check that we have both treatment and control units
   if (length(unique(d$Z)) < 2) {
     warning("Only one treatment group present")
     return(NA_real_)
   }
 
-  # Fit propensity score model using GBM
-  ps_fit <- tryCatch({
+  # Coerce all logical covariates to factor; characters to factor as well.
+  is_logical <- vapply(d, is.logical, logical(1))
+  if (any(is_logical)) {
+    for (nm in names(d)[is_logical]) d[[nm]] <- factor(d[[nm]], levels = c(FALSE, TRUE))
+  }
+  is_char <- vapply(d, is.character, logical(1))
+  if (any(is_char)) {
+    for (nm in names(d)[is_char]) d[[nm]] <- factor(d[[nm]])
+  }
+
+  # Fit TWANG PS model
+  ps_fit <- tryCatch(
     twang::ps(
       formula = form,
       data = d,
-      estimand = "ATT",
-      stop.method = "es.mean",
-      n.trees = 5000,
-      interaction.depth = 3,
+      estimand = estimand,
+      stop.method = stop.method,
+      n.trees = n.trees,
+      interaction.depth = interaction.depth,
       verbose = FALSE
-    )
-  }, error = function(e) {
-    warning(paste("twang::ps failed:", e$message))
-    return(NULL)
-  })
+    ),
+    error = function(e) {
+      warning(sprintf("twang::ps failed: %s", e$message))
+      return(NULL)
+    }
+  )
+  if (is.null(ps_fit)) return(NA_real_)
 
-  if (is.null(ps_fit)) {
+  # Extract stabilized weights for chosen stop.method
+  weights <- tryCatch(
+    twang::get.weights(ps_fit, stop.method = stop.method),
+    error = function(e) {
+      warning(sprintf("get.weights failed: %s", e$message))
+      return(NULL)
+    }
+  )
+  if (is.null(weights) || !any(is.finite(weights))) {
+    warning("Weights missing or non-finite")
     return(NA_real_)
   }
 
-  # Get weights
-  weights <- tryCatch({
-    twang::get.weights(ps_fit, stop.method = "es.mean")
-  }, error = function(e) {
-    warning(paste("get.weights failed:", e$message))
-    return(NULL)
-  })
-
-  if (is.null(weights) || any(is.na(weights))) {
-    warning("Weights contain NA values")
+  # Weighted ATT: treated mean (weights ≈ 1) minus reweighted controls
+  d$wt <- weights
+  grp <- aggregate(list(Y = d$Y * d$wt, w = d$wt), by = list(Z = d$Z), FUN = sum)
+  if (!all(c(0,1) %in% grp$Z) || any(grp$w == 0)) {
+    warning("Invalid weights by group")
     return(NA_real_)
   }
-
-  # Calculate weighted ATT
-  d_weighted <- d %>%
-    dplyr::mutate(wt = weights)
-
-  att <- d_weighted %>%
-    dplyr::group_by(Z) %>%
-    dplyr::summarize(Y_wtd = weighted.mean(Y, wt), .groups = "drop") %>%
-    dplyr::summarize(att = diff(Y_wtd)) %>%
-    dplyr::pull(att)
-
-  return(att)
+  mu1 <- grp$Y[grp$Z == 1] / grp$w[grp$Z == 1]
+  mu0 <- grp$Y[grp$Z == 0] / grp$w[grp$Z == 0]
+  as.numeric(mu1 - mu0)
 }
+
 
 #' Estimate ATT using Kernel Balancing (kbal package)
 #'

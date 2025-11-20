@@ -31,7 +31,7 @@ run_comprehensive_sim <- function(sim_type,
   dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
   # Load helper functions
-  source(here::here("R/wrappers.R"))
+  source(here::here("scripts/wrappers.R"))
   source(here::here("R/utils.R"))
   source("R/sim_data.R")
 

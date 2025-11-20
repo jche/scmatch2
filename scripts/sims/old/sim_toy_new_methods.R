@@ -25,7 +25,7 @@ if (USE_PARALLEL) {
 dir.create("data/outputs/sim_toy_results/toy_new_methods",
            showWarnings = FALSE, recursive = TRUE)
 
-source(here::here("R/wrappers.R"))
+source(here::here("scripts/wrappers.R"))
 source(here::here("R/utils.R"))
 
 # Run simulations for new methods only

@@ -9,7 +9,7 @@ echo "=== Checking Simulation Progress ==="
 echo ""
 
 for sim in acic hainmueller kang; do
-  dir="data/outputs/sim_slurm/${sim}"
+  dir="data/outputs/sim/${sim}"
   if [ -d "$dir" ]; then
     count=$(ls ${dir}/iter_*.csv 2>/dev/null | wc -l)
     echo "${sim}: ${count}/100 iterations complete"

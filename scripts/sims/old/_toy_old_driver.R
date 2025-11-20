@@ -13,7 +13,7 @@ library(CSM)
 dir.create("data/outputs/sim_toy_results/toy_new_methods_seq",
            showWarnings = FALSE, recursive = TRUE)
 
-source(here::here("R/wrappers.R"))
+source(here::here("scripts/wrappers.R"))
 source(here::here("R/utils.R"))
 
 # Number of iterations

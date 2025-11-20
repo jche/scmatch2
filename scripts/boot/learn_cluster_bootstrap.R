@@ -7,7 +7,7 @@ source("R/matching.R")
 source("R/estimate.R")
 source("R/inference.R")
 source("R/sim_data.R")
-source("R/wrappers.R")
+source("scripts/wrappers.R")
 source("R/utils.R")
 source("R/bootstrap.R")
 
