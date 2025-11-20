@@ -5,7 +5,7 @@
 #SBATCH -c 4
 #SBATCH --mem=8G
 #SBATCH -t 02:30:00
-#SBATCH --array=1-2
+#SBATCH --array=1-1000
 
 # ---------------------------------------------------------------------
 # SLURM job array: run all four DGPs (acic, hainmueller, kang, toy)
