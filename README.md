@@ -11,8 +11,10 @@ particular, it identifies sets of units local to each treated unit in
 turn, and then makes a synthetic control for each treated unit using
 those local units.
 
-Details can be found on the paper: [Che et. al. (2024), Caliper
-Synthetic Matching](https://arxiv.org/abs/2411.05246)
+Details can be found on the paper: 
+
+* **Original CSM Method:** [Che et. al. (2024), Caliper Synthetic Matching](https://arxiv.org/abs/2411.05246)
+* **Variance Estimation (Paper 2):** [Preprint: Inference in Matching (November 2025)](https://mengeks.github.io/files/Inference_in_Matching-10Nov2025.pdf)
 
 The GitHub repo also has replication materials for the associated paper
 in the `scripts` directory; see below for further discussion of this
