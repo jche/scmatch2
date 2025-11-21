@@ -709,7 +709,6 @@ get_att_twang <- function(
   as.numeric(mu1 - mu0)
 }
 
-
 #' Estimate ATT using Kernel Balancing (kbal package)
 #'
 #' @param d A data frame with treatment Z, outcome Y, and covariates
@@ -722,6 +721,12 @@ get_att_kbal <- function(d, covs, numdims = NULL) {
   if (!requireNamespace("kbal", quietly = TRUE)) {
     stop("Package 'kbal' is needed for this function. Please install it with: install.packages('kbal')",
          call. = FALSE)
+  }
+
+  # Check for valid Treatment variable (0/1 or T/F)
+  # This ensures the test case for 'df_bad' passes
+  if (!all(unique(d$Z) %in% c(0, 1, FALSE, TRUE))) {
+    stop("Treatment variable must be either 0, 1 or FALSE, TRUE")
   }
 
   # Prepare data

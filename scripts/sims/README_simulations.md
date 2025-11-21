@@ -45,6 +45,9 @@ Rscript scripts/sims/demo_run_single_iter_fast.R
 This runs the `toy` DGP for one iteration using only fast estimators  
 (`diff`, `bal1`, `or_lm`, `ps_lm`) and prints a one-line summary.
 
+Alternatively, **you can open the script in RStudio and run all lines interactively**  
+to see the workflow step by step.
+
 Output → `data/outputs/sims/toy/iter_0001.csv`.
 
 ---
@@ -111,6 +114,9 @@ Combine iteration CSVs and print performance summaries:
 Rscript scripts/analysis/collect_slurm_results.R
 ```
 
+Alternatively, **you can open and run `scripts/analysis/collect_slurm_results.R`  
+directly in RStudio** to interactively inspect summaries.
+
 Creates combined files:
 
 ```
@@ -125,7 +131,20 @@ data/outputs/sim_canonical_results/
 
 ---
 
-## ⚠️ 5. Important: Adjust your paths
+## 🖼️ 5. Generate figures
+
+Once results are collected, you can reproduce the paper-quality plots via:
+
+```
+scripts/figs/fig_sim_canonicals.R   # canonical DGPs (ACIC, Hainmueller, Kang)
+scripts/figs/fig_sim_toy.R          # toy simulation
+```
+
+These scripts read the combined CSVs and produce all simulation figures.
+
+---
+
+## ⚠️ 6. Important: Adjust your paths
 
 Before running on your own system:
 
@@ -158,14 +177,15 @@ Rscript -e "library(CSM); library(twang); library(kbal)"
 
 ---
 
-## 🧠 6. Typical workflow summary
+## 🧠 7. Typical workflow summary
 
 | Step | Command | Purpose |
 |------|----------|----------|
-| Quick check | `Rscript scripts/sims/demo_run_single_iter_fast.R` | Verify environment |
+| Quick check | `Rscript scripts/sims/demo_run_single_iter_fast.R` or run in RStudio | Verify environment |
 | Local dev run | `Rscript scripts/sims/run_local_all.R 3` | Run small replication locally |
 | Cluster run | `sbatch scripts/sims/run_slurm_all.sh` | Full-scale SLURM job array |
-| Combine results | `Rscript scripts/analysis/collect_slurm_results.R` | Summarize all outputs |
+| Combine results | `Rscript scripts/analysis/collect_slurm_results.R` or run interactively | Summarize all outputs |
+| Make figures | run `scripts/figs/fig_sim_canonicals.R` / `scripts/figs/fig_sim_toy.R` | Generate simulation plots |
 
 ---
 
@@ -187,5 +207,5 @@ Rscript scripts/sims/run_single_iteration.R hainmueller 1 diff bal1
 ---
 
 **Author:** Xiang Meng  
-**Last updated:** 2025-11-20  
+**Last updated:** 2025-11-21  
 **Contact:** xmeng@g.harvard.edu

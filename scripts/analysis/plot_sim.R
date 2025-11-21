@@ -152,9 +152,9 @@ acic_plot_sim_type <- function(simname,
                       legend.position="none") {
   df <- res %>%
     filter(sim_type == simname)
-  if (simname == "hainmueller"){
-    df <- df %>% select(-twang)
-  }
+  # if (simname == "hainmueller"){
+  #   df <- df %>% select(-twang)
+  # }
   return(RMSE_plot(df,title,ylab,xlab,legend.position))
 }
 
