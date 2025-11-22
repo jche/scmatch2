@@ -34,7 +34,7 @@ gen_df_adv_k(
 
 \item{ctr_dist}{Distance parameter influencing cluster separation.}
 
-\item{prop_nc_unif}{Proportion of control units drawn uniformly from \link{0,1}^k box.}
+\item{prop_nc_unif}{Proportion of control units drawn uniformly from the \eqn{[0,1]^k} box.}
 }
 \value{
 A tibble containing a k-dimensional toy dataset.

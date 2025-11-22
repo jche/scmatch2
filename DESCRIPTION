@@ -4,8 +4,7 @@ Version: 0.0.0.9000
 Authors@R: 
     person("Xiang", "Meng", , "xmeng@g.harvard.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0009-0000-7502-1314"))
-    person("Che", "Jonathan", , "jche@exponent.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
+    person("Che", "Jonathan", , "jche@exponent.com", role = c("aut", "cre"))
     person("Luke", "Miratrix", , "lmiratrix@g.harvard.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-0078-1906"))
 Description: Given an observational dataset, match all the treated units to controls using a radial matching algorithm, and then use the matched controls to build a synthetic counterfactual for each treated unit.

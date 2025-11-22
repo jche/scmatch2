@@ -161,7 +161,8 @@ gen_toy_covar_k <- function(n, centers, k, sd) {
       colnames(points) <- paste0("X", 1:k)
 
       # Now convert to tibble with proper names
-      all_points_list[[i]] <- as_tibble(points)
+      all_points_list[[i]] <- as_tibble(points,
+                                        .name_repair = "universal_quiet" )
     }
   }
 
@@ -181,7 +182,7 @@ gen_toy_covar_k <- function(n, centers, k, sd) {
 #' @param f0_fun Function for baseline potential outcome Y0 (expects k-dim matrix X).
 #' @param tx_effect_fun Function for treatment effect (expects k-dim matrix X).
 #' @param ctr_dist Distance parameter influencing cluster separation.
-#' @param prop_nc_unif Proportion of control units drawn uniformly from [0,1]^k box.
+#' @param prop_nc_unif Proportion of control units drawn uniformly from the \eqn{[0,1]^k} box.
 #'
 #' @return A tibble containing a k-dimensional toy dataset.
 #' @export
@@ -222,7 +223,7 @@ gen_df_adv_k <- function(nc, nt, k, # Added k
   nc_unif <- ceiling(nc * prop_nc_unif)
   if (nc_unif > 0) {
     unif_matrix <- matrix(runif(nc_unif * k), ncol = k)
-    dat_conear <- as_tibble(unif_matrix)
+    dat_conear <- as_tibble(unif_matrix, .name_repair = "universal_quiet")
     colnames(dat_conear) <- paste0("X", 1:k)
     dat_conear$Z <- FALSE
   } else {
@@ -389,7 +390,9 @@ gen_df_hain <- function(nt = 50,
 
   df <- as_tibble(rmvnorm(NUMSAMP,
                           mean = c(0,0,0),
-                          sigma = matrix(c(2,1,-1,1,1,-0.5,-1,-0.5,1), ncol=3))) %>%
+                          sigma = matrix(c(2,1,-1,1,1,-0.5,-1,-0.5,1), ncol=3)),
+                  .name_repair = "universal_quiet"
+                  ) %>%
     mutate(V4 = runif(NUMSAMP, min=-3, max=3),
            V5 = rchisq(NUMSAMP, df=1),
            V6 = sample(c(T,F), NUMSAMP, replace=T, prob=c(0.5,0.5)),
@@ -490,14 +493,15 @@ gen_df_acic <- function(model.trt="step",
     dplyr::rename_with(.cols = dplyr::everything(), ~ stringr::str_remove(., "\\.")) %>%
     dplyr::mutate(id = 1:n(), .before = X1,
                   Z = Z == 1) %>%
-    tibble::as_tibble()
+    tibble::as_tibble( .name_repair = "universal_quiet" )
 
   return(df)
 }
 
 
 gen_df_kang <- function(n=1000) {
-  as_tibble(rmvnorm(n, mean=rep(0,4), sigma=diag(4))) %>%
+  as_tibble(rmvnorm(n, mean=rep(0,4), sigma=diag(4)),
+            .name_repair = "universal_quiet"  ) %>%
     mutate(Y = 210 + 27.4*V1 + 13.7*(V2+V3+V4) + rnorm(n),
            e = rje::expit(-V1 + 0.5*V2 - 0.25*V3 - 0.1*V4)) %>%
     mutate(X1 = exp(V1/2),

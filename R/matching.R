@@ -192,10 +192,12 @@ gen_matches <- function(df,
   } else {
     df <- df %>%
       group_by( across( all_of( treatment ) ) ) %>%
-      mutate( id = paste0( ifelse( treatment == 0, "co", "tx" ),
-                           1:n() ) ) %>%
+      mutate( id = paste0( ifelse( !.data[[treatment]], "co", "tx" ),
+                           row_number() ) ) %>%
       ungroup()
   }
+  df <- df %>%
+    dplyr::relocate( id )
 
   ### step 0: generate distance matrix, and
   #   store an uncapped version as well.
@@ -237,6 +239,8 @@ gen_matches <- function(df,
                                    metric = metric,
                                    scaling = scaling )
   attr( res, "covariates" ) <- covs
+
+
   return(res)
 }
 

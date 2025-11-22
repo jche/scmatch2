@@ -19,24 +19,27 @@ test_that("gen_matches returns correct matches
             res_matched_pair_1 <- as.matrix(res$matches[[1]])
             expected_matched_pair_1 <-
               data.frame(
+                id = c( "tx1", "co1", "co2" ),
                 Z = c(1, 0, 0),
                 X = c(0, 0.5, 0.8),
                 dist = c(0, 0.5, 0.8),
                 subclass = c("tx1", "tx1", "tx1")
               )
-            rownames(expected_matched_pair_1) <- c('1','2','3')
+            #rownames(expected_matched_pair_1) <- c('1','2','3')
             expect_equal(res_matched_pair_1,
                          as.matrix(expected_matched_pair_1))
 
             res_matched_pair_2 <- as.matrix(res$matches[[2]])
+            res_matched_pair_2
             expected_matched_pair_2 <-
               data.frame(
+                id = c("tx2", "co2" ),
                 Z = c(1, 0),
                 X = c(1.6, 0.8),
                 dist = c(0, 0.8),
                 subclass = c("tx2", "tx2")
               )
-            rownames(expected_matched_pair_2) <- c('1','3')
+            #rownames(expected_matched_pair_2) <- c('1','3')
             expect_equal(res_matched_pair_2,
                          as.matrix(expected_matched_pair_2))
           })
@@ -55,14 +58,16 @@ test_that("gen_matches did well in different scaling",{
                      caliper = 1)
 
   res_matched_pair_1 <- as.matrix(res$matches[[1]])
+  res_matched_pair_1
   expected_matched_pair_1 <-
     data.frame(
+      id = c("tx1", "co1"),
       Z = c(1, 0),
       X = c(0, 0.5), # X retains in the original scale
       dist = c(0, 0.75), # but distance is computed in scaled X
       subclass = c("tx1", "tx1")
     )
-  rownames(expected_matched_pair_1) <- c('1','2')
+ # rownames(expected_matched_pair_1) <- c('1','2')
   expect_equal(res_matched_pair_1,
                as.matrix(expected_matched_pair_1))
 
@@ -76,12 +81,13 @@ test_that("gen_matches did well in different scaling",{
   res_matched_pair_1 <- as.matrix(res$matches[[1]])
   expected_matched_pair_1 <-
     data.frame(
+      id = c("tx1", "co1"),
       Z = c(1, 0),
       X = c(0, 0.5),
       dist = c(0, 0.5), # distance is retained in original scale, but the last unit got unmatched
       subclass = c("tx1", "tx1")
     )
-  rownames(expected_matched_pair_1) <- c('1','2')
+  #rownames(expected_matched_pair_1) <- c('1','2')
   expect_equal(res_matched_pair_1,
                as.matrix(expected_matched_pair_1))
 })
@@ -169,11 +175,11 @@ test_that("gen_matches do the correct thing with non-uniform scaling", {
 
   # Scaling and caliper gives same thing?
   retx2 <- get_cal_matches(df=test_df,
-                          covs = c( "X1", "X2" ),
-                          treatment = "Z",
-                          scaling = c(4, 1),
-                          rad_method = "fixed",
-                          caliper = 1/0.25)
+                           covs = c( "X1", "X2" ),
+                           treatment = "Z",
+                           scaling = c(4, 1),
+                           rad_method = "fixed",
+                           caliper = 1/0.25)
 
 
   expect_equal( result_table( res )$weights, result_table( retx2 )$weights )

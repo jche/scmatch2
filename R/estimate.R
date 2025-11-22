@@ -157,41 +157,45 @@ get_pooled_variance <- function(
 }
 
 
-#' #' Main function: Estimate the variance from the plug-in estimator
-#' #'
-#' #' @param matches_table The data frame of the matched table
-#' #' @param outcome Name of the outcome variable (default "Y")
-#' #' @param treatment Name of the treatment variable (default "Z")
-#' #' @param var_weight_type The way that cluster variances are averaged
-#' #' "num_units": weight by number of units in the subclass
-#' #' "ess_units": weight effective size of units in the subclass
-#' #' "uniform: weight each cluster equally
-#' #' @return A tibble with SE, sigma_hat, N_T, and N_C_tilde
-#' #' @export
-#' get_se_AE_table <- function(
-#'     matches_table,
-#'     outcome = "Y",
-#'     treatment = "Z",
-#'     var_weight_type = "ess_units") {
-#'
-#'   weighted_var <- get_pooled_variance(
-#'     matches_table = matches_table,
-#'     outcome = outcome,
-#'     treatment = treatment,
-#'     var_weight_type = var_weight_type)
-#'
-#'   sigma_hat <- sqrt(weighted_var)
-#'
-#'   # Step 4: Calculate N_T and effective size of controls (N_C_tilde)
-#'   Ns <- calc_N_T_N_C(matches_table)
-#'
-#'   # Step 5: Calculate the plug-in standard error
-#'   SE <- get_plug_in_SE(
-#'     N_T = Ns$N_T,
-#'     ESS_C = Ns$N_C_tilde,
-#'     sigma_hat = sigma_hat
-#'     )
-#'
+# #' Main function: Estimate the variance from the plug-in estimator
+# #'
+# #' @param matches_table The data frame of the matched table
+# #' @param outcome Name of the outcome variable (default "Y")
+# #' @param treatment Name of the treatment variable (default "Z")
+# #' @param var_weight_type The way that cluster variances are averaged
+# #' "num_units": weight by number of units in the subclass
+# #' "ess_units": weight effective size of units in the subclass
+# #' "uniform: weight each cluster equally
+# #' @return A tibble with SE, sigma_hat, N_T, and N_C_tilde
+# #' @export
+# get_se_AE_table <- function(
+#     matches_table,
+  #   outcome = "Y",
+  #   treatment = "Z",
+  #   var_weight_type = "ess_units") {
+  #
+  # weighted_var <- get_pooled_variance(
+  #   matches_table = matches_table,
+  #   outcome = outcome,
+  #   treatment = treatment,
+  #   var_weight_type = var_weight_type)
+  #
+  # sigma_hat <- sqrt(weighted_var)
+  #
+  # # Step 4: Calculate N_T and effective size of controls (N_C_tilde)
+  # Ns <- calc_N_T_N_C(matches_table)
+  #
+  # # Step 5: Calculate the plug-in standard error
+  # SE <- get_plug_in_SE(
+  #   N_T = Ns$N_T,
+  #   ESS_C = Ns$N_C_tilde,
+  #   sigma_hat = sigma_hat
+  #   )
+  #
+
+
+
+
 get_se_AE <- function(matches,
                       outcome = "Y",
                       treatment = "Z",

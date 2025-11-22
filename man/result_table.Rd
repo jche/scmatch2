@@ -6,7 +6,7 @@
 \usage{
 result_table(
   csm,
-  return = c("all", "sc_units", "agg_co_units"),
+  return = c("all", "sc_units", "agg_co_units", "exact"),
   feasible_only = FALSE,
   nonzero_weight_only = FALSE
 )
@@ -16,7 +16,8 @@ result_table(
 result table.  Possible values: "sc_units" (the synthetic control
 units), "agg_co_units" (the unique control units, with total
 weight across all their matches), or "all" (control units will be
-repeated if matched multiply). Defaults to "all".}
+repeated if matched multiply). "exact" returns only exact matches
+(up to machine precision on distance). Defaults to "all".}
 
 \item{feasible_only}{TRUE means only return units which were
 matched without expanding the caliper.}
