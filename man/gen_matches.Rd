@@ -11,7 +11,8 @@ gen_matches(
   scaling = 1,
   metric = "maximum",
   caliper = 1,
-  rad_method = c("adaptive", "1nn", "fixed", "adaptive-5nn", "knn"),
+  rad_method = c("adaptive", "1nn", "fixed", "adaptive-knn", "knn"),
+  id_name = NULL,
   k = 5,
   ...
 )
@@ -40,6 +41,12 @@ each treated unit.  fixed means drop treated units with no
 matches closer than caliper. 1nn means largest of closest control
 and caliper.}
 
+\item{id_name}{Name of ID column, if one is desired. Otherwise unique
+IDs will be generated automatically.}
+
+\item{k}{For "knn" radius method, number of nearest neighbors to
+use. Defaults to 5.}
+
 \item{...}{Extra arguments}
 }
 \value{
@@ -58,6 +65,9 @@ units
 \details{
 Note: we allow controls to be repeatedly used (we match with
 replacement).
+
+Generally use the \code{get_cal_matches()} function instead, which
+wraps this.
 }
 \examples{
 df <- CSM:::gen_one_toy()

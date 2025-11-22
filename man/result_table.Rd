@@ -2,8 +2,7 @@
 % Please edit documentation in R/csm_matches_object.R
 \name{result_table}
 \alias{result_table}
-\title{Get table of aggregated results, with rows for synthetic units if
-that was asked for}
+\title{Obtain table of aggregated results}
 \usage{
 result_table(
   csm,
@@ -13,15 +12,18 @@ result_table(
 )
 }
 \arguments{
-\item{return}{Possible values: "sc_units", "agg_co_units", or
-"all". How to aggregate units, if at all, in making the result
-table.  Defaults to "all".}
+\item{return}{How to aggregate units, if at all, in making the
+result table.  Possible values: "sc_units" (the synthetic control
+units), "agg_co_units" (the unique control units, with total
+weight across all their matches), or "all" (control units will be
+repeated if matched multiply). Defaults to "all".}
 
 \item{feasible_only}{TRUE means only return units which were
 matched without expanding the caliper.}
 }
 \value{
-dataframe
+dataframe of the treatment and control units.  This
+dataframe can be analyzed as an as-if experimental dataset.
 }
 \description{
 This method will give the controls as synthetic controls

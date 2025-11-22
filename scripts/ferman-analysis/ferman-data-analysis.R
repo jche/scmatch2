@@ -7,8 +7,9 @@ library(tidyverse)
 options(list(dplyr.summarise.inform = FALSE))
 theme_set( theme_classic() )
 
+# Load the data
 ferman_for_analysis <-
-  readRDS(here::here( "scripts/ferman-analysis/data/ferman_for_analysis.rds" ))
+  readRDS( here::here( "scripts/ferman-analysis/data/ferman_for_analysis.rds" ) )
 head( ferman_for_analysis )
 
 # Drop unneeded variables

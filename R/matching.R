@@ -6,9 +6,10 @@
 
 #' get the radius size for each treated unit
 #'
-#' @param dm data
-#' @param rad_method Method for radius
+#' @param dm Distance metric, rows are treated units, columns are control units
+#' @param rad_method Method for determining radius size
 #' @param caliper Caliper size
+#' @param k For knn method, number of nearest neighbors
 #'
 #' @export
 get_radius_size <- function(dm,
@@ -16,6 +17,7 @@ get_radius_size <- function(dm,
                             caliper,
                             k){
   ntx = nrow(dm)
+
   radius_sizes <- numeric(ntx)
   if (rad_method == "adaptive") {
     # Adaptive: r = max(caliper, 1nn)
@@ -24,14 +26,15 @@ get_radius_size <- function(dm,
       temp_sorted <- sort(temp)
       radius_sizes[i] <- max(caliper, temp_sorted[1])
     }
-  } else if (rad_method == "1nn") {
+  } else if (rad_method == "1nn" || (rad_method=="knn" && k==1) ) {
     radius_sizes <- apply(dm, 1, min)
-  } else if (rad_method == "adaptive-5nn"){
+  } else if (rad_method == "adaptive-knn") {
     for (i in 1:ntx) {
       temp <- dm[i,]
       temp_sorted <- sort(temp)
+      # TODO: Define what adaptive-knn is supposed to be
       adacal <- max(caliper, temp_sorted[1])
-      radius_sizes[i] <- min(adacal, temp_sorted[5])
+      radius_sizes[i] <- min(adacal, temp_sorted[k])
     }
   } else if (rad_method == "knn") {
     for (i in 1:ntx) {
@@ -39,8 +42,7 @@ get_radius_size <- function(dm,
       temp_sorted <- sort(temp)
       radius_sizes[i] <- temp_sorted[k]
     }
-  }
-  else {
+  } else {
     radius_sizes <- rep(caliper, nrow(dm))
   }
   return(radius_sizes)
@@ -50,6 +52,7 @@ get_radius_size <- function(dm,
 
 
 # matching method ---------------------------------------------------------
+
 # generate df of matched controls for each treated unit
 get_matched_co_from_dm_trimmed <- function(df, dm_trimmed, treatment) {
   ntx <- nrow(dm_trimmed)
@@ -124,6 +127,9 @@ set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
 #' Note: we allow controls to be repeatedly used (we match with
 #' replacement).
 #'
+#' Generally use the \code{get_cal_matches()} function instead, which
+#' wraps this.
+#'
 #'
 #' @param df A data frame containing all the listed covariates and the
 #'   treatment indicator.
@@ -141,6 +147,10 @@ set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
 #'   each treated unit.  fixed means drop treated units with no
 #'   matches closer than caliper. 1nn means largest of closest control
 #'   and caliper.
+#' @param k For "knn" radius method, number of nearest neighbors to
+#'   use. Defaults to 5.
+#' @param id_name Name of ID column, if one is desired. Otherwise unique
+#'   IDs will be generated automatically.
 #' @param ... Extra arguments
 #'
 #' @return A list of results.  matches: list of small datasets of
@@ -160,7 +170,8 @@ gen_matches <- function(df,
                         scaling=1,
                         metric="maximum",
                         caliper=1,
-                        rad_method = c("adaptive", "1nn", "fixed","adaptive-5nn", "knn"),
+                        rad_method = c("adaptive", "1nn", "fixed","adaptive-knn", "knn"),
+                        id_name = NULL,
                         k = 5,
                         ...) {
 
@@ -174,6 +185,17 @@ gen_matches <- function(df,
   # store helpful constants
   ntx <- df %>% pull({{treatment}}) %>% sum()   # number of tx units
   p   <- df %>% dplyr::select(all_of(covs)) %>% ncol()     # number of matched covariates
+
+  if ( !is.null( id_name ) ) {
+    stopifnot( id_name %in% colnames(df) )
+    df$id = df[[id_name]]
+  } else {
+    df <- df %>%
+      group_by( across( all_of( treatment ) ) ) %>%
+      mutate( id = paste0( ifelse( treatment == 0, "co", "tx" ),
+                           1:n() ) ) %>%
+      ungroup()
+  }
 
   ### step 0: generate distance matrix, and
   #   store an uncapped version as well.

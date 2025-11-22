@@ -11,6 +11,7 @@ ferman_for_analysis <-
 c <- 0.35
 covariate_caliper <- c(rep(0.2, 3), 1/1000)
 scaling <- 1/covariate_caliper
+scaling
 
 ferman_scm <- ferman_for_analysis %>%
   get_cal_matches(
@@ -19,5 +20,8 @@ ferman_scm <- ferman_for_analysis %>%
     caliper = c,
     metric = "maximum",   # "maximum", "euclidean", "manhattan"
     rad_method = "adaptive",
-    scaling = 1/covariate_caliper,
+    scaling = scaling,
     est_method = "scm")
+
+
+

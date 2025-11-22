@@ -65,11 +65,12 @@ ggplot( dat, aes( X1, X2, color = Z ) ) + geom_point() +
 To calculate matches, call `get_cal_matches()`--it will match, make synthetic controls for each unit, and give you a final dataset back, stored as an `csm_matches` object:
 ```{r}
 mtch <- get_cal_matches( dat, 
-                        metric = "maximum",
-                        scaling = c( 1/0.2, 1/0.2),
-                        caliper = 1, 
-                        rad_method = "adaptive", 
-                        est_method = "scm" ) 
+                         covs = ~ X1 + X2,
+                         metric = "maximum",
+                         scaling = c( 1/0.2, 1/0.2 ),
+                         caliper = 1, 
+                         rad_method = "adaptive", 
+                         est_method = "scm" ) 
 mtch
 ```
 

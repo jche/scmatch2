@@ -12,7 +12,7 @@ Description: Given an observational dataset, match all the treated units to cont
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Depends: 
     R (>= 3.6.0)
 Imports:
@@ -32,7 +32,6 @@ Imports:
     AIPW,
     optweight,
     MatchIt,
-    aciccomp2016,
     gtools
 Remotes:
     vdorie/aciccomp/2016
@@ -40,5 +39,6 @@ Suggests:
     testthat (>= 3.0.0),
     grf,
     twang,
-    kbal
+    kbal,
+    aciccomp2016
 Config/testthat/edition: 3

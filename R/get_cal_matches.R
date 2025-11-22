@@ -48,24 +48,29 @@ make_treatment_table <- function( df, matches, caliper ) {
 #'
 #' This is the core method of the CSM package. Conduct (adaptive)
 #' radius matching with optional synthetic step on the resulting sets
-#' of controls. The function creates a matched dataset by finding control
-#' units that are similar to treatment units based on specified covariates
-#' and distance metrics, then optionally weights these controls using synthetic
-#' control methods.
+#' of controls. The function creates a matched dataset by finding
+#' control units that are similar to treatment units based on
+#' specified covariates and distance metrics, then optionally weights
+#' these controls using synthetic control methods.
 #'
-#' @param df The data frame of data to be matched. Must contain treatment
-#'   indicator and covariates for matching.
-#' @param covs Specification of covariates to use for matching. Can be variable
-#'   names or tidyselect helpers like \code{starts_with("X")}. Defaults to
-#'   variables starting with "X".
-#' @param treatment Name of the column in \code{df} containing the treatment
-#'   indicator (0/1 or TRUE/FALSE). Defaults to "Z".
+#' @param df The data frame of data to be matched. Must contain
+#'   treatment indicator and covariates for matching.
+#' @param covs Specification of covariates to use for matching. Can be
+#'   variable names or tidyselect helpers like
+#'   \code{starts_with("X")}. Defaults to variables starting with "X".
+#'
+#' @param treatment Name of the column in \code{df} containing the
+#'   treatment indicator (0/1 or TRUE/FALSE). Defaults to "Z".
+#'
+#' @param form Formula of form treatment ~ cov1 + cov2 + ...
+#'   specifying the treatment variable and covariates to use for
+#'   matching.  If not null, will override covs and treatment.
 #' @param metric A string specifying the distance metric. One of
 #'   "maximum", "euclidean", or "manhattan".
 #' @param caliper A numeric specifying the caliper size for matching.
 #'   Controls the maximum allowable distance between matched units.
-#' @param rad_method Method to determine the radius size for each treated unit.
-#'   Options include:
+#' @param rad_method Method to determine the radius size for each
+#'   treated unit. Options include:
 #'   \itemize{
 #'     \item "adaptive": Uses the maximum of the caliper and the distance to nearest control
 #'     \item "fixed": Uses the specified caliper value
@@ -84,9 +89,9 @@ make_treatment_table <- function( df, matches, caliper ) {
 #'   also be a single row matrix). These are often just the inverses
 #'   of covariate-specific standard deviations. Controls the relative
 #'   importance of different covariates in the distance calculation.
-#' @param id_name Name of column to look for ID values. If that
-#'   column is not found, a canonical \code{id} corresponding to row
-#'   numbers will be created.
+#' @param id_name Name of column to look for ID values. If that column
+#'   is not found, a canonical \code{id} corresponding to row numbers
+#'   will be created.
 #' @param warn A logical indicating whether to warn about dropped
 #'   units (those that cannot be matched within the caliper).
 #' @param k Integer specifying the number of neighbors to use when
@@ -100,12 +105,12 @@ make_treatment_table <- function( df, matches, caliper ) {
 #'     \item \code{dm_uncapped}: Original distance matrix without censoring
 #'     \item \code{treatment_table}: Table of treated units with matching information
 #'   }
-#'   The object also has attributes storing the settings used for matching.
+#'   The object also has attributes storing the settings used for
+#'   matching.
 #'
-#' @seealso
-#'   \code{\link{gen_matches}} for the underlying matching function,
-#'   \code{\link{est_weights}} for weight calculation,
-#'   \code{\link{result_table}} for extracting results
+#' @seealso \code{\link{gen_matches}} for the underlying matching
+#' function, \code{\link{est_weights}} for weight calculation,
+#' \code{\link{result_table}} for extracting results
 #'
 #' @examples
 #' # Generate example data
@@ -128,6 +133,7 @@ make_treatment_table <- function( df, matches, caliper ) {
 #'
 #' @export
 get_cal_matches <- function( df,
+                             form = NULL,
                              covs = starts_with("X"),
                              treatment = "Z",
                              metric = c("maximum", "euclidean", "manhattan"),
@@ -138,11 +144,20 @@ get_cal_matches <- function( df,
                              id_name = "id",
                              warn = TRUE ,
                              k = 5  ## for KNN matching
-                             ) {
+) {
   metric <- match.arg(metric)
   rad_method <- match.arg(rad_method)
   est_method <- match.arg(est_method)
 
+  # formula is of form treatment ~ covariates.
+  # Extract these into 'treatment' and 'covs'
+  if ( !is.null(form) ) {
+    mf <- model.frame( form, data = df )
+    treatment <- colnames( mf )[1]
+    covs <- colnames( mf )[ -1 ]
+  }
+
+  # Add ID column if not present
   if ( !( id_name %in% colnames(df) ) ) {
     df$id <- paste0( "U", 1:nrow(df) )
   } else {
@@ -159,7 +174,8 @@ get_cal_matches <- function( df,
       metric = metric,
       caliper = caliper,
       rad_method = rad_method,
-      k = k )
+      k = k,
+      id_name="id" )
 
   # scmatches$matches is a list of length ntx. Each element is a data
   # frame of matched controls for the given unit.
@@ -189,13 +205,24 @@ get_cal_matches <- function( df,
 
   # keep a bunch of attributes around, just in case
   settings <- attr(scmatches, "settings" )
+
+  settings$covariates = covs
+  settings$treatment = treatment
+  settings$metric = metric
+  settings$caliper = caliper
   settings$rad_method = rad_method
   settings$est_method = est_method
-  settings$return = return
-  settings$treatment = treatment
+  settings$scaling = scaling
+  settings$id_name = id_name
+  settings$k = k
+
   attr( scmatches, "settings" ) <- settings
 
   class(scmatches) = "csm_matches"
 
   return(scmatches)
 }
+
+
+
+

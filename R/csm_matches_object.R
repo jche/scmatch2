@@ -85,6 +85,15 @@ as.data.frame.csm_matches <- function(
 print.csm_matches <- function(x, ...) {
   ntx = length( x$matches )
 
+  mtch = bind_rows( x$matches ) %>%
+    dplyr::filter( Z == 0 )
+  nco = n_distinct( mtch$id )
+  n_drop = sum( is.na( x$adacalipers ) )
+
+  mex <- mtch %>%
+    filter( abs(dist) < 10*.Machine$double.eps )
+  n_exact = n_distinct( mex$id )
+
   tt <- x$treatment_table
   if ( !is.null( tt ) ) {
     ntx_over = sum( tt$feasible != 1 )
@@ -120,13 +129,19 @@ print.csm_matches <- function(x, ...) {
   cal <- settings$cal
   cat( glue::glue( 'csm_matches: matching with "{settings$metric}" distance\
                         match covariates: {covs} \
-                   {ntx} Treated units matched to control units ({ntx_over} above set caliper) \
+                   {ntx} treated units matched to {nco} control units ({ntx_over} above set caliper) \
+                   \t({n_exact} exact matches) \
                    Adaptive calipers: {adas} \
                    \tTarget caliper = {cal} \
                    \tMax distance ranges {d_min} - {d_max} \
                    scaling: {scaling}' ) )
 
   cat("\n")
+  if ( n_drop > 0 ) {
+    cat( "\t" )
+    cat( glue::glue( "{n_drop} treated units dropped" ) )
+    cat("\n")
+  }
 }
 
 
@@ -226,25 +241,28 @@ unmatched_units <- function( csm ) {
 }
 
 
-#' Get table of aggregated results, with rows for synthetic units if
-#' that was asked for
+#' Obtain table of aggregated results
 #'
 #' This method will give the controls as synthetic controls
 #' (sc_units), the individual controls with repeat rows if controls
 #' were used for different treated units (all), or aggregated controls
 #' with only one row per control unit (agg_co_units).
 #'
-#' @param return Possible values: "sc_units", "agg_co_units", or
-#'   "all". How to aggregate units, if at all, in making the result
-#'   table.  Defaults to "all".
+#' @param return How to aggregate units, if at all, in making the
+#'   result table.  Possible values: "sc_units" (the synthetic control
+#'   units), "agg_co_units" (the unique control units, with total
+#'   weight across all their matches), or "all" (control units will be
+#'   repeated if matched multiply). "exact" returns only exact matches
+#'   (up to machine precision on distance). Defaults to "all".
 #' @param feasible_only TRUE means only return units which were
 #'   matched without expanding the caliper.
 #'
-#' @return dataframe
+#' @return dataframe of the treatment and control units.  This
+#'   dataframe can be analyzed as an as-if experimental dataset.
 #' @export
 #'
 result_table <- function( csm,
-                          return = c( "all", "sc_units", "agg_co_units" ),
+                          return = c( "all", "sc_units", "agg_co_units", "exact" ),
                           feasible_only = FALSE,
                           nonzero_weight_only = FALSE ) {
 
@@ -254,9 +272,19 @@ result_table <- function( csm,
   rs <- switch(return,
                sc_units     = agg_sc_units(csm$matches),
                agg_co_units = agg_co_units(csm$matches),
-               all          = bind_rows(csm$matches) )
+               all          = bind_rows(csm$matches),
+               exact        = bind_rows(csm$matches) %>%
+                 filter( abs(dist) < 10*.Machine$double.eps )
+  )
 
-
+  if ( return == "exact" ) {
+    rs <- rs %>%
+      group_by( subclass ) %>%
+      mutate( nc = n() - 1 ) %>%
+      ungroup() %>%
+      dplyr::filter( nc > 0 ) %>%
+      dplyr::select( -nc )
+  }
 
   if ( feasible_only ) {
     fs = feasible_unit_subclass(csm)

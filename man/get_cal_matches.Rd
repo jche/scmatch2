@@ -6,6 +6,7 @@
 \usage{
 get_cal_matches(
   df,
+  form = NULL,
   covs = starts_with("X"),
   treatment = "Z",
   metric = c("maximum", "euclidean", "manhattan"),
@@ -19,15 +20,19 @@ get_cal_matches(
 )
 }
 \arguments{
-\item{df}{The data frame of data to be matched. Must contain treatment
-indicator and covariates for matching.}
+\item{df}{The data frame of data to be matched. Must contain
+treatment indicator and covariates for matching.}
 
-\item{covs}{Specification of covariates to use for matching. Can be variable
-names or tidyselect helpers like \code{starts_with("X")}. Defaults to
-variables starting with "X".}
+\item{form}{Formula of form treatment ~ cov1 + cov2 + ...
+specifying the treatment variable and covariates to use for
+matching.  If not null, will override covs and treatment.}
 
-\item{treatment}{Name of the column in \code{df} containing the treatment
-indicator (0/1 or TRUE/FALSE). Defaults to "Z".}
+\item{covs}{Specification of covariates to use for matching. Can be
+variable names or tidyselect helpers like
+\code{starts_with("X")}. Defaults to variables starting with "X".}
+
+\item{treatment}{Name of the column in \code{df} containing the
+treatment indicator (0/1 or TRUE/FALSE). Defaults to "Z".}
 
 \item{metric}{A string specifying the distance metric. One of
 "maximum", "euclidean", or "manhattan".}
@@ -35,8 +40,8 @@ indicator (0/1 or TRUE/FALSE). Defaults to "Z".}
 \item{caliper}{A numeric specifying the caliper size for matching.
 Controls the maximum allowable distance between matched units.}
 
-\item{rad_method}{Method to determine the radius size for each treated unit.
-Options include:
+\item{rad_method}{Method to determine the radius size for each
+treated unit. Options include:
 \itemize{
 \item "adaptive": Uses the maximum of the caliper and the distance to nearest control
 \item "fixed": Uses the specified caliper value
@@ -58,9 +63,9 @@ also be a single row matrix). These are often just the inverses
 of covariate-specific standard deviations. Controls the relative
 importance of different covariates in the distance calculation.}
 
-\item{id_name}{Name of column to look for ID values. If that
-column is not found, a canonical \code{id} corresponding to row
-numbers will be created.}
+\item{id_name}{Name of column to look for ID values. If that column
+is not found, a canonical \code{id} corresponding to row numbers
+will be created.}
 
 \item{warn}{A logical indicating whether to warn about dropped
 units (those that cannot be matched within the caliper).}
@@ -77,15 +82,16 @@ An S3 object of class "csm_matches" containing:
 \item \code{dm_uncapped}: Original distance matrix without censoring
 \item \code{treatment_table}: Table of treated units with matching information
 }
-The object also has attributes storing the settings used for matching.
+The object also has attributes storing the settings used for
+matching.
 }
 \description{
 This is the core method of the CSM package. Conduct (adaptive)
 radius matching with optional synthetic step on the resulting sets
-of controls. The function creates a matched dataset by finding control
-units that are similar to treatment units based on specified covariates
-and distance metrics, then optionally weights these controls using synthetic
-control methods.
+of controls. The function creates a matched dataset by finding
+control units that are similar to treatment units based on
+specified covariates and distance metrics, then optionally weights
+these controls using synthetic control methods.
 }
 \examples{
 # Generate example data
@@ -108,7 +114,7 @@ as.data.frame(mtch)
 
 }
 \seealso{
-\code{\link{gen_matches}} for the underlying matching function,
-\code{\link{est_weights}} for weight calculation,
+\code{\link{gen_matches}} for the underlying matching
+function, \code{\link{est_weights}} for weight calculation,
 \code{\link{result_table}} for extracting results
 }

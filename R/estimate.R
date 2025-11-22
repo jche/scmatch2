@@ -196,6 +196,7 @@ get_se_AE <- function(matches,
                       outcome = "Y",
                       treatment = "Z",
                       var_weight_type = "ess_units"){
+
   if ( is.csm_matches( matches ) ) {
     matches <- full_unit_table(matches)
   }
