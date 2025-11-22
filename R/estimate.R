@@ -1,4 +1,4 @@
-
+# R/estimate.R
 
 
 # functions for estimating effects
