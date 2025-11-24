@@ -99,6 +99,7 @@ gen_dm <- function(df,
   # pull out df with only covariates
   covs <- df %>%
     dplyr::select(all_of(covs))
+  c_names = colnames(covs)
 
   covs_coerced <-  coerce_covs(covs)
 
@@ -118,6 +119,8 @@ gen_dm <- function(df,
   # Assign tx/co indices to row/col names of the dm
   rownames(dm) <- tx_obs
   colnames(dm) <- co_obs
+
+  attr( dm, "covariates" ) <- c_names
 
   return(dm)
 }

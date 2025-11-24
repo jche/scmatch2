@@ -234,12 +234,17 @@ gen_matches <- function(df,
               dm_uncapped = dm_uncapped)
 
   class(res) <- "csm_matches"
-  attr( res, "settings" ) <- list( caliper = caliper,
-                                   rad_method = rad_method,
-                                   metric = metric,
-                                   scaling = scaling )
-  attr( res, "covariates" ) <- covs
 
+  settings <- list( caliper = caliper,
+                    rad_method = rad_method,
+                    metric = metric,
+                    scaling = scaling )
+  settings$treatment = treatment
+  settings$id_name = id_name
+  settings$k = k
+
+  attr( res, "settings" ) <- settings
+  attr( res, "covariates" ) <- attr( dm, "covariates" )
 
   return(res)
 }
@@ -265,11 +270,11 @@ gen_matches <- function(df,
 #'   for each control unit.
 #'
 #' @export
-est_weights <- function(matched_gps,
-                        covs = attr( matched_gps, "covariates" ),
-                        scaling = attr( matched_gps, "settings" )$scaling,
-                        est_method = c("scm", "average"),
-                        metric = attr( matched_gps, "settings" )$metric ) {
+est_weights <- function( matched_gps,
+                         covs = attr( matched_gps, "covariates" ),
+                         scaling = attr( matched_gps, "settings" )$scaling,
+                         est_method = c("scm", "average"),
+                         metric = attr( matched_gps, "settings" )$metric ) {
   #                          c("maximum", "euclidean", "manhattan")) {
 
   est_method = match.arg(est_method)

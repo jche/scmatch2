@@ -85,14 +85,20 @@ as.data.frame.csm_matches <- function(
 print.csm_matches <- function(x, ...) {
   ntx = length( x$matches )
 
-  mtch = bind_rows( x$matches ) %>%
-    dplyr::filter( Z == 0 )
-  nco = n_distinct( mtch$id )
   n_drop = sum( is.na( x$adacalipers ) )
 
-  mex <- mtch %>%
-    filter( abs(dist) < 10*.Machine$double.eps )
-  n_exact = n_distinct( mex$id )
+  if ( length( x$matches ) > 0 ) {
+    mtch = bind_rows( x$matches ) %>%
+      dplyr::filter( Z == 0 )
+    nco = n_distinct( mtch$id )
+
+    mex <- mtch %>%
+      filter( abs(dist) < 10*.Machine$double.eps )
+    n_exact = n_distinct( mex$id )
+  } else {
+    nco = 0
+    n_exact = 0
+  }
 
   tt <- x$treatment_table
   if ( !is.null( tt ) ) {
@@ -161,31 +167,34 @@ summary.csm_matches <- function(x, ...) {
   cat( glue::glue( "{nunique1} unique control units matched, {nunique2} with non-zero weight" ) )
   cat( "\n" )
 
-  cat( "Treatment match pattern (before weighting):\n" )
-  rs0 = filter( rs, Z == 0 )
-  tb = as.numeric( table( rs$subclass ) )
-  max = max( tb )
-  tb[ tb > 7 ] = 7
-  tb = table( tb )
-  if ( "7" %in% names(tb) ) {
-    w = which( names(tb) == "7" )
-    names(tb)[w] = paste0( "7-", max )
+  if ( nrow(rs) == 0 ) {
+    cat( " No matches were made.\n" )
+  } else {
+    cat( "Treatment match pattern (before weighting):\n" )
+    tb = as.numeric( table( rs$subclass ) )
+    max = max( tb )
+    tb[ tb > 7 ] = 7
+    tb = table( tb )
+    if ( "7" %in% names(tb) ) {
+      w = which( names(tb) == "7" )
+      names(tb)[w] = paste0( "7-", max )
+    }
+    print(tb)
+
+    cat( "Treatment match pattern (after weighting):" )
+    rs0 = filter( rs, weights > 0, Z == 0 )
+    tb = table( table( rs0$subclass ) )
+    print( tb )
+
+    cat( "Control unit reuse:" )
+    tb = table( table( rsC$id ) )
+    print( tb )
+
+    cat( "Summary of aggregated control weights\n" )
+    rs2 = result_table( x, return = "agg_co_units" ) %>%
+      filter( weights > 0 )
+    print( summary( rs2$weights ) )
   }
-  print(tb)
-
-  cat( "Treatment match pattern (after weighting):" )
-  rs0 = filter( rs, weights > 0, Z == 0 )
-  tb = table( table( rs0$subclass ) )
-  print( tb )
-
-  cat( "Control unit reuse:" )
-  tb = table( table( rsC$id ) )
-  print( tb )
-
-  cat( "Summary of aggregated control weights\n" )
-  rs2 = result_table( x, return = "agg_co_units" ) %>%
-    filter( weights > 0 )
-  print( summary( rs2$weights ) )
 }
 
 
@@ -277,6 +286,16 @@ result_table <- function( csm,
                  filter( abs(dist) < 10*.Machine$double.eps )
   )
 
+  # Deal with empty result table if nothing is matched.
+  # (This is not great coding, I don't think.)
+  if ( nrow(rs) == 0 ) {
+    rs$id = character()
+    rs$subclass = character()
+    rs$Z = integer()
+    rs$weights = numeric()
+  }
+
+
   if ( return == "exact" ) {
     rs <- rs %>%
       group_by( subclass ) %>%
@@ -324,5 +343,54 @@ full_unit_table <- function( csm,
                 nonzero_weight_only = nonzero_weight_only )
 }
 
+
+
+
+
+
+#' Update a matching call to change some parameters
+#'
+#' @param res A csm_matches object
+#' @param ... Parameters to change in the matching call
+#' @return A new csm_matches object with updated parameters
+#'
+#' @examples
+#' # Generate example data
+#' set.seed(4044440)
+#' dat <- gen_one_toy(nt = 5)
+#'
+#' # Perform matching
+#' mtch <- get_cal_matches(dat,
+#'                         metric = "maximum",
+#'                         scaling = c(1/0.2, 1/0.2),
+#'                         caliper = 1,
+#'                         rad_method = "adaptive",
+#'                         est_method = "scm")
+#'
+#' # View matching results
+#' mtch
+#'
+#' update_matches( mtch, caliper = 0.05, rad_method = "fixed" )
+#'
+#' @export
+update_matches <- function( res, data, ... ) {
+  stopifnot( inherits( res, "csm_matches" ) )
+
+  args = attr( res, "settings" )
+  args = modifyList( args, list( ... ) )
+
+  covs = attr( res, "covariates" )
+  new_res <- get_cal_matches( df=data,
+                              covs = covs,
+                              treatment = args$treatment,
+                              metric = args$metric,
+                              caliper = args$caliper,
+                              rad_method = args$rad_method,
+                              est_method = args$est_method,
+                              scaling = args$scaling,
+                              id_name = args$id_name,
+                              k = args$k )
+  return( new_res )
+}
 
 

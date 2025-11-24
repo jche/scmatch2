@@ -83,5 +83,6 @@ test_that("Manual computation should match the gen_dm output",{
   # only check
   dimnames(actual_dm) <- NULL
   dimnames(expected_dm) <- NULL
+  attr( actual_dm, "covariates" ) <- NULL
   expect_equal(as.matrix(actual_dm), expected_dm, ignore_attr = FALSE)
 })

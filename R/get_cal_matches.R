@@ -31,11 +31,23 @@ make_treatment_table <- function( df, matches, caliper ) {
     id = df %>% filter(Z == 1) %>% pull(id),
     adacal = matches$adacalipers )
 
-  rs <- left_join( rs, adacalipers_df, by = "id" ) %>%
-    mutate( nc = ifelse( is.na(nc), 0, nc ),
-            feasible = ifelse( !is.na(adacal) & adacal <= caliper, 1, 0 ),
-            matched = ifelse( nc > 0, 1, 0 ),
-            id = as.character( id ) )
+  if ( nrow(rs) > 0 ) {
+
+
+    rs <- full_join( rs, adacalipers_df, by = "id" ) %>%
+      mutate( nc = ifelse( is.na(nc), 0, nc ),
+              feasible = ifelse( !is.na(adacal) & adacal <= caliper, 1, 0 ),
+              matched = ifelse( nc > 0, 1, 0 ),
+              id = as.character( id ) )
+  } else {
+    rs = adacalipers_df
+    rs$nc = 0
+    rs$ess = 0
+    rs$max_dist = NA
+    rs$feasible = 0
+    rs$matched = 0
+    rs$subclass = rs$id
+  }
 
   rs
 }
@@ -159,23 +171,23 @@ get_cal_matches <- function( df,
 
   # Add ID column if not present
   if ( !( id_name %in% colnames(df) ) ) {
-    df$id <- paste0( "U", 1:nrow(df) )
+    n_zeros <- nchar(as.character(nrow(df)))
+    df$id <- sprintf(paste0("U%0", n_zeros, "d"), 1:nrow(df))
   } else {
     df$id = as.character(df[[id_name]])
   }
 
   ### use rad_method: generate matches
   # get caliper matches
-  scmatches <- df %>%
-    gen_matches(
-      covs = covs,
-      treatment = treatment,
-      scaling = scaling,
-      metric = metric,
-      caliper = caliper,
-      rad_method = rad_method,
-      k = k,
-      id_name="id" )
+  scmatches <- gen_matches( df,
+                            covs = covs,
+                            treatment = treatment,
+                            scaling = scaling,
+                            metric = metric,
+                            caliper = caliper,
+                            rad_method = rad_method,
+                            k = k,
+                            id_name="id" )
 
   # scmatches$matches is a list of length ntx. Each element is a data
   # frame of matched controls for the given unit.
@@ -192,11 +204,10 @@ get_cal_matches <- function( df,
   # Possibly warn if treated units were lost
   unmatched_units <- filter( treatment_table, matched==0 )
   if ( warn && nrow(unmatched_units) > 0) {
-    if ( length( nrow <= 20 ) ) {
-      warning(glue::glue("Dropped the following treated units from data:
-                        \t {paste(unmatched_units$id, collapse=\", \")}"))
+    if ( nrow(unmatched_units) <= 20 ) {
+      warning(glue::glue("Dropped the following treated units ({nrow(unmatched_units)} units from {nrow(treatment_table)}) from data: {paste(unmatched_units$id, collapse=\", \")}"))
     } else {
-      warning(glue::glue("Dropped {nrow(unmatched_units) treated units from data.") )
+      warning(glue::glue("Dropped {nrow(unmatched_units)} of {nrow(treatment_table)} treated units from data.") )
     }
   }
 
@@ -206,15 +217,7 @@ get_cal_matches <- function( df,
   # keep a bunch of attributes around, just in case
   settings <- attr(scmatches, "settings" )
 
-  settings$covariates = covs
-  settings$treatment = treatment
-  settings$metric = metric
-  settings$caliper = caliper
-  settings$rad_method = rad_method
   settings$est_method = est_method
-  settings$scaling = scaling
-  settings$id_name = id_name
-  settings$k = k
 
   attr( scmatches, "settings" ) <- settings
 

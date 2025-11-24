@@ -168,7 +168,7 @@ test_that("gen_matches do the correct thing with non-uniform scaling", {
                          treatment = "Z",
                          scaling = c(1, 0.25),
                          rad_method="fixed",
-                         caliper = 1)
+                         caliper = 1, warn = FALSE)
   res
   expect_equal( res$adacalipers, c( 1, NA, 1, 1 ) )
 
@@ -179,7 +179,7 @@ test_that("gen_matches do the correct thing with non-uniform scaling", {
                            treatment = "Z",
                            scaling = c(4, 1),
                            rad_method = "fixed",
-                           caliper = 1/0.25)
+                           caliper = 1/0.25, warn=FALSE)
 
 
   expect_equal( result_table( res )$weights, result_table( retx2 )$weights )
@@ -222,6 +222,7 @@ test_that("set_NA_to_unmatched_co should get the correct output",{
   colnames(expected_res) <- c(2,3,4)
   rownames(expected_res) <- 1
 
+  attr( res, "covariates" ) <- NULL
   expect_equal(res, expected_res)
 })
 
