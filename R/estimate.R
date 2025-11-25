@@ -50,7 +50,7 @@ get_att_point_est <- function(matched_df, treatment = "Z", outcome = "Y") {
 
 calc_N_T_N_C <- function(preds_csm){
   if ( is.csm_matches( preds_csm ) ) {
-    preds_csm <- full_unit_table(preds_csm)
+    preds_csm <- result_table(preds_csm)
   }
 
   N_T <- nrow(preds_csm %>% filter(Z==T))
@@ -131,6 +131,7 @@ get_pooled_variance <- function(
     outcome = "Y",
     treatment = "Z",
     var_weight_type = "ess_units"){
+
   # Step 1: Filter the matched data to retain only control units with at least 2 in subclass
   matches_filtered <-
     matches_table %>%
@@ -202,7 +203,7 @@ get_se_AE <- function(matches,
                       var_weight_type = "ess_units"){
 
   if ( is.csm_matches( matches ) ) {
-    matches <- full_unit_table(matches)
+    matches <- result_table(matches)
   }
 
   get_se_AE_table(
@@ -241,7 +242,7 @@ get_measurement_error_variance_OR <- function(matches,
                                               block_size = NA) {
   # Convert to data frame if needed
   if (is.csm_matches(matches)) {
-    matches <- full_unit_table(matches)
+    matches <- result_table(matches)
   }
 
   # Check if bias column exists, if not set bias to 0
@@ -344,28 +345,37 @@ get_measurement_error_variance <- function(
   ))
 }
 
-#' Calculate the total variance estimator (V)
+#' Estimate ATT and SE
 #'
-#' Implements the total variance estimator from the paper, which accounts for
-#' both measurement error variance (V_E) and population heterogeneity variance (V_P).
+#' Calculate ATT and associated standard error using the total
+#' variance estimator from the paper that accounts for both
+#' measurement error and population heterogeneity.
 #'
-#' @param matches The CSM match object, an R S3 object
-#' @param outcome Name of the outcome variable (default "Y")
+#' @param scmatch The CSM match object, an R S3 object, or a data
+#'   frame of the full results.
 #' @param treatment Name of the treatment variable (default "Z")
-#' @param var_weight_type The way that cluster variances are averaged:
-#'   "num_units": weight by number of units in the subclass
-#'   "ess_units": weight by effective sample size of units in the subclass
-#'   "uniform": weight each cluster equally
-#' @param variance_method Method for calculating measurement error variance:
-#'   "pooled": use get_measurement_error_variance (default)
+#' @param outcome Name of the outcome variable (default "Y")
+#' @param var_weight_type The way that cluster variances are averaged
+#'   (default "ess_units"): "num_units": weight by number of units in
+#'   the subclass "ess_units": weight by effective sample size of
+#'   units in the subclass "uniform": weight each cluster equally
+#' @param variance_method Method for calculating measurement error
+#'   variance: "pooled": use get_measurement_error_variance (default)
 #'   "bootstrap": use get_measurement_error_variance_OR
-#' @param boot_mtd Bootstrap method when variance_method = "bootstrap" (default: "wild")
-#' @param B Number of bootstrap samples when variance_method = "bootstrap" (default: 250)
+#' @param boot_mtd Bootstrap method when variance_method = "bootstrap"
+#'   (default: "wild")
+#' @param B Number of bootstrap samples when variance_method =
+#'   "bootstrap" (default: 250)
 #' @param seed_addition Additional seed for bootstrap (default: 11)
-#' @return A tibble with total variance (V), measurement error variance (V_E),
-#'   population heterogeneity variance (V_P), and other relevant statistics
 #' @export
-get_total_variance <- function(
+#'
+#' @return A tibble with ATT estimate (ATT), standard error (SE),
+#'   total variance (V), measurement error variance (V_E), population
+#'   heterogeneity variance (V_P), and other relevant statistics
+#'
+#' @export
+#'
+estimate_ATT <- function(
     matches,
     outcome = "Y",
     treatment = "Z",
@@ -377,9 +387,13 @@ get_total_variance <- function(
 
   # Convert to data frame if needed
   if (is.csm_matches(matches)) {
-    matches_df <- full_unit_table(matches)
+    matches_df <- result_table(matches)
   } else {
     matches_df <- matches
+  }
+
+  if ( n_distinct( matches_df[[treatment]] ) != 2 ) {
+    stop(glue::glue( "treatment variable `{treatment}` must be binary (0/1)") )
   }
 
   # Get measurement error variance estimate (V_E) using specified method
@@ -472,12 +486,14 @@ get_total_variance <- function(
   SE <- sqrt(V) * 1 / sqrt(N_T)
 
   result <- tibble(
-    V = V,
-    V_E = V_E,
-    V_P = V_P,
+    ATT = att_estimate,
     SE = SE,
     N_T = N_T,
-    ESS_C = ESS_C
+    ESS_C = ESS_C,
+    t = att_estimate / SE,
+    V = V,
+    V_E = V_E,
+    V_P = V_P
   )
 
   # Add sigma_hat if available (from pooled method we have, from OR method we impute)
@@ -492,53 +508,4 @@ get_total_variance <- function(
   return(result)
 }
 
-#' Estimate ATT with correct variance estimation
-#'
-#' Calculate ATT and associated standard error using the total variance estimator
-#' from the paper that accounts for both measurement error and population heterogeneity.
-#'
-#' @param scmatch The CSM match object, an R S3 object
-#' @param treatment Name of the treatment variable (default "Z")
-#' @param outcome Name of the outcome variable (default "Y")
-#' @param var_weight_type The way that cluster variances are averaged (default "ess_units")
-#' @param variance_method Method for calculating measurement error variance:
-#'   "pooled": use get_measurement_error_variance (default)
-#'   "bootstrap": use get_measurement_error_variance_OR
-#' @param boot_mtd Bootstrap method when variance_method = "bootstrap" (default: "wild")
-#' @param B Number of bootstrap samples when variance_method = "bootstrap" (default: 250)
-#' @param seed_addition Additional seed for bootstrap (default: 11)
-#' @return A tibble with ATT estimate, standard error, t-statistic, and variance components
-#' @export
-get_ATT_estimate <- function(
-    scmatch,
-    treatment = "Z",
-    outcome = "Y",
-    var_weight_type = "ess_units",
-    variance_method = "pooled",
-    boot_mtd = "wild",
-    B = 250,
-    seed_addition = 11) {
 
-  # Calculate ATT point estimate
-  ATT <- get_att_point_est(scmatch,
-                           treatment = treatment,
-                           outcome = outcome)
-
-  # Calculate total variance and standard error
-  variance_results <- get_total_variance(
-    matches = scmatch,
-    treatment = treatment,
-    outcome = outcome,
-    var_weight_type = var_weight_type,
-    variance_method = variance_method,
-    boot_mtd = boot_mtd,
-    B = B,
-    seed_addition = seed_addition
-  )
-
-  # Add ATT to results and calculate t-statistic
-  variance_results %>%
-    mutate(ATT = ATT) %>%
-    relocate(ATT) %>%
-    mutate(t = ATT/SE)
-}

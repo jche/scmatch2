@@ -12,6 +12,8 @@ result_table(
 )
 }
 \arguments{
+\item{csm}{A csm_matches object from a matching call.}
+
 \item{return}{How to aggregate units, if at all, in making the
 result table.  Possible values: "sc_units" (the synthetic control
 units), "agg_co_units" (the unique control units, with total
@@ -19,8 +21,12 @@ weight across all their matches), or "all" (control units will be
 repeated if matched multiply). "exact" returns only exact matches
 (up to machine precision on distance). Defaults to "all".}
 
-\item{feasible_only}{TRUE means only return units which were
-matched without expanding the caliper.}
+\item{feasible_only}{TRUE means only return treated units and
+matched controls for units that could be matched without
+expanding the caliper.}
+
+\item{nonzero_weight_only}{TRUE means drop any control units with 0
+weight (e.g., due to scm weighting).}
 }
 \value{
 dataframe of the treatment and control units.  This

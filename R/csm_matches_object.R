@@ -204,7 +204,7 @@ summary.csm_matches <- function(x, ...) {
 #' @export
 caliper_table <- function( csm ) {
   csm$treatment_table %>%
-    dplyr::select( id, subclass, max_dist, adacal )
+    dplyr::select( id, subclass, feasible, max_dist, adacal )
 }
 
 
@@ -257,17 +257,22 @@ unmatched_units <- function( csm ) {
 #' were used for different treated units (all), or aggregated controls
 #' with only one row per control unit (agg_co_units).
 #'
+#' @param csm A csm_matches object from a matching call.
+#' @param feasible_only TRUE means only return treated units and
+#'   matched controls for units that could be matched without
+#'   expanding the caliper.
+#' @param nonzero_weight_only TRUE means drop any control units with 0
+#'   weight (e.g., due to scm weighting).
 #' @param return How to aggregate units, if at all, in making the
 #'   result table.  Possible values: "sc_units" (the synthetic control
 #'   units), "agg_co_units" (the unique control units, with total
 #'   weight across all their matches), or "all" (control units will be
 #'   repeated if matched multiply). "exact" returns only exact matches
 #'   (up to machine precision on distance). Defaults to "all".
-#' @param feasible_only TRUE means only return units which were
-#'   matched without expanding the caliper.
 #'
 #' @return dataframe of the treatment and control units.  This
 #'   dataframe can be analyzed as an as-if experimental dataset.
+#'
 #' @export
 #'
 result_table <- function( csm,
@@ -315,32 +320,6 @@ result_table <- function( csm,
   }
 
   rs
-}
-
-
-
-
-#' Get full raw table of all the units
-#'
-#' Return dataframe with control units repeated, grouped with treated
-#' unit with individual weights with those treated units.  Treated
-#' units also included.
-#'
-#' @param csm A csm_matches object from a matching call.
-#' @param feasible_only TRUE means only return treated units and
-#'   matched controls for units that could be matched within the set
-#'   caliper.
-#' @param nonzero_weight_only TRUE means drop any control units with 0
-#'   weight (e.g., due to scm weighting).
-#' @return dataframe, one row per treated unit and a row per control
-#'   unit for each time it was used.
-#' @seealso [result_table()]
-#' @export
-full_unit_table <- function( csm,
-                             feasible_only = FALSE,
-                             nonzero_weight_only = FALSE ) {
-  result_table( csm, "all", feasible_only = feasible_only,
-                nonzero_weight_only = nonzero_weight_only )
 }
 
 

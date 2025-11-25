@@ -3,10 +3,8 @@
 \name{AggregationMethods}
 \alias{AggregationMethods}
 \alias{agg_sc_units}
-\alias{agg_sc_units,}
-\alias{agg_co_units,}
-\alias{agg_avg_units}
 \alias{agg_co_units}
+\alias{agg_avg_units}
 \title{aggregation methods for matched data}
 \usage{
 agg_sc_units(scweights)

@@ -71,7 +71,7 @@ test_that("sensitivity plot does not crash", {
     result_table( res, return = "agg_co_units" )
 
 
-    get_ATT_estimate( res )
+    estimate_ATT( res )
 
   }
 

@@ -28,7 +28,7 @@ single_run <- function( toy_ctr_dist = 0.5,
   )
 
   ### Perform inference using the A-E method
-  ATT_estimate <- get_ATT_estimate( mtch ) %>%
+  ATT_estimate <- estimate_ATT( mtch ) %>%
     mutate( CI_lower = ATT - 1.96*SE,
             CI_upper = ATT + 1.96*SE,
             true_SE = f0_sd * sqrt( 1 / N_T + 1 / N_C_tilde ),
@@ -54,7 +54,7 @@ single_run <- function( toy_ctr_dist = 0.5,
                             (true_ATT < CI_upper_true_SE) )
 
   # Get error and bias
-  full_units <- full_unit_table(mtch, nonzero_weight_only = TRUE )
+  full_units <- result_table(mtch, nonzero_weight_only = TRUE )
   err_and_bias <- full_units %>%
     group_by(Z) %>%
     summarize(mn_noise = sum(noise*weights) / sum(weights),
@@ -195,7 +195,7 @@ sim_inference_CSM_A_E_finite <- function( dgp_name,
     )
 
     ### Perform inference using the A-E method
-    ATT_estimate <- get_ATT_estimate( mtch )
+    ATT_estimate <- estimate_ATT( mtch )
     att_est[i] <- ATT_estimate$ATT
     se_AE[i] = ATT_estimate$SE
     CI_lower[i] = att_est[i] -1.96 *  se_AE[i]
@@ -231,7 +231,7 @@ sim_inference_CSM_A_E_finite <- function( dgp_name,
       (att < CI_upper_true_SE[i])
 
     # Get error and bias
-    full_units <- full_unit_table(mtch, nonzero_weight_only = TRUE )
+    full_units <- result_table(mtch, nonzero_weight_only = TRUE )
     error[i] <- full_units %>%
       group_by(Z) %>%
       summarize(mn = sum(noise*weights) / sum(weights)) %>%

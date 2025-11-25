@@ -34,10 +34,10 @@ ferman_scm <- get_cal_matches( ferman_for_analysis,
     est_method = "scm" )
 ferman_scm
 
-full_unit_table(ferman_scm, nonzero_weight_only = TRUE ) %>%
+result_table(ferman_scm, nonzero_weight_only = TRUE ) %>%
   rename( isp = is_sao_paolo )
 
-get_ATT_estimate( ferman_scm, "Z", "y2010" )
+estimate_ATT( ferman_scm, "Z", "y2010" )
 
 
 ## Number of used controls
@@ -180,7 +180,7 @@ plot_max_caliper_size <-
   expand_limits(color=1)
 
 feasible_w_adacal <-
-  full_unit_table(ferman_scm) %>%
+  result_table(ferman_scm) %>%
   left_join( caliper_table( ferman_scm ),
              by = c( "id", "subclass" ) ) %>%
   group_by(subclass)
@@ -299,6 +299,13 @@ plot_SATT <- p+
   ) +
   ylim(c(-0.1,0.2))
 
+
+plot_max_caliper_size
+plot_SATT
+
+
+
+# Make a combined plot for the paper
 plot_all <- gridExtra::grid.arrange(
   plot_max_caliper_size,
   plot_SATT,
@@ -311,6 +318,8 @@ ggsave(
   width=9.7,
   height=4.5
 )
+
+
 
 
 #########
@@ -364,7 +373,7 @@ ferman_scm_avg <- ferman_for_analysis %>%
     est_method = "average" )
 
 feasible_w_adacal <-
-  full_unit_table(ferman_scm_avg) %>%
+  result_table(ferman_scm_avg) %>%
   left_join( caliper_table( ferman_scm_avg ),
              by = c( "id", "subclass" ) ) %>%
   group_by(subclass)

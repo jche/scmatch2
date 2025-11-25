@@ -65,7 +65,7 @@ ggplot( dat, aes( X1, X2, color = Z ) ) + geom_point() +
 To calculate matches, call `get_cal_matches()`--it will match, make synthetic controls for each unit, and give you a final dataset back, stored as an `csm_matches` object:
 ```{r}
 mtch <- get_cal_matches( dat, 
-                         covs = ~ X1 + X2,
+                         form = Z ~ X1 + X2,
                          metric = "maximum",
                          scaling = c( 1/0.2, 1/0.2 ),
                          caliper = 1, 
@@ -74,7 +74,7 @@ mtch <- get_cal_matches( dat,
 mtch
 ```
 
-There are a variety of things you can pull from the result object.
+There are a variety of things you can pull from the result.
 You can get a list of statistics on the treated units:
 ```{r}
 mtch$treatment_table
@@ -82,10 +82,10 @@ mtch$treatment_table
 
 You can see all the units used, grouped by subclass:
 ```{r}
-full_unit_table(mtch, nonzero_weight_only = TRUE ) 
+result_table(mtch, nonzero_weight_only = TRUE ) 
 ```
 
-You can get the final dataset (here filtering to only matches within the initial caliper):
+You can filter to only matches within the initial caliper:
 ```{r}
 result_table( mtch, feasible_only = TRUE )
 ```
@@ -95,16 +95,18 @@ You can also get the final generated result as a data.frame by casting the resul
 head( as.data.frame( mtch ), n = 10 )
 ```
 
-You can estimate impacts on the matched dataset using whatever tools you want, or use the options discussed in our paper as so:
+You can estimate impacts on the matched dataset using whatever tools you want.
+The option discussed in our paper is implemented as so:
 ```{r}
-get_ATT_estimate( mtch )
+estimate_ATT( mtch )
 ```
 
 
-# Dependencies
+# Notes on Dependencies
 
 This package has some tricky dependencies.
-In particular, it (optionally) uses a DGP (for simulation) from ACIC 2016:
+In particular, it (optionally) uses a DGP (for simulation) from ACIC 2016.
+You have to install it first from GitHub:
 
 ```
 remotes::install_github("vdorie/aciccomp/2016")

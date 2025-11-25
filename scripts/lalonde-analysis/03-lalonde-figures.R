@@ -40,7 +40,7 @@ ggsave(here::here("figures/lalonde/lalonde_love.png"), plot = p_love, height = 4
 # The paper compares SCM, Average, and 1-NN. We need to run the other two.
 
 # A. SCM (Already run)
-ess_scm <- full_unit_table(lalonde_scm, feasible_only=TRUE) %>%
+ess_scm <- result_table(lalonde_scm, feasible_only=TRUE) %>%
   filter(Z==0) %>% summarise(ess = sum(weights)^2/sum(weights^2)) %>% pull(ess)
 
 # B. Average (Simple average of matches in caliper)
@@ -52,7 +52,7 @@ lalonde_avg <- lalonde_df %>%
     scaling = lalonde_params$dist_scaling,
     est_method = "average" # <--- CHANGE
   )
-ess_avg <- full_unit_table(lalonde_avg, feasible_only=TRUE) %>%
+ess_avg <- result_table(lalonde_avg, feasible_only=TRUE) %>%
   filter(Z==0) %>% summarise(ess = sum(weights)^2/sum(weights^2)) %>% pull(ess)
 
 # C. 1-NN (Nearest Neighbor)
@@ -65,7 +65,7 @@ lalonde_1nn <- lalonde_df %>%
     scaling = lalonde_params$dist_scaling,
     est_method = "average"
   )
-ess_1nn <- full_unit_table(lalonde_1nn, feasible_only=TRUE) %>%
+ess_1nn <- result_table(lalonde_1nn, feasible_only=TRUE) %>%
   filter(Z==0) %>% summarise(ess = sum(weights)^2/sum(weights^2)) %>% pull(ess)
 
 # Print to console to verify against paper (Expect: ~72.6, ~129.9, ~67.0)
@@ -143,10 +143,10 @@ ggd_att_filtered <- ggd_att_full %>%
 
 # 4. Prepare for SE Loop
 n_filtered <- nrow(ggd_att_filtered)
-se_total_variance_filtered <- numeric(n_filtered)
+se_estimate_ATT_filtered <- numeric(n_filtered)
 
 # Full unit table for pulling raw data
-all_units_for_se <- full_unit_table(lalonde_scm) %>%
+all_units_for_se <- result_table(lalonde_scm) %>%
   left_join(lalonde_scm$treatment_table, by = c("subclass","id")) %>%
   group_by(subclass) %>%
   mutate(adacal = ifelse(is.na(adacal), first(na.omit(adacal)), adacal)) %>%
@@ -176,23 +176,23 @@ for (i in 1:n_filtered) {
     nrow() > 0
 
   if (!has_valid_variance_group) {
-    se_total_variance_filtered[i] <- NA
+    se_estimate_ATT_filtered[i] <- NA
     next
   }
 
   # D. TOTAL VARIANCE ESTIMATION
   # We apply the V estimator to the cumulative dataset
-  total_variance_result <- get_total_variance(
+  estimate_ATT_result <- get_estimate_ATT(
     matches = df_curr,
     outcome = "Y",
     treatment = "Z",
     variance_method = "pooled"
   )
 
-  if (is.na(total_variance_result$SE)) {
-    se_total_variance_filtered[i] <- NA
+  if (is.na(estimate_ATT_result$SE)) {
+    se_estimate_ATT_filtered[i] <- NA
   } else {
-    se_total_variance_filtered[i] <- total_variance_result$SE
+    se_estimate_ATT_filtered[i] <- estimate_ATT_result$SE
   }
 }
 
@@ -211,8 +211,8 @@ p_satt <- ggd_att_filtered %>%
   geom_hline(yintercept=0, lty="dotted") +
   geom_errorbar(
     aes(
-      ymin = cum_avg - 1.96 * se_total_variance_filtered,
-      ymax = cum_avg + 1.96 * se_total_variance_filtered
+      ymin = cum_avg - 1.96 * se_estimate_ATT_filtered,
+      ymax = cum_avg + 1.96 * se_estimate_ATT_filtered
     ),
     width = 0.5, alpha = 0.2
   ) +
@@ -223,18 +223,18 @@ p_tradeoff_all <- gridExtra::grid.arrange(plot_max_cal, p_satt, ncol=2)
 ggsave(here::here("figures/lalonde/lalonde_fsatt_tradeoff.png"), plot = p_tradeoff_all, width = 10, height = 5)
 
 # # Output final point estimate for the full set (SATT)
-# full_set <- full_unit_table(lalonde_scm, feasible_only = FALSE)
+# full_set <- result_table(lalonde_scm, feasible_only = FALSE)
 # print("SATT Estimate (Using all units, for comparison):")
 # print(get_att_point_est(full_set))
 # -------------------------------------------------------------------------
 # 5. Final numbers for text
 # -------------------------------------------------------------------------
 # FSATT (Feasible only)
-feasible <- full_unit_table(lalonde_scm, feasible_only = TRUE)
+feasible <- result_table(lalonde_scm, feasible_only = TRUE)
 print("FSATT Estimate (Matches Paper ~$1595):")
 print(get_att_point_est(feasible))
 
 # SATT (Full)
-full_set <- full_unit_table(lalonde_scm, feasible_only = FALSE)
+full_set <- result_table(lalonde_scm, feasible_only = FALSE)
 print("SATT Estimate (Matches Paper ~$1344):")
 print(get_att_point_est(full_set))

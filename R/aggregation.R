@@ -17,7 +17,7 @@
 #' like CEM would do).
 #'
 #' @name AggregationMethods
-#' @aliases agg_sc_units, agg_co_units, agg_avg_units
+#' @aliases agg_sc_units agg_co_units agg_avg_units
 #'
 #' @param scweights scm_matches object or list of sc weights (tibbles
 #'   with tx unit in first row).

@@ -6,6 +6,13 @@
 \usage{
 ess_plot(d)
 }
+\arguments{
+\item{d}{Data frame of matched units including columns for Z
+(treatment indicator), subclass (matched set identifier), dist
+(distance from treated unit), and weights (SCM weights).  E.g., the results from the}
+}
 \description{
-Effective sample size (ESS) plot
+Plot the effective sample size (ESS) of the treated units, and
+various forms of possible control groups depending on their
+weighting.
 }

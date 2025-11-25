@@ -17,7 +17,7 @@ mtch
 
 mtch$treatment_table # a table of statistics on the treated units
 
-full_unit_table(mtch, nonzero_weight_only = TRUE )
+result_table(mtch, nonzero_weight_only = TRUE )
 # table of all units used, grouped by subclass (cluster)
 # of treated and match controls.
 # There is also "dist": the distance between the treated and the control
@@ -26,7 +26,7 @@ full_unit_table(mtch, nonzero_weight_only = TRUE )
 result_table( mtch, feasible_only = TRUE )
 
 # Effect estimate
-get_ATT_estimate( mtch )
+estimate_ATT( mtch )
 
 
 #########
@@ -46,8 +46,8 @@ mtch
 
 mtch$treatment_table # a table of statistics on the treated units
 
-full_unit_table(mtch, nonzero_weight_only = TRUE )
+result_table(mtch, nonzero_weight_only = TRUE )
 
 result_table( mtch, feasible_only = TRUE )
-get_ATT_estimate( mtch )
+estimate_ATT( mtch )
 

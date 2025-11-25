@@ -330,7 +330,7 @@ get_matches <- function(matching_type,
   } else {
     stop("Invalid matching_type. Must be 'maximum_fixed_scm' or 'euclidean_knn'.")
   }
-  df_dgp_with_matches <- full_unit_table(
+  df_dgp_with_matches <- result_table(
     df_dgp_with_matches,
     nonzero_weight_only = FALSE
   )

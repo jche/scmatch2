@@ -40,7 +40,7 @@ test_that("basic object functionality", {
 
   dd = as.data.frame( mtch )
   expect_true( is.data.frame( dd ) )
-  expect_equal( nrow( dd ), nrow( full_unit_table( mtch ) ) )
+  expect_equal( nrow( dd ), nrow( result_table( mtch ) ) )
 
   expect_output( ss <- print( mtch ) )
 
@@ -191,7 +191,7 @@ result_table <- function( csm,
 #'   unit for each time it was used.
 #' @seealso [result_table()]
 #' @export
-full_unit_table <- function( csm,
+result_table <- function( csm,
                              feasible_only = FALSE,
                              nonzero_weight_only = FALSE ) {
   result_table( csm, "all", feasible_only = feasible_only,

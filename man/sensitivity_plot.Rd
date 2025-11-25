@@ -5,7 +5,7 @@
 \title{Make sensitivity plot of changing caliper}
 \usage{
 sensitivity_plot(
-  res,
+  csm,
   data,
   min_cal = 0.05,
   max_cal = 5,
@@ -14,9 +14,6 @@ sensitivity_plot(
 )
 }
 \arguments{
-\item{res}{A csm_matches object, used to get the settings for
-matching}
-
 \item{data}{The data the csm_matches object was fit to. (One could
 put in alternate data here, if the covariates aligned.)}
 
@@ -28,6 +25,9 @@ put in alternate data here, if the covariates aligned.)}
 
 \item{return_table}{If TRUE, return a table of results instead of a
 plot}
+
+\item{res}{A csm_matches object, used to get the settings for
+matching}
 }
 \value{
 A ggplot object showing the sensitivity plot.  It has an

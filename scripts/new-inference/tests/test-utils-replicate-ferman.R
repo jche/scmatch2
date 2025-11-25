@@ -43,7 +43,7 @@ test_that("get_matched_control_ids generates correct output", {
     k = k
   )
 
-  full_matched_table <- full_unit_table(mtch, nonzero_weight_only = FALSE)
+  full_matched_table <- result_table(mtch, nonzero_weight_only = FALSE)
   matched_matrix <- get_matched_control_ids(full_matched_table)
 
   expect_equal(dim(matched_matrix), c(N1, k),
@@ -70,7 +70,7 @@ test_that("get_matched_control_ids generates correct output", {
     k = k
   )
 
-  full_matched_table <- full_unit_table(mtch, nonzero_weight_only = FALSE)
+  full_matched_table <- result_table(mtch, nonzero_weight_only = FALSE)
   matched_matrix <- get_matched_control_ids(full_matched_table)
 
   expect_equal(dim(matched_matrix), c(N1, k),
