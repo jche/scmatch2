@@ -46,7 +46,7 @@ test_that("cem returns numeric", {
 test_that("get_matches works with different matching types", {
   test_df <- data.frame(Z = c(1,0,0,0,1),
                         X = c(0,0.5,0.8,3,1.6))
-  res_max <- get_matches("maximum_fixed_scm", test_df, scaling = 1)
+  res_max <- get_matches("maximum_fixed_scm",  test_df, scaling = 1)
   expect_true(nrow(res_max) >= 1)
 
   # euclidean_knn minimal check

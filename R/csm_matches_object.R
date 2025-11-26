@@ -373,3 +373,84 @@ update_matches <- function( res, data, ... ) {
 }
 
 
+
+
+
+#' Return the parameters of the method
+#'
+#' @param csm A csm_matches object
+#' @return A list of the settings used in the matching call
+#' @export
+params <- function( csm ) {
+  params = attr( csm, "settings" )
+  params$covariates = attr( csm, "covariates" )
+
+  params
+}
+
+
+#' Return result table for listed treated units
+#'
+#' @param csm A csm_matches object
+#' @param id list of ids for treated units
+#' @param nonzero_weight_only TRUE means drop any control units with 0
+#'   weight (e.g., due to scm weighting).
+#' @return Dataframe of matches
+#' @export
+get_match_sets <- function( csm, id,
+                     nonzero_weight_only = TRUE ) {
+  id_list = id
+  rs <- result_table( csm )
+
+  if ( nonzero_weight_only ) {
+    rs <- rs %>%
+      filter( weights > 0 )
+  }
+
+  tx_id = csm$treatment_table %>%
+    filter( id %in% id_list ) %>%
+    pull( subclass )
+
+  bad_rs <- rs %>%
+    filter( subclass %in% tx_id  ) %>%
+    left_join( csm$treatment_table %>%
+                 select( subclass, adacal ),
+               by = "subclass"  ) %>%
+    arrange( -adacal, -Z )
+
+  bad_rs
+}
+
+
+#' Return result table for the bad matches
+#'
+#' @param csm A csm_matches object
+#' @param threshold Distance threshold for bad matches
+#' @param nonzero_weight_only TRUE means drop any control units with 0
+#'   weight (e.g., due to scm weighting)
+#'
+#' @return Dataframe of bad matches
+#' @export
+bad_matches <- function( csm, threshold,
+                         nonzero_weight_only = TRUE ) {
+  rs <- result_table( csm )
+
+  if ( nonzero_weight_only ) {
+    rs <- rs %>%
+      filter( weights > 0 )
+  }
+
+  tx_id = csm$treatment_table %>%
+    filter( adacal > threshold ) %>%
+    pull( id )
+
+  bad_rs <- rs %>%
+    filter( subclass %in% tx_id  ) %>%
+    left_join( csm$treatment_table %>%
+                 select( subclass, adacal ),
+               by = "subclass"  ) %>%
+    arrange( -adacal, -Z )
+
+  bad_rs
+}
+

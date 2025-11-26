@@ -7,13 +7,13 @@
 get_cal_matches(
   df,
   form = NULL,
-  covs = starts_with("X"),
-  treatment = "Z",
+  covs = NULL,
+  treatment = NULL,
   metric = c("maximum", "euclidean", "manhattan"),
   caliper = 1,
   rad_method = c("adaptive", "fixed", "1nn", "adaptive-5nn", "knn"),
   est_method = c("scm", "scm_extrap", "average"),
-  scaling = default_scaling(df, covs),
+  scaling = NULL,
   id_name = "id",
   warn = TRUE,
   k = 5
@@ -28,11 +28,12 @@ specifying the treatment variable and covariates to use for
 matching.  If not null, will override covs and treatment.}
 
 \item{covs}{Specification of covariates to use for matching. Can be
-variable names or tidyselect helpers like
-\code{starts_with("X")}. Defaults to variables starting with "X".}
+variable names, list of column numbers, or NULL.  If NULL, will
+use covariate names found in the scaling parameter, or default to
+all columns starting with "X".}
 
 \item{treatment}{Name of the column in \code{df} containing the
-treatment indicator (0/1 or TRUE/FALSE). Defaults to "Z".}
+treatment indicator (with values 0/1 or TRUE/FALSE).}
 
 \item{metric}{A string specifying the distance metric. One of
 "maximum", "euclidean", or "manhattan".}
@@ -59,9 +60,11 @@ Options include:
 }}
 
 \item{scaling}{A vector of scaling constants for covariates (can
-also be a single row matrix). These are often just the inverses
-of covariate-specific standard deviations. Controls the relative
-importance of different covariates in the distance calculation.}
+also be a single row data frame). These are often just the
+inverses of covariate-specific standard deviations. Controls the
+relative importance of different covariates in the distance
+calculation.  If covs not supplied, will use name of this
+parameter to identify covariates.}
 
 \item{id_name}{Name of column to look for ID values. If that column
 is not found, a canonical \code{id} corresponding to row numbers

@@ -73,11 +73,11 @@ get_matched_co_from_dm_trimmed <- function(df, dm_trimmed, treatment) {
   map( 1:ntx, function(x) {
     # Step 1: get which co units are matched to each tx unit
     matched_obs <- which(!is.na(dm_trimmed[x,]))
+
     # if no matches, drop treated unit
     if (length(matched_obs) == 0) {
       return(NULL)
     }
-
 
     # for each matched co unit, record distance from tx unit
     distances <- dm_trimmed[x, matched_obs]
@@ -85,7 +85,7 @@ get_matched_co_from_dm_trimmed <- function(df, dm_trimmed, treatment) {
       ungroup() %>%
       mutate(dist = distances)
 
-    ## Step 2: get the treat uni
+    ## Step 2: get the treat unit
     df_trt_x <- df_trt %>%
       ungroup() %>%
       slice(x)
@@ -93,6 +93,10 @@ get_matched_co_from_dm_trimmed <- function(df, dm_trimmed, treatment) {
     df_tmp <- df_trt_x %>%
       mutate(dist = 0) %>%
       rbind(matched_rows)
+
+    if ( nrow( df_tmp ) > 100 ) {
+      browser()
+    }
 
     df_tmp %>%
       mutate(subclass = IDs[[x]] )
@@ -178,6 +182,10 @@ gen_matches <- function(df,
   ### Step -1: set up some constants
   rad_method <- match.arg(rad_method)
   args <- list(...)
+
+  if ( is.numeric(covs) ) {
+    covs = colnames(df)[covs]
+  }
 
   stopifnot( treatment %in% colnames(df) )
   #stopifnot( all( covs %in% colnames(df) ) )

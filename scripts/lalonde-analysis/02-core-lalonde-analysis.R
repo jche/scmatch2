@@ -6,6 +6,7 @@ library(tidyverse)
 library(here)
 
 lalonde_df <- readRDS(here::here("scripts/lalonde-analysis/data/lalonde_for_analysis.rds"))
+dim( lalonde_df )
 
 # MATCHING SETTINGS BASED ON LALONDE PAPER SNIPPET (Section 3.2)
 # The paper uses a fixed initial caliper of c = 1.
@@ -36,9 +37,27 @@ lalonde_scm <- lalonde_df %>%
     est_method = "scm"
   )
 
+lalonde_scm
+
+
 # Helper to expose the scaling and metric to downstream scripts if needed
-lalonde_params <- list(
-  dist_scaling = DIST_SCALING,
-  metric = METRIC,
-  caliper = CALIPER
-)
+lalonde_params <- params( lalonde_scm )
+
+lalonde_params
+
+
+cc <- caliper_table( lalonde_scm ) %>%
+  arrange(-adacal)
+cc
+
+bad_matches( lalonde_scm, 10000 )
+
+bad_matches( lalonde_scm, 10000, nonzero_weight_only = FALSE ) %>%
+  group_by( subclass ) %>%
+  summarise (n = n() )
+
+get_matches( lalonde_scm, "U00149", nonzero_weight_only = FALSE )
+
+result_table( lalonde_scm, include_caliper = TRUE )
+%>%
+  arrange( desc( caliper ) )

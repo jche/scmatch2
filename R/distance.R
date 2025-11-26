@@ -22,7 +22,8 @@ coerce_covs <- function(covs) {
   # TODO: Change this to using model.matrix to make dummy variables
 
   covs_coerced <-  covs %>%
-    mutate(across(!where(is.numeric), ~as.numeric(as.factor(.))))
+    mutate(across(where(is.logical), ~as.numeric(.))) %>%
+    mutate(across(!where(is.numeric), ~as.numeric(as.factor(.))-1))
   return(covs_coerced)
 }
 

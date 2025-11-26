@@ -16,6 +16,7 @@ test_that("basic object functionality", {
 
   # Perform matching
   mtch <- get_cal_matches(dat,
+                          treatment = "Z",
                           metric = "maximum",
                           scaling = c(1/0.2, 1/0.2),
                           caliper = 0.25,
@@ -100,6 +101,7 @@ test_that("basic object functionality", {
 
   expect_warning(
     mtch <- get_cal_matches(dat,
+                            form = Z ~ X1 + X2,
                             metric = "maximum",
                             scaling = c(1/0.2, 1/0.2),
                             caliper = 0.05,

@@ -1,3 +1,7 @@
+
+# Generate figures for supplemental lalonde analysis
+
+
 # scripts/lalonde-analysis/03-lalonde-figures.R
 library(CSM)
 library(latex2exp)
@@ -41,17 +45,19 @@ ggsave(here::here("figures/lalonde/lalonde_love.png"), plot = p_love, height = 4
 
 # A. SCM (Already run)
 ess_scm <- result_table(lalonde_scm, feasible_only=TRUE) %>%
-  filter(Z==0) %>% summarise(ess = sum(weights)^2/sum(weights^2)) %>% pull(ess)
+  filter(Z==0) %>%
+  summarise(ess = sum(weights)^2/sum(weights^2)) %>%
+  pull(ess)
 
 # B. Average (Simple average of matches in caliper)
-lalonde_avg <- lalonde_df %>%
-  get_cal_matches(
+lalonde_avg <-  get_cal_matches( lalonde_df,
     caliper = lalonde_params$caliper,
     metric = lalonde_params$metric,
     rad_method = "adaptive", # Keep same radius logic
-    scaling = lalonde_params$dist_scaling,
+    scaling = lalonde_params$scaling,
     est_method = "average" # <--- CHANGE
   )
+
 ess_avg <- result_table(lalonde_avg, feasible_only=TRUE) %>%
   filter(Z==0) %>% summarise(ess = sum(weights)^2/sum(weights^2)) %>% pull(ess)
 
@@ -62,14 +68,16 @@ lalonde_1nn <- lalonde_df %>%
     caliper = lalonde_params$caliper,
     metric = lalonde_params$metric,
     rad_method = "1nn",  # <--- CHANGE
-    scaling = lalonde_params$dist_scaling,
+    scaling = lalonde_params$scaling,
     est_method = "average"
   )
 ess_1nn <- result_table(lalonde_1nn, feasible_only=TRUE) %>%
   filter(Z==0) %>% summarise(ess = sum(weights)^2/sum(weights^2)) %>% pull(ess)
 
 # Print to console to verify against paper (Expect: ~72.6, ~129.9, ~67.0)
-print(tibble(Method = c("SCM", "Average", "1-NN"), ESS = c(ess_scm, ess_avg, ess_1nn)))
+print( tibble(Method = c("SCM", "Average", "1-NN"),
+              ESS = c(ess_scm, ess_avg, ess_1nn)))
+
 
 
 # -------------------------------------------------------------------------
@@ -94,6 +102,25 @@ plot_dm <- function(dist_to_plot){
 }
 
 # Top 1, 2, 3 distances
+dists <- dm_col_sorted[1:3,] %>%
+  t() %>%
+  as_tibble( .name_repair = "unique") %>%
+  set_names( c("Top_1", "Top_2", "Top_3") ) %>%
+  pivot_longer( cols=everything(),
+                names_to = "Rank",
+                values_to = "Distance")
+
+summary(dists$Distance)
+dists$Distance[dists$Distance >= 1000 ] = NA  # Cap for better visualization
+
+ggplot( dists, aes( Distance )  ) +
+  facet_wrap( ~Rank, ncol=1 ) +
+  geom_histogram( color="black" )
+
+# NOTE: WTF on distances?
+
+
+# Old style histogram
 p_dist_1 <- plot_dm(dm_col_sorted[1,])
 p_dist_2 <- plot_dm(dm_col_sorted[2,])
 p_dist_3 <- plot_dm(dm_col_sorted[3,])
@@ -182,7 +209,7 @@ for (i in 1:n_filtered) {
 
   # D. TOTAL VARIANCE ESTIMATION
   # We apply the V estimator to the cumulative dataset
-  estimate_ATT_result <- get_estimate_ATT(
+  estimate_ATT_result <- estimate_ATT(
     matches = df_curr,
     outcome = "Y",
     treatment = "Z",
@@ -220,12 +247,16 @@ p_satt <- ggd_att_filtered %>%
   theme_classic()
 
 p_tradeoff_all <- gridExtra::grid.arrange(plot_max_cal, p_satt, ncol=2)
+
 ggsave(here::here("figures/lalonde/lalonde_fsatt_tradeoff.png"), plot = p_tradeoff_all, width = 10, height = 5)
 
 # # Output final point estimate for the full set (SATT)
 # full_set <- result_table(lalonde_scm, feasible_only = FALSE)
 # print("SATT Estimate (Using all units, for comparison):")
 # print(get_att_point_est(full_set))
+
+
+
 # -------------------------------------------------------------------------
 # 5. Final numbers for text
 # -------------------------------------------------------------------------

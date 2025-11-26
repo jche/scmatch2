@@ -1,7 +1,7 @@
 
 
-# Scale each by standard deviation, and exact match on binary
-# covariates.
+# Scale each by standard deviation, and exact match on binary or
+# categorical covariates.
 default_scaling <- function( df, covs ) {
   df %>%
     summarize(across(all_of(covs),
@@ -68,11 +68,12 @@ make_treatment_table <- function( df, matches, caliper ) {
 #' @param df The data frame of data to be matched. Must contain
 #'   treatment indicator and covariates for matching.
 #' @param covs Specification of covariates to use for matching. Can be
-#'   variable names or tidyselect helpers like
-#'   \code{starts_with("X")}. Defaults to variables starting with "X".
+#'   variable names, list of column numbers, or NULL.  If NULL, will
+#'   use covariate names found in the scaling parameter, or default to
+#'   all columns starting with "X".
 #'
 #' @param treatment Name of the column in \code{df} containing the
-#'   treatment indicator (0/1 or TRUE/FALSE). Defaults to "Z".
+#'   treatment indicator (with values 0/1 or TRUE/FALSE).
 #'
 #' @param form Formula of form treatment ~ cov1 + cov2 + ...
 #'   specifying the treatment variable and covariates to use for
@@ -98,9 +99,11 @@ make_treatment_table <- function( df, matches, caliper ) {
 #'     \item "average": Simple average weighting
 #'   }
 #' @param scaling A vector of scaling constants for covariates (can
-#'   also be a single row matrix). These are often just the inverses
-#'   of covariate-specific standard deviations. Controls the relative
-#'   importance of different covariates in the distance calculation.
+#'   also be a single row data frame). These are often just the
+#'   inverses of covariate-specific standard deviations. Controls the
+#'   relative importance of different covariates in the distance
+#'   calculation.  If covs not supplied, will use name of this
+#'   parameter to identify covariates.
 #' @param id_name Name of column to look for ID values. If that column
 #'   is not found, a canonical \code{id} corresponding to row numbers
 #'   will be created.
@@ -121,8 +124,8 @@ make_treatment_table <- function( df, matches, caliper ) {
 #'   matching.
 #'
 #' @seealso \code{\link{gen_matches}} for the underlying matching
-#' function, \code{\link{est_weights}} for weight calculation,
-#' \code{\link{result_table}} for extracting results
+#'   function, \code{\link{est_weights}} for weight calculation,
+#'   \code{\link{result_table}} for extracting results
 #'
 #' @examples
 #' # Generate example data
@@ -146,13 +149,13 @@ make_treatment_table <- function( df, matches, caliper ) {
 #' @export
 get_cal_matches <- function( df,
                              form = NULL,
-                             covs = starts_with("X"),
-                             treatment = "Z",
+                             covs = NULL,
+                             treatment = NULL,
                              metric = c("maximum", "euclidean", "manhattan"),
                              caliper = 1,
                              rad_method = c("adaptive", "fixed", "1nn","adaptive-5nn", "knn"),
                              est_method = c("scm", "scm_extrap", "average"),
-                             scaling = default_scaling(df,covs),
+                             scaling = NULL,
                              id_name = "id",
                              warn = TRUE ,
                              k = 5  ## for KNN matching
@@ -167,7 +170,19 @@ get_cal_matches <- function( df,
     mf <- model.frame( form, data = df )
     treatment <- colnames( mf )[1]
     covs <- colnames( mf )[ -1 ]
+  } else if ( is.null( covs ) && !is.null(scaling) && !is.null(names(scaling)) ) {
+    # Pull covariates from scaling list
+    covs <- names( scaling )
+  } else if ( is.null( covs ) ) {
+    # Default to all columns starting with "X"
+    covs <- get_x_vars( df )
   }
+
+  if ( is.null( treatment ) ) {
+    warning( "treatment variable not specified; defaulting to 'Z'" )
+    treatment <- "Z"
+  }
+
 
   # Add ID column if not present
   if ( !( id_name %in% colnames(df) ) ) {
@@ -175,6 +190,15 @@ get_cal_matches <- function( df,
     df$id <- sprintf(paste0("U%0", n_zeros, "d"), 1:nrow(df))
   } else {
     df$id = as.character(df[[id_name]])
+  }
+
+  if ( is.null(scaling) ) {
+    scaling <- default_scaling( df, covs )
+  }
+
+  scnames = names(scaling)
+  if ( !is.null(scnames) ) {
+    stopifnot( all( scnames == covs ) )
   }
 
   ### use rad_method: generate matches
