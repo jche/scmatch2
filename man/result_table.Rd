@@ -8,7 +8,8 @@ result_table(
   csm,
   return = c("all", "sc_units", "agg_co_units", "exact"),
   feasible_only = FALSE,
-  nonzero_weight_only = FALSE
+  nonzero_weight_only = FALSE,
+  include_caliper = FALSE
 )
 }
 \arguments{
@@ -27,6 +28,9 @@ expanding the caliper.}
 
 \item{nonzero_weight_only}{TRUE means drop any control units with 0
 weight (e.g., due to scm weighting).}
+
+\item{include_caliper}{If TRUE, include columns for the caliper size
+and maximum distance for each treated unit.}
 }
 \value{
 dataframe of the treatment and control units.  This

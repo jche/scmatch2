@@ -9,8 +9,9 @@ lalonde_df <- readRDS(here::here("scripts/lalonde-analysis/data/lalonde_for_anal
 dim( lalonde_df )
 
 # MATCHING SETTINGS BASED ON LALONDE PAPER SNIPPET (Section 3.2)
-# The paper uses a fixed initial caliper of c = 1.
-CALIPER <- 1
+
+# TODO: If we set caliper to 0.5, then we actually see a change in the
+CALIPER <- 0.25
 METRIC <- "maximum"
 CAL_METHOD <- "adaptive" # The paper uses adaptive caliper: c_t = max{1, d_t}
 
@@ -27,9 +28,11 @@ DIST_SCALING <- tibble(
   X8 = 1/5000  # Average earnings, 1975 (Caliper of $5,000)
 )
 
+
 # Run matching
 lalonde_scm <- lalonde_df %>%
   get_cal_matches(
+    form = Z ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8,
     caliper = CALIPER, # 💥 UPDATED to 1
     metric = METRIC,
     rad_method = CAL_METHOD,
@@ -50,14 +53,8 @@ cc <- caliper_table( lalonde_scm ) %>%
   arrange(-adacal)
 cc
 
-bad_matches( lalonde_scm, 10000 )
+bad_matches( lalonde_scm, 1.5 )
 
-bad_matches( lalonde_scm, 10000, nonzero_weight_only = FALSE ) %>%
-  group_by( subclass ) %>%
-  summarise (n = n() )
 
-get_matches( lalonde_scm, "U00149", nonzero_weight_only = FALSE )
+get_match_sets( lalonde_scm, "U00149", nonzero_weight_only = FALSE )
 
-result_table( lalonde_scm, include_caliper = TRUE )
-%>%
-  arrange( desc( caliper ) )

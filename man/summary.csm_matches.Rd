@@ -4,7 +4,7 @@
 \alias{summary.csm_matches}
 \title{Summary method for csm_matches object}
 \usage{
-\method{summary}{csm_matches}(x, ...)
+\method{summary}{csm_matches}(x, outcome = NULL, ...)
 }
 \arguments{
 \item{x}{object to summarize}

@@ -68,6 +68,14 @@ sensitivity_plot <- function( csm,
 
 
 
+make_tx_axis <- function( atts ) {
+
+  dp = nrow(atts)
+  rest_pts = atts$N_T[-seq(1,ceiling(dp/10))]
+
+  scale_x_continuous(breaks = c( min(atts$N_T), pretty(rest_pts)))
+
+}
 
 #' Make feasible plot showing cumulative ATT as feasible units are
 #' added
@@ -81,8 +89,10 @@ sensitivity_plot <- function( csm,
 #' @param return_table If TRUE, return the full table of results
 #'   instead of a plot
 #' @param caliper_plot If TRUE, return a plot of maximum caliper size
-#'   vs number of treated units.
-#' @return A ggplot object showing the feasible plot
+#'   vs number of treated units.  If "both" return a list of both
+#'   plots, along with the table itself.
+#' @return A ggplot object showing the feasible plot, or a table of
+#'   results if return_table is TRUE.
 #' @export
 feasible_plot <- function( csm,
                            return_table = FALSE,
@@ -122,8 +132,8 @@ feasible_plot <- function( csm,
     return( ggd_att )
   }
 
-
-  if ( caliper_plot ) {
+  plot_max_caliper_size <- NA
+  if ( caliper_plot == TRUE || (caliper_plot=="both") ) {
     plot_max_caliper_size <-
       ggd_att %>%
       ggplot(aes(x=N_T, y=adacal)) +
@@ -132,14 +142,18 @@ feasible_plot <- function( csm,
       theme_classic() +
       labs(y = "Maximum caliper size used",
            x = "Total number of treated units used") +
-      expand_limits(y=0)
+      expand_limits(y=0) +
+      make_tx_axis( ggd_att )
 
-    return( plot_max_caliper_size )
+    if ( caliper_plot != "both" ) {
+      return( plot_max_caliper_size )
+    }
   }
 
 
 
   # PLot the results
+
 
   plot_SATT <-  ggd_att %>%
     ggplot(aes(x=N_T, y=ATT)) +
@@ -149,31 +163,39 @@ feasible_plot <- function( csm,
     theme_classic() +
     labs(y = "Cumulative ATT Estimate",
          x = "Total number of treated units used") +
-    expand_limits(color=1) +
-    geom_hline(yintercept=0, lty="dotted") +
-    theme(
-      legend.direction="horizontal",
-      legend.position.inside = c(0.5, 0.85),
-      legend.background = element_blank(),
-      legend.box.background = element_rect(colour = "black")
-    ) +
+    #expand_limits(color=1) +
+    # theme(
+    #   legend.direction="horizontal",
+    #    legend.position.inside = c(0.5, 0.85),
+    #   legend.background = element_blank(),
+    #    legend.box.background = element_rect(colour = "black")
+    #  ) +
     labs(
       y = "Cumulative ATT Estimate",
       x = "Total number of treated units used"
     ) +
-    geom_errorbar(
+    geom_ribbon(
       aes(
         ymin = ATT - 1.96 * SE,
         ymax = ATT + 1.96 * SE
       ),
-      width = 0.1,
-      linewidth = 0.5
+      alpha=0.2
+      #width = 0.1,
+      #linewidth = 0.5
     ) +
-    ylim(c(-0.1, 0.2))
+    geom_hline(yintercept=0, lty="dotted") +
+    geom_hline(yintercept=ggd_att$ATT[1], lty="dashed", color="blue") +
+    make_tx_axis( ggd_att )
 
+  # ylim(c(-0.1, 0.2))
+
+  if ( caliper_plot == "both" ) {
+    return( list( plot_SATT = plot_SATT,
+                  plot_max_caliper_size = plot_max_caliper_size,
+                  table = ggd_att ) )
+  }
   plot_SATT
 
 }
-
 
 

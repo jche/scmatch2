@@ -22,7 +22,8 @@ test_that("get_cal_matches works well", {
   test_df <-
     data.frame(Z=c(1,0,0,0,1),
                X1=c(0,0.5,0.8,3,1.6),
-               X2=c(0,0,0,0,0) )
+               X2=c(0,0,0,0,0),
+               GG = rnorm(5) )
   test_df2 = test_df
   test_df2$X2 = 1
   test_df2$Z = 0
@@ -62,7 +63,7 @@ test_that("get_cal_matches works well", {
   #expect_equal( res[[ 1, 1]], 1 )
   expect_true( is.data.frame( res[ 1, ] ) )
 
-  expect_output( p <- summary( res ), "match pattern")
+  expect_output( p <- summary( res, outcome="GG" ), "Subclass sizes")
   # summary(res)
 
 })

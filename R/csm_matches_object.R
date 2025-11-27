@@ -133,9 +133,12 @@ print.csm_matches <- function(x, ...) {
     scaling = paste( round( scaling, digits=3), collapse = ", " )
   }
   cal <- settings$cal
+
+  tco = dim( x )[[2]]
+
   cat( glue::glue( 'csm_matches: matching with "{settings$metric}" distance\
                         match covariates: {covs} \
-                   {ntx} treated units matched to {nco} control units ({ntx_over} above set caliper) \
+                   {ntx} treated units matched to {nco} of {tco} control units ({ntx_over} above set caliper) \
                    \t({n_exact} exact matches) \
                    Adaptive calipers: {adas} \
                    \tTarget caliper = {cal} \
@@ -155,11 +158,20 @@ print.csm_matches <- function(x, ...) {
 #' @param x object to summarize
 #' @param ... Extra arguments (currently ignored).
 #' @export
-summary.csm_matches <- function(x, ...) {
+summary.csm_matches <- function(x, outcome = NULL, ... ) {
 
   print.csm_matches(x)
 
   rs = result_table(x)
+
+  if ( nrow(rs) == 0 ) {
+    cat( " No matches were made.\n" )
+    return( invisible(
+      list( csm = x,
+            att = NA,
+            subclass_sizes = c( `0`= length(x$adacalipers) ) ) ) )
+  }
+
   rsC = filter( rs, Z == 0 )
 
   nunique1 = length( unique( rsC$id ) )
@@ -167,34 +179,62 @@ summary.csm_matches <- function(x, ...) {
   cat( glue::glue( "{nunique1} unique control units matched, {nunique2} with non-zero weight" ) )
   cat( "\n" )
 
-  if ( nrow(rs) == 0 ) {
-    cat( " No matches were made.\n" )
-  } else {
-    cat( "Treatment match pattern (before weighting):\n" )
-    tb = as.numeric( table( rs$subclass ) )
-    max = max( tb )
-    tb[ tb > 7 ] = 7
-    tb = table( tb )
-    if ( "7" %in% names(tb) ) {
-      w = which( names(tb) == "7" )
-      names(tb)[w] = paste0( "7-", max )
-    }
-    print(tb)
-
-    cat( "Treatment match pattern (after weighting):" )
-    rs0 = filter( rs, weights > 0, Z == 0 )
-    tb = table( table( rs0$subclass ) )
-    print( tb )
-
-    cat( "Control unit reuse:" )
-    tb = table( table( rsC$id ) )
-    print( tb )
-
-    cat( "Summary of aggregated control weights\n" )
-    rs2 = result_table( x, return = "agg_co_units" ) %>%
-      filter( weights > 0 )
-    print( summary( rs2$weights ) )
+  att = NULL
+  if ( !is.null( outcome ) ) {
+    stopifnot( outcome %in% names(x$matches[[1]]) )
+    cat( "ATT estimates and sample sizes:\n" )
+    att <- estimate_ATT(x, outcome=outcome) %>%
+      dplyr::select( -V, -V_E, -V_P ) %>%
+      as.data.frame()
+    att %>%
+      print( row.names = FALSE )
   }
+
+  cat( "Subclass sizes (before weighting):\n" )
+  tb = as.numeric( table( rsC$subclass ) )
+  max = max( tb )
+
+  # Get first existing value at least as big as 7 from tb
+  bigs <- tb[tb >= 7]
+
+  if ( length(bigs) > 0 ) {
+    first_val <- sort(bigs)[[1]]
+    tb[ tb >= first_val ] = first_val
+
+    tbtb = table( tb )
+    if ( as.character(first_val) %in% names(tbtb) ) {
+      w = which( names(tbtb) == "7" )
+      names(tbtb)[w] = paste0( "7-", max )
+    }
+  } else {
+    tbtb = table( tb )
+  }
+
+  print(tbtb)
+
+  cat( "Subclass sizes (after weighting):" )
+  rs0 = filter( rsC, weights > 0 )
+  tb = table( table( rs0$subclass ) )
+  print( tb )
+
+  cat( "Control unit reuse (before weighting):" )
+  tb = table( table( rsC$id ) )
+  print( tb )
+
+  cat( "Control unit reuse (after weighting):" )
+  tb = table( table( rs0$id ) )
+  print( tb )
+
+  cat( "Summary of aggregated control weights\n" )
+  rs2 = result_table( x, return = "agg_co_units" ) %>%
+    filter( weights > 0 )
+  print( summary( rs2$weights ) )
+
+  return( invisible( list(
+    csm = x,
+    att = att,
+    subclass_sizes = tbtb
+  ) ) )
 }
 
 
@@ -269,6 +309,8 @@ unmatched_units <- function( csm ) {
 #'   weight across all their matches), or "all" (control units will be
 #'   repeated if matched multiply). "exact" returns only exact matches
 #'   (up to machine precision on distance). Defaults to "all".
+#' @param include_caliper If TRUE, include columns for the caliper size
+#'  and maximum distance for each treated unit.
 #'
 #' @return dataframe of the treatment and control units.  This
 #'   dataframe can be analyzed as an as-if experimental dataset.
@@ -278,7 +320,8 @@ unmatched_units <- function( csm ) {
 result_table <- function( csm,
                           return = c( "all", "sc_units", "agg_co_units", "exact" ),
                           feasible_only = FALSE,
-                          nonzero_weight_only = FALSE ) {
+                          nonzero_weight_only = FALSE,
+                          include_caliper = FALSE ) {
 
   return = match.arg( return )
 
@@ -317,6 +360,13 @@ result_table <- function( csm,
 
   if ( nonzero_weight_only ) {
     rs <- filter( rs, weights > 0 )
+  }
+
+  if ( include_caliper ) {
+    rs <- rs %>%
+      left_join( caliper_table( csm ) %>%
+                   dplyr::select( -id, -max_dist ),
+                 by = "subclass" )
   }
 
   rs
@@ -398,7 +448,7 @@ params <- function( csm ) {
 #' @return Dataframe of matches
 #' @export
 get_match_sets <- function( csm, id,
-                     nonzero_weight_only = TRUE ) {
+                            nonzero_weight_only = TRUE ) {
   id_list = id
   rs <- result_table( csm )
 
@@ -416,7 +466,7 @@ get_match_sets <- function( csm, id,
     left_join( csm$treatment_table %>%
                  select( subclass, adacal ),
                by = "subclass"  ) %>%
-    arrange( -adacal, -Z )
+    arrange( -adacal, subclass, -Z )
 
   bad_rs
 }
@@ -449,7 +499,7 @@ bad_matches <- function( csm, threshold,
     left_join( csm$treatment_table %>%
                  select( subclass, adacal ),
                by = "subclass"  ) %>%
-    arrange( -adacal, -Z )
+    arrange( -adacal, subclass, -Z )
 
   bad_rs
 }

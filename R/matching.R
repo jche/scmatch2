@@ -94,9 +94,9 @@ get_matched_co_from_dm_trimmed <- function(df, dm_trimmed, treatment) {
       mutate(dist = 0) %>%
       rbind(matched_rows)
 
-    if ( nrow( df_tmp ) > 100 ) {
-      browser()
-    }
+ #   if ( nrow( df_tmp ) > 100 ) {
+ #     browser()
+ #   }
 
     df_tmp %>%
       mutate(subclass = IDs[[x]] )

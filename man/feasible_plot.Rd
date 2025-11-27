@@ -14,10 +14,12 @@ feasible_plot(csm, return_table = FALSE, caliper_plot = FALSE)
 instead of a plot}
 
 \item{caliper_plot}{If TRUE, return a plot of maximum caliper size
-vs number of treated units.}
+vs number of treated units.  If "both" return a list of both
+plots, along with the table itself.}
 }
 \value{
-A ggplot object showing the feasible plot
+A ggplot object showing the feasible plot, or a table of
+results if return_table is TRUE.
 }
 \description{
 Given a csm_matches object, this function makes a plot showing how
