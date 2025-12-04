@@ -47,14 +47,14 @@ ggsave(here::here("figures/lalonde_love.pdf"), plot = p_love, height = 3, width 
 # 1.(b) Look at how distances are distributed after matching ----
 # -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
 
-dplt <- distance_density_plot( lalonde_scm )
-
-dplt +
+dplt <- distance_density_plot( lalonde_scm ) +
   theme(legend.position = "bottom")
+
+dplt
 
 attr( dplt, "table" )
 
-ggsave(here::here("figures/lalonde_distance_density.pdf"), plot = dplt, width = 6, height = 4)
+ggsave(here::here("figures/lalonde_distance_density.pdf"), plot = dplt, width = 6, height = 2)
 
 
 
@@ -149,8 +149,9 @@ ggsave( plt, filename = here::here( "figures/lalonde_caliper_sensitivity_plot.pd
 tbl = caliper_sensitivity_table( plt )
 tbl
 
-caliper_sensitivity_plot_stats( plt )
-ggsave( plt, filename = here::here( "figures/lalonde_caliper_sensitivity_plot_stats.pdf"),
+plt_stats <- caliper_sensitivity_plot_stats( plt )
+plt_stats
+ggsave( plt_stats, filename = here::here( "figures/lalonde_caliper_sensitivity_plot_stats.pdf"),
         width = 7, height = 5 )
 
 

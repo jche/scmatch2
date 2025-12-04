@@ -209,7 +209,7 @@ get_distance_table <- function( scm,
     dist_table <- dist_table %>%
       pivot_longer( c( `SCM`, `average`, `closest` ),
                   names_to = "method", values_to="distance" ) %>%
-    mutate(method = factor( method, levels = c( "SCM", "Average", "1-NN" ) ) )
+    mutate(method = factor( method, levels = c( "SCM", "Average", "closest" ) ) )
   }
 
 
@@ -240,6 +240,12 @@ distance_density_plot <- function(scm, feasible_only = FALSE, boxplot_style = TR
 
   dist_table <- get_distance_table( scm, long_table = TRUE )
 
+  # rename method factor level closest to 1-NN
+  dist_table <- dist_table %>%
+    mutate( method = recode( method,
+                             closest = "1-NN",
+                             average = "Average",
+                             SCM = "SCM" ) )
 
   dd <- if ( feasible_only ) {
     dist_table %>%
