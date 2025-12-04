@@ -83,13 +83,16 @@ as.data.frame.csm_matches <- function(
 #' @param x object to print
 #' @export
 print.csm_matches <- function(x, ...) {
-  ntx = length( x$matches )
+  ntx = length( x$adacalipers )
+  ntx_match = length( x$matches )
+
+  tx_var = attr( x, "settings" )$treatment
 
   n_drop = sum( is.na( x$adacalipers ) )
 
   if ( length( x$matches ) > 0 ) {
     mtch = bind_rows( x$matches ) %>%
-      dplyr::filter( Z == 0 )
+      dplyr::filter( .data[[tx_var]] == 0 )
     nco = n_distinct( mtch$id )
 
     mex <- mtch %>%
@@ -102,7 +105,7 @@ print.csm_matches <- function(x, ...) {
 
   tt <- x$treatment_table
   if ( !is.null( tt ) ) {
-    ntx_over = sum( tt$feasible != 1 )
+    ntx_over = sum( tt$feasible != 1 & tt$matched == 1 )
     d_min = round( min( tt$max_dist ), digits = 3 )
     d_max = round( max( tt$max_dist ), digits = 3 )
   } else {
@@ -136,18 +139,22 @@ print.csm_matches <- function(x, ...) {
 
   tco = dim( x )[[2]]
 
-  cat( glue::glue( 'csm_matches: matching with "{settings$metric}" distance\
-                        match covariates: {covs} \
-                   {ntx} treated units matched to {nco} of {tco} control units ({ntx_over} above set caliper) \
-                   \t({n_exact} exact matches) \
+  if ( is.null( settings$est_method) ) {
+    settings$est_method = "none"
+  }
+  cat( glue::glue( 'csm_matches: matching with "{settings$metric}" distance and "{settings$rad_method}" radii\
+                        aggregating sets with "{settings$est_method}" method \
+                        match covariates: {covs}' ) )
+  cat("\n")
+  cat( glue::glue( '{ntx_match} treated units matched to {nco} of {tco} control units \
+                   \t({n_exact} exact matches, {ntx_match - ntx_over} below caliper, {ntx_over} above caliper) \
                    Adaptive calipers: {adas} \
                    \tTarget caliper = {cal} \
-                   \tMax distance ranges {d_min} - {d_max} \
-                   scaling: {scaling}' ) )
+                   Max distance ranges {d_min} - {d_max} \
+                   \tscaling: {scaling}' ) )
 
   cat("\n")
   if ( n_drop > 0 ) {
-    cat( "\t" )
     cat( glue::glue( "{n_drop} treated units dropped" ) )
     cat("\n")
   }
@@ -165,14 +172,15 @@ summary.csm_matches <- function(x, outcome = NULL, ... ) {
   rs = result_table(x)
 
   if ( nrow(rs) == 0 ) {
-    cat( " No matches were made.\n" )
+    cat( "No matches were made.\n" )
     return( invisible(
       list( csm = x,
             att = NA,
             subclass_sizes = c( `0`= length(x$adacalipers) ) ) ) )
   }
 
-  rsC = filter( rs, Z == 0 )
+  tx_var = attr( x, "settings" )$treatment
+  rsC = filter( rs, .data[[tx_var]] == 0 )
 
   nunique1 = length( unique( rsC$id ) )
   nunique2 = length( unique( rsC$id[ rsC$weights > 0 ] ) )
@@ -319,6 +327,7 @@ unmatched_units <- function( csm ) {
 #'
 result_table <- function( csm,
                           return = c( "all", "sc_units", "agg_co_units", "exact" ),
+                          outcome = NULL,
                           feasible_only = FALSE,
                           nonzero_weight_only = FALSE,
                           include_caliper = FALSE ) {
@@ -327,8 +336,8 @@ result_table <- function( csm,
 
   # Swap result type if asked
   rs <- switch(return,
-               sc_units     = agg_sc_units(csm$matches),
-               agg_co_units = agg_co_units(csm$matches),
+               sc_units     = agg_sc_units(csm,outcome=outcome),
+               agg_co_units = agg_co_units(csm,outcome=outcome),
                all          = bind_rows(csm$matches),
                exact        = bind_rows(csm$matches) %>%
                  filter( abs(dist) < 10*.Machine$double.eps )
@@ -337,9 +346,10 @@ result_table <- function( csm,
   # Deal with empty result table if nothing is matched.
   # (This is not great coding, I don't think.)
   if ( nrow(rs) == 0 ) {
+    tx_var = attr( csm, "settings" )$treatment
     rs$id = character()
     rs$subclass = character()
-    rs$Z = integer()
+    rs[tx_var] = integer()
     rs$weights = numeric()
   }
 
@@ -402,14 +412,14 @@ result_table <- function( csm,
 #' update_matches( mtch, caliper = 0.05, rad_method = "fixed" )
 #'
 #' @export
-update_matches <- function( res, data, ... ) {
+update_matches <- function( res, data, warn = TRUE, ... ) {
   stopifnot( inherits( res, "csm_matches" ) )
 
   args = attr( res, "settings" )
   args = modifyList( args, list( ... ) )
 
   covs = attr( res, "covariates" )
-  new_res <- get_cal_matches( df=data,
+  new_res <- get_cal_matches( data=data,
                               covs = covs,
                               treatment = args$treatment,
                               metric = args$metric,
@@ -418,6 +428,7 @@ update_matches <- function( res, data, ... ) {
                               est_method = args$est_method,
                               scaling = args$scaling,
                               id_name = args$id_name,
+                              warn = warn,
                               k = args$k )
   return( new_res )
 }
@@ -461,12 +472,14 @@ get_match_sets <- function( csm, id,
     filter( id %in% id_list ) %>%
     pull( subclass )
 
+  tx_var = attr( csm, "settings" )$treatment
+
   bad_rs <- rs %>%
     filter( subclass %in% tx_id  ) %>%
     left_join( csm$treatment_table %>%
                  select( subclass, adacal ),
                by = "subclass"  ) %>%
-    arrange( -adacal, subclass, -Z )
+    arrange( -adacal, subclass, -.data[[tx_var]] )
 
   bad_rs
 }
@@ -493,13 +506,14 @@ bad_matches <- function( csm, threshold,
   tx_id = csm$treatment_table %>%
     filter( adacal > threshold ) %>%
     pull( id )
+  tx_var = attr( csm, "settings" )$treatment
 
   bad_rs <- rs %>%
     filter( subclass %in% tx_id  ) %>%
     left_join( csm$treatment_table %>%
                  select( subclass, adacal ),
                by = "subclass"  ) %>%
-    arrange( -adacal, subclass, -Z )
+    arrange( -adacal, subclass, -.data[[tx_var]] )
 
   bad_rs
 }

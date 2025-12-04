@@ -3,9 +3,9 @@
 
 
 # scripts/lalonde-analysis/03-lalonde-figures.R
+library(tidyverse)
 library(CSM)
 library(latex2exp)
-library(tidyverse)
 library(here)
 library(gridExtra)
 # library(wesanderson) # Optional, using default colors per previous instruction
@@ -17,94 +17,107 @@ theme_set(theme_classic())
 source(here::here("scripts/lalonde-analysis/02-core-lalonde-analysis.R"))
 
 # Ensure figures directory exists
-if(!dir.exists(here::here("figures/lalonde"))) dir.create(here::here("figures/lalonde"), recursive = TRUE)
+if(!dir.exists(here::here("figures/"))) dir.create(here::here("figures/"), recursive = TRUE)
 
-# -------------------------------------------------------------------------
-# 1. Love Plot (Covariate Balance) - Figure 1 in Paper
-# -------------------------------------------------------------------------
+
+summary( lalonde_scm )
+
+
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
+# 1. Love Plot (Covariate Balance) - Figure 1 in Paper ----
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
 
 # Map X names back to readable names for the plot
 covs_names <- c("Black", "Hispanic", "Married", "No Degree",
-                "Age", "Education", "Earnings (1974)", "Earnings (1975)")
-names(covs_names) <- paste0("X", 1:8)
+                "Age", "Education", "Earnings (1974)", "Earnings (1975)",
+                "High School Grad", "College Grad")
+names(covs_names) <- c( paste0("X", 1:8), "HS", "COLL" )
 
-# Using the CSM love_plot logic
-# The paper emphasizes the balance of the *feasible* set.
-set.seed(2)
-p_love <- love_plot(lalonde_scm, covs = paste0("X", 1:8), B = NA) +
-  scale_y_discrete(labels = covs_names) +
+p_love <- love_plot(lalonde_scm, covs = c( "X5", "X6", "X7", "X8"),
+                    covs_names = covs_names[5:8] ) +
   labs(title = "Covariate Balance (Lalonde)")
 
 p_love
 
-ggsave(here::here("figures/lalonde/lalonde_love.png"), plot = p_love, height = 4, width = 6)
-
-
-# -------------------------------------------------------------------------
-# 2. Comparison Table (Replicating Table 2 in Paper)
-# -------------------------------------------------------------------------
-# The paper compares SCM, Average, and 1-NN. We need to run the other two.
-
-summary( lalonde_scm )
-estimate_ATT( lalonde_scm )
-
-tbl <- compare_ess( lalonde_scm, lalonde_df )
-print( tbl )
+ggsave(here::here("figures/lalonde_love.pdf"), plot = p_love, height = 3, width = 6)
 
 
 
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
+# 1.(b) Look at how distances are distributed after matching ----
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
 
-# -------------------------------------------------------------------------
-# 3. Distances Histogram (Top K)
-# -------------------------------------------------------------------------
+dplt <- distance_density_plot( lalonde_scm )
 
-# Extract distance matrix from slot
-dist_matrix <- data.frame(t(as.matrix(lalonde_scm$dm_uncapped)))
-dm_col_sorted <- apply(dist_matrix, 2, sort)
+dplt +
+  theme(legend.position = "bottom")
 
-# Updated plotting function to show the "hard to match" units
-# The paper mentions max adaptive caliper is ~2.62.
-plot_dm <- function(dist_to_plot){
-  tibble(d = as.numeric(as.matrix(dist_to_plot))) %>%
-    filter(d < 10) %>% # Filter out exact match dummies (1000), keep adaptive ones (~2.6)
-    ggplot(aes(d)) +
-    geom_histogram(color="black", binwidth=0.1) +
-    geom_vline(xintercept = lalonde_params$caliper, col="red") +
-    theme_classic() +
-    labs(y=NULL, x = TeX("$d(X_t, X_j)$")) +
-    theme(axis.ticks.y = element_blank(), axis.text.y = element_blank())
-}
+attr( dplt, "table" )
 
-# Top 1, 2, 3 distances
-dists <- dm_col_sorted[1:3,] %>%
-  t() %>%
-  as_tibble( .name_repair = "unique") %>%
-  set_names( c("Top_1", "Top_2", "Top_3") ) %>%
-  pivot_longer( cols=everything(),
-                names_to = "Rank",
-                values_to = "Distance")
-
-summary(dists$Distance)
-
-ggplot( dists, aes( Distance )  ) +
-  facet_wrap( ~Rank, ncol=1 ) +
-  geom_histogram( color="black" )
+ggsave(here::here("figures/lalonde_distance_density.pdf"), plot = dplt, width = 6, height = 4)
 
 
 
-# Old style histogram
-# TODO/NOTE: I don't like the shifting x-axis.  Replace with the above
-p_dist_1 <- plot_dm(dm_col_sorted[1,])
-p_dist_2 <- plot_dm(dm_col_sorted[2,])
-p_dist_3 <- plot_dm(dm_col_sorted[3,])
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
+# 2. Comparison of Methods Table ----
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
 
-p_dist_all <- gridExtra::grid.arrange(p_dist_1, p_dist_2, p_dist_3, ncol=1)
-ggsave(here::here("figures/lalonde/lalonde_top_k_distances.png"), plot = p_dist_all, width = 5, height = 8)
+# The paper compares ESS of SCM, Average, and 1-NN. We need to run the
+# other two to get these numbers.
+
+ss <- sensitivity_table( lalonde_scm, outcome="Y",
+                         include_distances = TRUE )
+
+ss
 
 
-# -------------------------------------------------------------------------
-# 4. SATT / Caliper Trade-off Plot (Figure 2) - Cumulative (FSATT -> SATT)
-# -------------------------------------------------------------------------
+plt <- ess_plot( lalonde_scm )
+plt
+
+plt <- ess_plot( lalonde_scm, feasible_only = TRUE )
+plt
+
+
+
+# Demo code: Some extra comparisons and explorations
+
+bad_matches( lalonde_scm, 1.5 )
+
+# If we want, we can explore sets by passing lists of IDs
+ss <- get_match_sets( lalonde_scm,
+                      c( "U00149", "U00065" ),
+                      nonzero_weight_only = FALSE )
+
+#ss <- ss %>%
+#  dplyr::select( all_of( c( names(DIST_SCALING ), "Z" ) ) )
+ss
+gen_dm( ss, covs = names( DIST_SCALING ),
+        treatment = "Z",
+        scaling = DIST_SCALING,
+        metric = METRIC )
+
+# Note: We are using maximum distance metric, hence the frequency of
+# ties.
+
+
+
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
+# 3. Distances Histogram (Top K) ----
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
+
+
+p_dist_all <- caliper_distance_plot( lalonde_scm, tops = c(1, 3, 6) )
+p_dist_all
+
+ggsave(here::here("figures/lalonde_top_k_distances.pdf"), plot = p_dist_all, width = 7, height = 3.5)
+
+
+
+
+
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
+# 4. SATT / Caliper Trade-off Plot (Figure 2) - Cumulative (FSATT -> SATT) ----
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
 
 plot_max_cal <- feasible_plot(lalonde_scm, caliper_plot = "both")
 p_satt = plot_max_cal$plot_SATT
@@ -113,24 +126,33 @@ plot_max_cal = plot_max_cal$plot_max_caliper_size
 p_tradeoff_all <- gridExtra::grid.arrange(plot_max_cal, p_satt, ncol=2)
 
 
-ggsave(here::here("figures/lalonde/lalonde_fsatt_tradeoff.png"), plot = p_tradeoff_all, width = 10, height = 5)
-
-# # Output final point estimate for the full set (SATT)
-# full_set <- result_table(lalonde_scm, feasible_only = FALSE)
-# print("SATT Estimate (Using all units, for comparison):")
-# print(get_att_point_est(full_set))
+ggsave(here::here("figures/lalonde_fsatt_tradeoff.pdf"), plot = p_tradeoff_all, width = 10, height = 5)
 
 
 
-# -------------------------------------------------------------------------
-# 5. Final numbers for text
-# -------------------------------------------------------------------------
-# FSATT (Feasible only)
-feasible <- result_table(lalonde_scm, feasible_only = TRUE)
-print("FSATT Estimate (Matches Paper ~$1595):")
-print(get_att_point_est(feasible))
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
+# 5. Sensitivity to caliper plot ----
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
 
-# SATT (Full)
-full_set <- result_table(lalonde_scm, feasible_only = FALSE)
-print("SATT Estimate (Matches Paper ~$1344):")
-print(get_att_point_est(full_set))
+
+# Note: Bit computationally intensive
+plt <- caliper_sensitivity_plot( lalonde_scm, lalonde_df,
+                         focus = "FATT",
+                         R = 11,
+                         min_cal = 0, max_cal = 1 )
+
+plt
+
+ggsave( plt, filename = here::here( "figures/lalonde_caliper_sensitivity_plot.pdf"),
+        width = 7, height = 5 )
+
+tbl = caliper_sensitivity_table( plt )
+tbl
+
+caliper_sensitivity_plot_stats( plt )
+ggsave( plt, filename = here::here( "figures/lalonde_caliper_sensitivity_plot_stats.pdf"),
+        width = 7, height = 5 )
+
+
+
+

@@ -40,7 +40,7 @@ test_that("exact matching defaults work", {
   test_df
 
 
-  res <- get_cal_matches(df=test_df,
+  res <- get_cal_matches(data=test_df,
                          Z ~ X1 + X2,
                          rad_method = "fixed",
                          scaling = 1,
@@ -79,7 +79,7 @@ test_that("exact matching defaults work", {
     ungroup() %>%
     relocate( ID )
 
-  res <- get_cal_matches(df=test_df,
+  res <- get_cal_matches(data=test_df,
                          Z ~ X1 + X2,
                          rad_method = "fixed",
                          scaling = 1,
@@ -91,7 +91,7 @@ test_that("exact matching defaults work", {
   expect_output( summary( res ) )
 
 
-  res <- get_cal_matches(df=test_df,
+  res <- get_cal_matches(data=test_df,
                          Z ~ X1 + X2,
                          scaling = 1,
                          caliper = 0, warn=FALSE )

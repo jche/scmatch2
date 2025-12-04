@@ -16,8 +16,8 @@ library(tidyverse)
 #' @export
 #'
 #' @examples
-#' df = data.frame( A = c( "A", "B", "A", "C" ) )
-#' coerce_covs( df )
+#' data = data.frame( A = c( "A", "B", "A", "C" ) )
+#' coerce_covs( data )
 coerce_covs <- function(covs) {
   # TODO: Change this to using model.matrix to make dummy variables
 
@@ -68,7 +68,7 @@ scale_covs <- function(covs, scaling){
 
 #' Generate (#tx) by (#co) distance matrix
 #'
-#' @param df dataframe contains at least covariates and treatments
+#' @param data dataframe contains at least covariates and treatments
 #' specified by "covs" and "treatment" argument
 #' @param covs a vector of characters,
 #' name of covariates to be matched; default all "X" variables
@@ -80,25 +80,25 @@ scale_covs <- function(covs, scaling){
 #' @return (#tx) by (#co) distance matrix
 #'
 #' @export
-gen_dm <- function(df,
-                   covs = get_x_vars(df),
+gen_dm <- function(data,
+                   covs = get_x_vars(data),
                    treatment = "Z",
                    scaling = 1,
                    metric = c("maximum", "euclidean", "manhattan")) {
 
-  # if (!all(covs %in% names(df))){
-  #   missing_covs <- covs[!covs %in% names(df)]
+  # if (!all(covs %in% names(data))){
+  #   missing_covs <- covs[!covs %in% names(data)]
   #   stop("covariates specified are not in the dataframe: ", paste(missing_covs,collapse=", "),call.=F )
   # }
 
-  # if (!(treatment %in% names(df))){
+  # if (!(treatment %in% names(data))){
   #   stop("Input treatment variable is wrong. You inputted: ", treatment )
   # }
 
   metric <- match.arg(metric)
 
-  # pull out df with only covariates
-  covs <- df %>%
+  # pull out data with only covariates
+  covs <- data %>%
     dplyr::select(all_of(covs))
   c_names = colnames(covs)
 
@@ -107,8 +107,8 @@ gen_dm <- function(df,
   covs <- scale_covs(covs_coerced, scaling)
 
   # Subset tx/co covs correctly
-  tx_obs <- which(as.logical(pull(df, {{treatment}})))
-  co_obs <- which(as.logical(!pull(df, {{treatment}})))
+  tx_obs <- which(as.logical(pull(data, {{treatment}})))
+  co_obs <- which(as.logical(!pull(data, {{treatment}})))
 
   tx_covs <- matrix(covs[tx_obs,], ncol = ncol(covs))   # in case only one tx unit
   co_covs <- covs[co_obs,]

@@ -108,8 +108,11 @@ test_that("basic object functionality", {
                             rad_method = "fixed",
                             est_method = "scm")
   )
-  summary( mtch )
-  expect_output( summary( mtch ) )
+  expect_output(
+    summary( mtch ),
+    "0 treated units matched to 0 of 4 control units"
+  )
+
   tt = CSM:::unmatched_units(mtch)
   expect_equal( nrow(tt), 5 )
 
@@ -237,7 +240,7 @@ update_matches <- function( res, ... ) {
   args = modifyList( args, list( ... ) )
 
   covs = attr( res, "covariates" )
-  new_res <- get_cal_matches( df=test_df,
+  new_res <- get_cal_matches( data=test_df,
                               covs = covs,
                               treatment = args$treatment,
                               metric = args$metric,

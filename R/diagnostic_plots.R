@@ -16,56 +16,283 @@ create_toy_df_plot <- function(toy_df) {
 }
 
 
+# Exploring distances -----
 
 
-# SCM evaluation plot -----------------------------------------------------
+#' Distance of kth neighbor plot
+#'
+#' Plot distribution of distances between treated units and their
+#' kth-nearest neighbors in the control group, for a set of k values.
+#'
+#' @param scm A csm_matches object
+#' @param tops A vector of integers indicating which nearest neighbors
+#'   to plot
+#' @param caliper Optional caliper value to plot as a vertical line.
+#'   Otherwise it will take caliper from scm object.  If NA will plot
+#'   no line.
+#' @param target_percentile Optional target percentile for caliper,
+#'   which will calculate caliper to achieve.
+#'
+#' @return The plot with some extra attributes.  First is "distances",
+#'   the table of distances to the kth nearest neighbor. Second, if
+#'   caliper provided, "table" with the table of proportion of
+#'   distances below the caliper for each k.  Last is "caliper", the
+#'   caliper value used.
+#'
+#' @export
+caliper_distance_plot <- function( scm, tops = 1:3, caliper = NULL,
+                                   target_percentile = NULL,
+                                   target_k = 1 ) {
 
-dist_density_plot <- function(d, scaling, metric) {
+  tops = sort(tops)
+
+  # Extract distance matrix from slot
+  dist_matrix <- data.frame(t(as.matrix(scm$dm_uncapped)))
+  dm_col_sorted <- apply(dist_matrix, 2, sort)
+
+  # Updated plotting function to show the "hard to match" units
+  plot_dm <- function(dist_to_plot){
+    tibble(d = as.numeric(as.matrix(dist_to_plot))) %>%
+      filter(d < 10) %>% # Filter out exact match dummies (1000), keep adaptive ones (~2.6)
+      ggplot(aes(d)) +
+      geom_histogram(color="black", binwidth=0.1) +
+      geom_vline(xintercept = lalonde_params$caliper, col="red") +
+      theme_classic() +
+      labs(y=NULL, x = TeX("$d(X_t, X_j)$")) +
+      theme(axis.ticks.y = element_blank(), axis.text.y = element_blank())
+  }
+
+  # Top 1, 2, 3 distances
+  dists <- dm_col_sorted[tops,] %>%
+    t() %>%
+    as.data.frame() %>%
+    set_names( tops ) %>%
+    pivot_longer( cols=everything(),
+                  names_to = "Rank",
+                  values_to = "Distance") %>%
+    mutate( Rank = as.numeric( Rank ) )
+
+
+  plt <- ggplot( dists, aes( Distance )  ) +
+    facet_wrap( ~Rank, ncol=1 ) +
+    geom_histogram( color="black" ) +
+    labs( y = "" ) +
+    theme_minimal() +
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      panel.grid.minor = element_blank()
+    )
+
+  if ( !is.null( target_percentile ) ) {
+    if( !( target_k %in% tops ) ) {
+      stop( "target_k must be one of the values in tops" )
+    }
+
+    caliper <- quantile( dists$Distance[ dists$Rank == target_k ],
+                         probs = target_percentile )
+  }
+  attr( plt, "distances" ) <- dists
+
+  if ( is.null( caliper ) ) {
+    caliper = params(scm)$caliper
+  }
+
+  if ( !is.null( caliper ) && !is.na( caliper) ) {
+
+    tbl <- dists %>%
+      group_by( Rank ) %>%
+      summarise( pct_below_caliper = mean( Distance <= caliper ) )
+
+    #  ach_percentile <- tbl$pct_below_caliper[ tbl$Rank == target_k ]
+
+    x_loc = max( dists$Distance ) * 0.95
+
+    plt <- plt +
+      geom_vline( xintercept = caliper, col="red" ) +
+      geom_text(
+        data = tbl,
+        aes(
+          x = x_loc, y = Inf,
+          label = scales::percent(pct_below_caliper, accuracy = 1)
+        ),
+        hjust = 1.1, vjust = 1.1,
+        inherit.aes = FALSE
+      ) +
+      labs( caption = glue::glue( "Caliper = {round( caliper, 3 )}" ) )
+
+    attr( plt, "caliper" ) <- caliper
+    attr( plt, "table" ) <- tbl
+  }
+
+  plt
+}
+
+
+#' Calculate distances from all matched treatment units to controls
+#'
+#' Look at distances between each treated unit and their synthetic
+#' control, average control, and closest control.
+#'
+#' @param scm A csm_matches object
+#' @param long_table If TRUE, return a long-form table with method and
+#'   distance columns.  If FALSE each tx unit is a row.
+#'
+#' @return A data frame with distances from each treated unit to their
+#'   synthetic control, average control, and closest control.
+#'
+#' @export
+get_distance_table <- function( scm,
+                                long_table = FALSE ) {
+  d = result_table(scm)
+  scaling = params(scm)$scaling
+  metric = params(scm)$metric
+  covariates = params(scm)$covariates
+  treatment = params(scm)$treatment
+  outcome = params(scm)$outcome
+
+  if ( is.null( scm$treatment_table ) ) {
+    scm$treatment_table <- make_treatment_table(scm)
+  }
+
   # check distances bw each tx/sc pair
-  sc_dists <- d %>%
-    agg_sc_units() %>%
+  sc_dists <- scm %>%
+    agg_sc_units()
+  stopifnot( all( sc_dists$id[sc_dists[[treatment]]==1] == scm$treatment_table$id) )
+  sc_dists <- sc_dists %>%
     gen_dm(scaling = scaling,
-           metric = metric) %>%
-    diag()
-  avg_dists <- d %>%
-    agg_avg_units() %>%
-    gen_dm(scaling = scaling,
+           covs = covariates,
+           treatment = treatment,
            metric = metric) %>%
     diag()
 
-  nn_dists <- d %>%
+  avg_dists <- scm %>%
+    agg_avg_units()
+  stopifnot( all( avg_dists$id[avg_dists[[treatment]]==1] == scm$treatment_table$id) )
+
+  avg_dists <- avg_dists %>%
+    gen_dm(scaling = scaling,
+           covs = covariates,
+           treatment = treatment,
+           metric = metric) %>%
+    diag()
+
+  nn_dists <- scm %>%
+    result_table() %>%
     group_by(Z,subclass) %>%
     filter(dist == min(dist)) %>%
-    slice(1) %>%
-    mutate(weights = 1) %>%
+    mutate(weights = 1/n()) %>%
     ungroup() %>%
-    agg_avg_units() %>%
+    agg_avg_units( covariates = covariates,
+                   treatment = treatment,
+                   outcome = outcome )
+  stopifnot( all( nn_dists$id[nn_dists[[treatment]]==1] == scm$treatment_table$id) )
+  nn_dists <- nn_dists %>%
     gen_dm(scaling = scaling,
+           covs = covariates,
+           treatment = treatment,
            metric = metric) %>%
     diag()
 
   res_list <- list(sc = sc_dists, avg = avg_dists, nn = nn_dists)
-  print(tibble(
-    method = c("SCM", "Average", "1-NN"),
-    mean = map_dbl(res_list, ~round(mean(.), 3)),
-    median = map_dbl(res_list, ~round(median(.), 3))
-  ))
+  dist_table <- tibble(id = scm$treatment_table$id,
+                       SCM = sc_dists,
+                       average = avg_dists,
+                       closest = nn_dists)
 
-  tibble(SCM = sc_dists,
-         Average = avg_dists,
-         "1-NN" = nn_dists) %>%
-    pivot_longer(everything()) %>%
-    mutate(name = factor(name, levels=c("SCM", "Average", "1-NN"))) %>%
-    ggplot(aes(x=value, color=name)) +
-    geom_density(linewidth=1) +
-    theme_classic() +
-    scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(5,4,1)]) +
-    labs(y = "Density",
-         x = "Distance between treated unit \nand corresponding control",
-         color = "Method")
+  dist_table <- dist_table %>%
+    left_join( scm$treatment_table %>%
+                 dplyr::select( id, feasible, matched ),
+               by="id" )
+
+  if ( long_table ) {
+    dist_table <- dist_table %>%
+      pivot_longer( c( `SCM`, `average`, `closest` ),
+                  names_to = "method", values_to="distance" ) %>%
+    mutate(method = factor( method, levels = c( "SCM", "Average", "1-NN" ) ) )
+  }
+
+
+  dist_table
 }
 
-scm_vs_avg_plot <- function(d, scaling, metric) {
+
+# SCM evaluation plot -----------------------------------------------------
+
+#' Calculate distances from treated units to their controls
+#'
+#'
+#' Look at distribution of pairwise distances between treated unit and
+#' their synthetic control, average control, and 1-NN control.
+#'
+#' @param scm A csm_matches object
+#' @param feasible_only If TRUE, only plot distances for treated units
+#'   that were feasible and matched.
+#' @param boxplot_style If TRUE, use boxplot style for the density
+#'   plot.
+#'
+#' @return A ggplot object showing the density of distances. Also has
+#'   two attributes: "table" with summary statistics of the distances,
+#'   and "dist_table" with the full table of distances.
+#'
+#' @export
+distance_density_plot <- function(scm, feasible_only = FALSE, boxplot_style = TRUE ) {
+
+  dist_table <- get_distance_table( scm, long_table = TRUE )
+
+
+  dd <- if ( feasible_only ) {
+    dist_table %>%
+      filter( feasible == 1 & matched == 1 )
+  } else {
+    dist_table
+  }
+
+  if ( boxplot_style ) {
+    plt <- ggplot( dd, aes( method, distance, col=method ) ) +
+      geom_boxplot() +
+      coord_flip() +
+      theme_classic() +
+      scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(5,4,1)]) +
+      labs(y = "",
+           y = "Distance between treated unit \nand corresponding control",
+           color = "Method")
+
+  } else {
+    plt <- ggplot(dd, aes(x=distance, color=method)) +
+      geom_density(linewidth=1) +
+      theme_classic() +
+      scale_color_manual(values = wesanderson::wes_palette("Zissou1", 5)[c(5,4,1)]) +
+      labs(y = "Density",
+           x = "Distance between treated unit \nand corresponding control",
+           color = "Method")
+  }
+
+  tbl <- dd %>%
+    group_by( method ) %>%
+    summarise( mean = mean( distance ),
+               median = median( distance ) )
+
+  attr( plt, "table" ) <- tbl
+  attr( plt, "dist_table" ) <- dist_table
+
+  return(plt)
+}
+
+
+
+#' Explore pairwise distances
+#'
+#' Look at the distance between each treated unit and their synthetic control
+#' versus the distance between each treated unit and the simple average control.
+#'
+#' @noRd
+scm_vs_avg_distance_plot <- function(scm) {
+
+  d = result_table(scm)
+  scaling = params(scm)$scaling
+  metric = params(scm)$metric
+
   # check distances bw each tx/sc pair
   sc_dists <- d %>%
     agg_sc_units() %>%
@@ -120,14 +347,17 @@ scm_vs_avg_plot <- function(d, scaling, metric) {
 
 # estimate-estimand tradeoff plot -----------------------------------------
 
-satt_plot <- function(res, B=NA) {
-  feasible_subclasses <- attr(res, "feasible_subclasses")
+satt_plot <- function(scm, B=NA) {
+
+  feasible_subclasses <- feasible_unit_subclass(scm)
+
   n_feasible <- length(feasible_subclasses)
 
+  res = result_table(scm)
   ggd_maxcal <- res %>%
     filter(!subclass %in% feasible_subclasses) %>%
     filter(Z==1) %>%
-    left_join(attr(res, "adacalipers"), by="id") %>%
+    left_join( caliper_table(scm), by="id") %>%
     arrange(adacal) %>%
     mutate(order = 1:n() + n_feasible)
 
@@ -141,7 +371,7 @@ satt_plot <- function(res, B=NA) {
 
   # ATT estimate vs. # co units added
   ggd_att <- res %>%
-    left_join(attr(res, "adacalipers"), by="id") %>%
+    left_join(caliper_table(scm), by="id") %>%
     group_by(subclass) %>%
     summarize(adacal = last(adacal),
               tx = Y[2] - Y[1]) %>%
@@ -369,7 +599,7 @@ satt_plot4 <- function(res, B=NA) {
     geom_line(alpha=0.5) +
     geom_point(
       # aes(color=adacal),
-               size=3) +
+      size=3) +
     theme_classic() +
     labs(y = "Cumulative ATT Estimate",
          x = "Total number of treated units used",
@@ -416,7 +646,7 @@ satt_plot4 <- function(res, B=NA) {
 
 # love plot ---------------------------------------------------------------
 
-get_diff_scm_co_and_tx <- function(res,covs){
+get_diff_scm_co_and_tx <- function(res, covs){
   stopifnot( is.csm_matches(res) )
 
   ada = res$treatment_table %>%
@@ -431,6 +661,8 @@ get_diff_scm_co_and_tx <- function(res,covs){
                      ~.[2] - .[1]))
   return(df_diff_scm_co_and_tx)
 }
+
+
 
 create_love_plot_df <- function(res, covs){
   feasible_subclasses <- feasible_units(res)
@@ -459,16 +691,33 @@ create_love_plot_df <- function(res, covs){
 #' passed.
 #'
 #' @export
-love_plot <- function(res, covs, covs_names = NULL, B=NA) {
-  love_steps <- create_love_plot_df(res, covs)
+love_plot <- function( csm, covs = NULL, covs_names = NULL, B=NA ) {
+
+
+  cc = params(csm)$covariates
+  if ( !is.null( covs ) ) {
+    stopifnot( all( covs %in% cc ) )
+  } else {
+    covs = cc
+  }
+
+  if ( !is.null( covs_names ) && !is.null( covs ) ) {
+    stopifnot( length( covs_names ) == length( covs ) )
+  }
+
+  love_steps <- create_love_plot_df(csm, covs)
+
   if ( !is.null( covs_names ) ) {
     love_steps$name <- covs_names[ match( love_steps$name, covs ) ]
+  } else {
+    covs_names = covs
   }
+
   p <- love_steps %>%
     ggplot(aes(x=order, color=name)) +
     geom_point(data=. %>%
-                 slice(c(1:length(covs),
-                      (n()-length(covs)):n())),
+                 slice( c( seq(1,length(covs)),
+                           seq( n()-length(covs)+1, n()))),
                aes(y=value), size=2) +
     geom_step(aes(y=value, group=name),
               linewidth=1.1) +
@@ -480,35 +729,36 @@ love_plot <- function(res, covs, covs_names = NULL, B=NA) {
     labs(y = "\n Covariate balance (tx-co)",
          x = "Total number of treated units used",
          color = "Covariate") +
-    theme_classic()
+    theme_classic() +
+    make_tx_axis( love_steps$order )
 
-  if (!is.na(B)) {
-    # bootstrap dists of FSATT and SATT
-    boot_fsatt <- attr(res, "scweights") %>%
-      bind_rows() %>%
-      filter(subclass %in% feasible_subclasses) %>%
-      agg_co_units() %>%
-      boot_bayesian_covs(covs=covs, B=B) %>%
-      pivot_longer(everything()) %>%
-      group_by(name) %>%
-      summarize(q025 = quantile(value, 0.025),
-                q975 = quantile(value, 0.975)) %>%
-      mutate(order = n_feasible+1)
+    if (!is.na(B)) {
+      # bootstrap dists of FSATT and SATT
+      boot_fsatt <- attr(csm, "scweights") %>%
+        bind_rows() %>%
+        filter(subclass %in% feasible_subclasses) %>%
+        agg_co_units() %>%
+        boot_bayesian_covs(covs=covs, B=B) %>%
+        pivot_longer(everything()) %>%
+        group_by(name) %>%
+        summarize(q025 = quantile(value, 0.025),
+                  q975 = quantile(value, 0.975)) %>%
+        mutate(order = n_feasible+1)
 
-    boot_satt <- attr(res, "scweights") %>%
-      agg_co_units() %>%
-      boot_bayesian_covs(covs=covs, B=B) %>%
-      pivot_longer(everything()) %>%
-      group_by(name) %>%
-      summarize(q025 = quantile(value, 0.025),
-                q975 = quantile(value, 0.975)) %>%
-      mutate(order = max(love_steps$order))
+      boot_satt <- attr(csm, "scweights") %>%
+        agg_co_units() %>%
+        boot_bayesian_covs(covs=covs, B=B) %>%
+        pivot_longer(everything()) %>%
+        group_by(name) %>%
+        summarize(q025 = quantile(value, 0.025),
+                  q975 = quantile(value, 0.975)) %>%
+        mutate(order = max(love_steps$order))
 
-    p <- p +
-      geom_errorbar(data=bind_rows(boot_fsatt, boot_satt),
-                    aes(ymin=q025, ymax=q975),
-                    width = 1)
-  }
+      p <- p +
+        geom_errorbar(data=bind_rows(boot_fsatt, boot_satt),
+                      aes(ymin=q025, ymax=q975),
+                      width = 1)
+    }
 
   return(p)
 

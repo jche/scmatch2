@@ -258,7 +258,7 @@ for (i in n_unique_subclass:n_feasible) {
   sigma_hat <- sqrt(weighted_var_df$weighted_var)
 
   # 5. calculate N_T and N_C
-  Ns <- calc_N_T_N_C(df_curr)
+  Ns <- calc_N_T_N_C(df_curr, treatment="Z")
 
   # 6. Calculate the variance of the estimator
   sd_curr <- sqrt((1/Ns$N_T + 1/Ns$N_C_tilde)) * sigma_hat
@@ -434,7 +434,7 @@ se_AEs <- numeric(n_unique_subclass)
   sigma_hat <- sqrt(weighted_var_df$weighted_var)
 
   # 5. calculate N_T and N_C
-  Ns <- calc_N_T_N_C(df_curr)
+  Ns <- calc_N_T_N_C(df_curr, treatment="Z")
 
   # 6. Calculate the variance of the estimator
   sd_curr <- sqrt((1/Ns$N_T + 1/Ns$N_C_tilde)) * sigma_hat

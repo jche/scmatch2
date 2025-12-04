@@ -12,7 +12,8 @@ estimate_ATT(
   variance_method = "pooled",
   boot_mtd = "wild",
   B = 250,
-  seed_addition = 11
+  seed_addition = 11,
+  feasible_only = FALSE
 )
 }
 \arguments{
@@ -36,6 +37,9 @@ variance: "pooled": use get_measurement_error_variance (default)
 "bootstrap" (default: 250)}
 
 \item{seed_addition}{Additional seed for bootstrap (default: 11)}
+
+\item{feasible_only}{Logical indicating whether to use only feasible
+matches (default: FALSE)}
 
 \item{scmatch}{The CSM match object, an R S3 object, or a data
 frame of the full results.}

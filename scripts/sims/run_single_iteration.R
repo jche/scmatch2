@@ -168,9 +168,9 @@ dist_scaling <- df %>%
     starts_with("X"),
     function(x) if (is.numeric(x)) (if (sim_type=="toy") 2*nbins else nbins) / (max(x)-min(x)) else 1000
   ))
-preds_csm <- get_cal_matches(df=df, metric="maximum", scaling=dist_scaling,
+preds_csm <- get_cal_matches(data=df, metric="maximum", scaling=dist_scaling,
                              rad_method="fixed", est_method="average", k=25)
-preds_cem <- get_cem_matches(df=df, num_bins=nbins, est_method="average", return="all")
+preds_cem <- get_cem_matches(data=df, num_bins=nbins, est_method="average", return="all")
 ninf      <- length(attr(preds_csm, "unmatched_units"))
 ninf_cem  <- sum(df$Z) - length(attr(preds_cem, "feasible_units"))
 df <- df %>% filter(!id %in% attr(preds_csm, "unmatched_units"))

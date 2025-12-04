@@ -4,14 +4,14 @@
 # functions for estimating effects
 # The following two functions should be combined
 #   once we get to know the input of get_att_point_est
-get_est_att_from_wt <- function(df,
+get_est_att_from_wt <- function(data,
                                 input_wt){
-  df_est_att <- df %>%
+  data_est_att <- data %>%
     cbind(wt=input_wt) %>%
     group_by(Z) %>%
     summarise(Y_wtd = weighted.mean(Y,wt))
 
-  est_att <- diff(df_est_att$Y_wtd)
+  est_att <- diff(data_est_att$Y_wtd)
   return(est_att)
 }
 
@@ -48,20 +48,24 @@ get_att_point_est <- function(matched_df, treatment = "Z", outcome = "Y") {
 
 
 
-calc_N_T_N_C <- function(preds_csm){
+calc_N_T_N_C <- function(preds_csm, treatment){
   if ( is.csm_matches( preds_csm ) ) {
+    treatment = params(preds_csm)$treatment
     preds_csm <- result_table(preds_csm)
   }
 
-  N_T <- nrow(preds_csm %>% filter(Z==T))
+  N_T <- nrow(preds_csm %>%
+                filter(.data[[treatment]]!=0))
+
   tmp <- preds_csm %>%
-    filter(Z==F) %>%
+    filter(.data[[treatment]]==0) %>%
     group_by(id) %>%
     summarise(w_i = sum(weights), .groups="drop")
   N_C_tilde <- N_T^2 / sum(tmp$w_i^2)
   return(list(N_T = N_T,
               N_C_tilde = N_C_tilde ))
 }
+
 
 
 ess <- function( weights ) {
@@ -284,7 +288,7 @@ get_measurement_error_variance_OR <- function(matches,
   }
 
   # Calculate sample sizes
-  Ns <- calc_N_T_N_C(matches)
+  Ns <- calc_N_T_N_C(matches, treatment = treatment)
 
   # Calculate V_E equivalent (variance per unit)
   V_E <- sd_boot^2
@@ -330,7 +334,7 @@ get_measurement_error_variance <- function(
   sigma_hat <- sqrt(weighted_var)
 
   # Calculate N_T and effective sample size of controls (ESS_C)
-  sample_sizes <- calc_N_T_N_C(matches_table)
+  sample_sizes <- calc_N_T_N_C(matches_table, treatment = treatment)
   N_T <- sample_sizes$N_T
   ESS_C <- sample_sizes$N_C_tilde
 
@@ -367,6 +371,8 @@ get_measurement_error_variance <- function(
 #' @param B Number of bootstrap samples when variance_method =
 #'   "bootstrap" (default: 250)
 #' @param seed_addition Additional seed for bootstrap (default: 11)
+#' @param feasible_only Logical indicating whether to use only feasible
+#'   matches (default: FALSE)
 #' @export
 #'
 #' @return A tibble with ATT estimate (ATT), standard error (SE),
@@ -383,13 +389,20 @@ estimate_ATT <- function(
     variance_method = "pooled",
     boot_mtd = "wild",
     B = 250,
-    seed_addition = 11) {
+    seed_addition = 11,
+    feasible_only = FALSE ) {
 
   # Convert to data frame if needed
   if (is.csm_matches(matches)) {
-    matches_df <- result_table(matches)
+    matches_df <- result_table(matches, feasible_only = feasible_only )
+    treatment = params(matches)$treatment
   } else {
     matches_df <- matches
+    if ( feasible_only ) {
+      stopifnot( "feasible" %in% colnames( matches ) )
+      matches_df <- matches %>%
+        filter( feasible == 1 )
+    }
   }
 
   if ( n_distinct( matches_df[[treatment]] ) != 2 ) {

@@ -62,7 +62,7 @@ get_SL_pred <- function(SL_fit, df_test, X_names){
 
 get_att_diff <- function(d) {
   if ( is.csm_matches( d ) ) {
-    d <- result_table(d, "sc" )
+    d <- result_table( d, "sc" )
   }
 
   d %>%
@@ -219,7 +219,7 @@ get_att_csm <- function(d,
                         rad_method = "adaptive",
                         est_method = "scm") {
   preds_csm <- get_cal_matches(
-    df = d,
+    data = d,
     metric = metric,
     scaling = scaling,
     rad_method = rad_method,
@@ -312,7 +312,7 @@ get_matches <- function( matching_type,
                          k = 8 ) {
   if (matching_type == "maximum_fixed_scm") {
     df_dgp_with_matches <- get_cal_matches(
-      df = df_dgp,
+      data = df_dgp,
       treatment="Z",
       metric = "maximum",
       scaling = scaling,
@@ -322,7 +322,7 @@ get_matches <- function( matching_type,
 
   } else if (matching_type == "euclidean_knn") {
     df_dgp_with_matches <- get_cal_matches(
-      df = df_dgp,
+      data = df_dgp,
       covs = NULL,
       treatment = "Z",
       scaling = 1,
@@ -345,10 +345,10 @@ get_matches <- function( matching_type,
 # Code to implement CEM matching via the MatchIt package
 # Allows SCM within cells if desired.
 get_cem_matches <- function(
-    df,
-    covs = CSM:::get_x_vars(df),
+    data,
+    covs = CSM:::get_x_vars(data),
     Z_FORMULA = as.formula(paste0("Z~",
-                                  paste0(grep("^X", names(df), value=T),
+                                  paste0(grep("^X", names(data), value=T),
                                          collapse="+"))),
     num_bins,
     est_method = c("average", "scm"),
@@ -357,10 +357,10 @@ get_cem_matches <- function(
   est_method <- match.arg(est_method)
   return <- match.arg(return)
   # print(Z_FORMULA)
-  # print(head(df))
+  # print(head(data))
   m.out3 <- MatchIt::matchit(
     Z_FORMULA,
-    data = df,
+    data = data,
     method = "cem",
     estimand = "ATT",
     grouping = NULL,   # exact match factor covariates
@@ -393,7 +393,7 @@ get_cem_matches <- function(
           select(-subclass_new, -weights))
 
   # calculate scaling
-  scaling = df %>%
+  scaling = data %>%
     summarize(across(all_of(covs),
                      function(x) {
                        if (is.numeric(x)) num_bins / (max(x) - min(x))
@@ -409,11 +409,11 @@ get_cem_matches <- function(
 
   # aggregate outcomes as desired
   m.data <- switch(return,
-                   sc_units     = agg_sc_units(scweights),
-                   agg_co_units = agg_co_units(scweights),
+                   sc_units     = agg_sc_units(scweights,outcome="Y"),
+                   agg_co_units = agg_co_units(scweights,outcome="Y"),
                    all          = bind_rows(scweights))
 
-  unmatched_units <- setdiff(df %>% filter(Z==1) %>% pull(id),
+  unmatched_units <- setdiff(data %>% filter(Z==1) %>% pull(id),
                              m.data %>% filter(Z==1) %>% pull(id))
   if (warn && length(unmatched_units) > 0) {
     warning(glue::glue("Dropped the following treated units from data:
@@ -437,7 +437,7 @@ get_att_cem <- function(d,
   estimand <- match.arg(estimand)
 
   preds_feasible <- get_cem_matches(
-    df = d,
+    data = d,
     num_bins = num_bins,
     est_method = est_method,
     warn=FALSE )
@@ -478,7 +478,7 @@ get_att_cem <- function(d,
 get_att_1nn <- function(d, scaling) {
 
   preds_1nn <- get_cal_matches(
-    df = d,
+    data = d,
     metric = "maximum",
     rad_method = "1nn",
     est_method = "average",
@@ -492,25 +492,25 @@ get_att_1nn <- function(d, scaling) {
 
 
 
-run_all_methods <- function( df, skip_slow = TRUE, num_bins = 5, extrapolate = TRUE ) {
+run_all_methods <- function( data, skip_slow = TRUE, num_bins = 5, extrapolate = TRUE ) {
 
-  bal <- CSM:::get_att_bal(df,
+  bal <- CSM:::get_att_bal(data,
                            form=as.formula('Z ~ X1+X2'),
                            tols=c(0.01, 0.01))
 
-  bal_int <- CSM:::get_att_bal(df,
+  bal_int <- CSM:::get_att_bal(data,
                                form=as.formula('Z ~ X1*X2'),
                                tols=c(0.01, 0.01, 0.1))
 
-  or_lm <- CSM:::get_att_or_lm(df, form=as.formula('Y ~ X1*X2'))
+  or_lm <- CSM:::get_att_or_lm(data, form=as.formula('Y ~ X1*X2'))
 
-  or_bart <- CSM:::get_att_or_bart(df, covs=c("X1", "X2"))
+  or_bart <- CSM:::get_att_or_bart(data, covs=c("X1", "X2"))
 
-  lm_ps <- CSM:::get_att_ps_lm(df, form=as.formula('Z ~ X1*X2'))
+  lm_ps <- CSM:::get_att_ps_lm(data, form=as.formula('Z ~ X1*X2'))
 
-  ps_bart <- CSM:::get_att_ps_bart(df, covs=c("X1", "X2"))
+  ps_bart <- CSM:::get_att_ps_bart(data, covs=c("X1", "X2"))
 
-  one_nn <- get_att_1nn( df, scaling = 1/num_bins )
+  one_nn <- get_att_1nn( data, scaling = 1/num_bins )
 
   if ( skip_slow ) {
     tmle = NA
@@ -519,22 +519,22 @@ run_all_methods <- function( df, skip_slow = TRUE, num_bins = 5, extrapolate = T
     # TODO: What are these libraries?  They don't seem to be defined.
     SL.library1 = c("SL.glm", "tmle.SL.dbarts2", "SL.glmnet")
 
-    tmle <- CSM:::get_att_tmle(df %>%
+    tmle <- CSM:::get_att_tmle(data %>%
                                  mutate(X3 = X1*X2),
                                covs=c("X1","X2","X3"),
                                Q.SL.library = SL.library1,
                                g.SL.library = SL.library1)
 
-    aipw <- CSM:::get_att_aipw(df %>%
+    aipw <- CSM:::get_att_aipw(data %>%
                                  mutate(X3 = X1*X2),
                                covs=c("X1","X2","X3"),
                                Q.SL.library = SL.library1,
                                g.SL.library = SL.library1)
   }
 
-  csm <- CSM:::get_att_csm(df, scaling = 1/num_bins, est_method="scm")
+  csm <- CSM:::get_att_csm(data, scaling = 1/num_bins, est_method="scm")
 
-  cem <- CSM:::get_att_cem(df, num_bins=num_bins, est_method="scm",
+  cem <- CSM:::get_att_cem(data, num_bins=num_bins, est_method="scm",
                            extrapolate = extrapolate )
 
   tibble(method = c("bal", "bal_int", "or_lm", "or_bart",
@@ -550,7 +550,7 @@ if (FALSE) {
   require(tidyverse)
   require( CSM )
 
-  # df <- CSM:::gen_df_adv2d(nc=1000, nt=50,
+  # data <- CSM:::gen_df_adv2d(nc=1000, nt=50,
   #                    tx_effect=0.2,
   #                    sd=0.03,
   #                    effect_fun = function(x,y) {
@@ -559,13 +559,13 @@ if (FALSE) {
   #                                         sigma = matrix(c(1,0.8,0.8,1), nrow=2))
   #                    })
 
-  # df <- CSM:::gen_df_full(nc=1000, nt=50, eps_sd=0,
+  # data <- CSM:::gen_df_full(nc=1000, nt=50, eps_sd=0,
   #                   tx_effect = function(x,y) {(0.5*(x+y))},
   #                   effect_fun = function(x,y) {x+y})
 
-  df <- CSM:::gen_one_toy()
+  data <- CSM:::gen_one_toy()
 
-  df %>%
+  data %>%
     ggplot(aes(X1,X2)) +
     geom_point(aes(pch=as.factor(Z), color=Y)) +
     scale_color_continuous(low="orange", high="blue") +
@@ -575,12 +575,12 @@ if (FALSE) {
          x = latex2exp::TeX("$X_1$"),
          y = latex2exp::TeX("$X_2$")) +
     facet_wrap(~Z)
-  df %>%
+  data %>%
     filter(Z) %>%
     summarize(eff = mean(Y1-Y0))
 
 
-  run_all_methods( df )
+  run_all_methods( data )
 
 }
 

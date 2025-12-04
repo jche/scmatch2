@@ -4,7 +4,7 @@
 \alias{ess_plot}
 \title{Effective sample size (ESS) plot}
 \usage{
-ess_plot(d)
+ess_plot(csm, feasible_only = FALSE)
 }
 \arguments{
 \item{d}{Data frame of matched units including columns for Z

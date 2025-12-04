@@ -2,44 +2,92 @@
 # aggregation functions ---------------------------------------------------
 
 
-#' aggregation methods for matched data
-#'
-#' agg_sc_units weights to make pairs of tx and synthetic control
-#' units. Generally aggregate by cluster defined by treated unit,
-#' calculating the weighted average of the control units in the
-#' cluster for all variables that start with "X" or "Y" in the
-#' dataframes.
-#'
-#' agg_co_units Aggregates across the controls, grouping repeated
-#' controls used by multiple treated units
-#'
-#' agg_avg_units does simple average of controls within groups (e.g.,
-#' like CEM would do).
-#'
-#' @name AggregationMethods
-#' @aliases agg_sc_units agg_co_units agg_avg_units
-#'
-#' @param scweights scm_matches object or list of sc weights (tibbles
-#'   with tx unit in first row).
-#'
-#' @return data.frame with tx and corresponding control units.
-#'
-#' @export
-agg_sc_units <- function(scweights) {
+prep_data <- function(scweights,
+                      covariates = get_x_vars(scweights),
+                      treatment = "Z",
+                      outcome =  NULL) {
+
+  # Pull params from the scweights object if it is a csm_matches
+  # object
   if ( is.csm_matches(scweights) ) {
+    treatment = params(scweights)$treatment
+    covariates = attr( scweights, "covariates" )
     scweights <- scweights$matches
   }
 
+  # Convert list of dataframes to single dataframe
   if (!is.data.frame(scweights)) {
     scweights <- scweights %>%
       map_dfr(~mutate(., subclass=id[1]))
   }
 
+  list( scweights = scweights,
+        covariates = covariates,
+        treatment = treatment,
+        outcome = outcome )
+}
+
+
+
+#' Aggregation methods for matched data
+#'
+#' @description These functions aggregate matched or
+#' synthetic-control–style output into unit-level summaries.
+#'
+#' @details
+#' **`agg_sc_units()`**
+#' Aggregate weights within treated-unit subclass to make pairs of tx
+#' and corresponding synthetic control units. Generally aggregate by
+#' cluster defined by treated unit, calculating the weighted average
+#' of the control units in the cluster for all covariates any any
+#' provided outcomes
+#'
+#' **`agg_co_units()`**
+#' Aggregates across control units, collecting repeated controls used
+#' across treated units and summing their weights.
+
+#'
+#' **`agg_avg_units()`**
+#' Computes simple averages of controls within each subclass
+#' (CEM-style averaging).
+#'
+#' @param scweights Either a `csm_matches` object or a list/data frame
+#'   of matching/synthetic-control weights where each subclass
+#'   contains one treated row and its controls.
+#' @param covariates Character vector of covariate names. Defaults to
+#'   `get_x_vars(scweights)`.
+#' @param treatment Name of the treatment indicator column.
+#' @param outcome Name of the outcome column.
+#'
+#' @return A `data.frame` with aggregated treated and control
+#'   summaries.
+#'
+#' @name AggregationMethods
+#' @aliases agg_sc_units agg_co_units agg_avg_units
+#'
+NULL
+
+
+
+#' @rdname AggregationMethods
+#' @export
+agg_sc_units <- function(scweights,
+                         covariates = get_x_vars(scweights),
+                         treatment = "Z",
+                         outcome = NULL ) {
+  prep <- prep_data( scweights,
+                     covariates,
+                     treatment,
+                     outcome )
+  treatment <- prep$treatment
+  outcome <- prep$outcome
+  covariates <- prep$covariates
+  scweights <- prep$scweights
+
+  cc = c( covariates, outcome )
   rs <- scweights %>%
-    group_by(subclass, Z) %>%
-    summarize(across(starts_with("X"),
-                     ~sum(.x * weights)),
-              across(starts_with("Y"),
+    group_by(subclass, .data[[treatment]] ) %>%
+    summarize(across( all_of( cc ),
                      ~sum(.x * weights)),
               .groups="drop_last") %>%
     mutate(id = c(NA, subclass[1]), .before="subclass") %>%
@@ -55,21 +103,20 @@ agg_sc_units <- function(scweights) {
 
 
 #' @rdname AggregationMethods
-#'
-#'
-#' @param scweights scm_matches object or list of sc weights (tibbles
-#'
 #' @export
-agg_co_units <- function(scweights) {
+agg_co_units <- function(scweights,
+                         covariates = get_x_vars(scweights),
+                         treatment = "Z",
+                         outcome = NULL ) {
 
-  if ( is.csm_matches(scweights) ) {
-    scweights <- scweights$matches
-  }
-
-  if (!is.data.frame(scweights)) {
-    scweights <- scweights %>%
-      bind_rows()
-  }
+  prep <- prep_data( scweights,
+                     covariates,
+                     treatment,
+                     outcome )
+  treatment <- prep$treatment
+  outcome <- prep$outcome
+  covariates <- prep$covariates
+  scweights <- prep$scweights
 
   scweights %>%
     group_by(id) %>%
@@ -83,22 +130,26 @@ agg_co_units <- function(scweights) {
 
 #' @rdname AggregationMethods
 #' @export
-agg_avg_units <- function(scweights) {
-  if ( is.csm_matches(scweights) ) {
-    scweights <- scweights$matches
-  }
+agg_avg_units <- function(scweights,
+                          covariates = get_x_vars(scweights),
+                          treatment = "Z",
+                          outcome = NULL ) {
+  prep <- prep_data( scweights,
+                     covariates,
+                     treatment,
+                     outcome )
+  treatment <- prep$treatment
+  outcome <- prep$outcome
+  covariates <- prep$covariates
+  scweights <- prep$scweights
 
-  if (!is.data.frame(scweights)) {
-    scweights <- scweights %>%
-      map_dfr(~mutate(., subclass=id[1]))
-  }
+  cc = c( covariates, outcome )
 
   rs <- scweights %>%
     group_by(subclass, Z) %>%
-    summarize(across(starts_with("X"),
+    summarize( across( all_of( cc ),
                      ~sum(.x * 1/n())),
-              across(starts_with("Y"),
-                     ~sum(.x * 1/n()))) %>%
+               .groups = "drop_last" ) %>%
     mutate(id = c(NA, subclass[1]), .before="subclass") %>%
     mutate(weights = 1) %>%
     ungroup()

@@ -5,7 +5,7 @@
 \title{Make feasible plot showing cumulative ATT as feasible units are
 added}
 \usage{
-feasible_plot(csm, return_table = FALSE, caliper_plot = FALSE)
+feasible_plot(csm, outcome = "Y", return_table = FALSE, caliper_plot = FALSE)
 }
 \arguments{
 \item{csm}{A csm_matches object}

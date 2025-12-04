@@ -7,6 +7,7 @@
 result_table(
   csm,
   return = c("all", "sc_units", "agg_co_units", "exact"),
+  outcome = NULL,
   feasible_only = FALSE,
   nonzero_weight_only = FALSE,
   include_caliper = FALSE

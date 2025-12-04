@@ -19,6 +19,6 @@ this will enforce exact matching on the category.
 Coerce non-numeric factor columns to integer values
 }
 \examples{
-df = data.frame( A = c( "A", "B", "A", "C" ) )
-coerce_covs( df )
+data = data.frame( A = c( "A", "B", "A", "C" ) )
+coerce_covs( data )
 }

@@ -43,6 +43,8 @@ test_that("cem returns numeric", {
   expect_true(is.numeric(cem))
 })
 
+
+
 test_that("get_matches works with different matching types", {
   test_df <- data.frame(Z = c(1,0,0,0,1),
                         X = c(0,0.5,0.8,3,1.6))
@@ -91,14 +93,14 @@ test_that("twang returns numeric for hainmueller (slow)", {
   skip_if_not_installed("twang")
 
   set.seed(123)
-  df <- gen_df_hain(nc = 200, nt = 40, sigma_e = "n100", outcome = "nl2", sigma_y = 1, ATE = 0)
+  df <- CSM:::gen_df_hain(nc = 200, nt = 40, sigma_e = "n100", outcome = "nl2", sigma_y = 1, ATE = 0)
   est <- get_att_twang(df, form = as.formula("Z ~ X1+X2+X3+X4+X5+X6"))
   expect_true(is.numeric(est) && length(est) == 1)
   expect_false(is.na(est))
 })
 
-test_that("TWANG synthetic DGP (slow)", {
-  skip_if_not(run_slow_tests(), "Set RUN_SLOW_TESTS=TRUE to enable slow tests")
+test_that("TWANG synthetic DGP", {
+  #skip_if_not(run_slow_tests(), "Set RUN_SLOW_TESTS=TRUE to enable slow tests")
   skip_if_not_installed("twang")
 
   set.seed(456)
@@ -122,8 +124,8 @@ test_that("TWANG synthetic DGP (slow)", {
   expect_length(att_twang, 1)
 })
 
-test_that("Kbal estimates (slow)", {
-  skip_if_not(run_slow_tests(), "Set RUN_SLOW_TESTS=TRUE to enable slow tests")
+test_that("Kbal estimates", {
+ # skip_if_not(run_slow_tests(), "Set RUN_SLOW_TESTS=TRUE to enable slow tests")
   skip_if_not_installed("kbal")
 
   set.seed(789)

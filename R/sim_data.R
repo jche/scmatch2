@@ -161,7 +161,7 @@ gen_toy_covar_k <- function(n, centers, k, sd) {
       colnames(points) <- paste0("X", 1:k)
 
       # Now convert to tibble with proper names
-      all_points_list[[i]] <- as_tibble(points,
+      all_points_list[[i]] <- tibble::as_tibble(points,
                                         .name_repair = "universal_quiet" )
     }
   }
@@ -223,7 +223,7 @@ gen_df_adv_k <- function(nc, nt, k, # Added k
   nc_unif <- ceiling(nc * prop_nc_unif)
   if (nc_unif > 0) {
     unif_matrix <- matrix(runif(nc_unif * k), ncol = k)
-    dat_conear <- as_tibble(unif_matrix, .name_repair = "universal_quiet")
+    dat_conear <- tibble::as_tibble(unif_matrix, .name_repair = "universal_quiet")
     colnames(dat_conear) <- paste0("X", 1:k)
     dat_conear$Z <- FALSE
   } else {
@@ -360,14 +360,23 @@ gen_one_toy <- function( k = 2, # Added dimensionality parameter k, default 2
 
 # canonical examples ------------------------------------------------------
 
-# generate sample dataset from Hainmueller (2012), exactly
-#  - note: generates a big population and samples nt/nco units
-# paper settings:
-#  - n (total number of units): 300, 600, 1500
-#  - r (ratio of co/tx units): 1,2,5
-#  - sigma_e: n30 = low overlap, n100 = high overlap, chi5 = weird overlap
-#  - outcome: "linear", "nl1", "nl2"
-#  - sigma_y: 1
+#' generate sample dataset from Hainmueller (2012), exactly
+#'
+#' note: generates a big population and samples nt/nco units paper
+#' settings:
+#'  - n (total number of units): 300, 600, 1500
+#'  - r (ratio of co/tx units): 1,2,5
+#'  - sigma_e: n30 = low overlap, n100 = high overlap, chi5 = weird overlap
+#'  - outcome: "linear", "nl1", "nl2"
+#'  - sigma_y: 1
+#'
+#' @param nt Number of treated units
+#' @param nc Number of control units
+#' @param sigma_e Error distribution for latent variable dictating
+#'   treatment assignment.
+#' @param outcome Outcome function type
+#'
+#' @export
 gen_df_hain <- function(nt = 50,
                         nc = 250,
                         sigma_e = c("chi5", "n30", "n100"),
@@ -388,10 +397,9 @@ gen_df_hain <- function(nt = 50,
     eps_e <- eps_e * sqrt(67.6) + 0.5
   }
 
-  df <- as_tibble(rmvnorm(NUMSAMP,
+  df <- as.data.frame(mvtnorm::rmvnorm(NUMSAMP,
                           mean = c(0,0,0),
                           sigma = matrix(c(2,1,-1,1,1,-0.5,-1,-0.5,1), ncol=3)),
-                  .name_repair = "universal_quiet"
                   ) %>%
     mutate(V4 = runif(NUMSAMP, min=-3, max=3),
            V5 = rchisq(NUMSAMP, df=1),
@@ -499,9 +507,20 @@ gen_df_acic <- function(model.trt="step",
 }
 
 
+#' Simulation data from the Kang paper
+#'
+#' A DGP for simulation studies.
+#'
+#' Generates a 4 dimensional multivariate normal that then gets
+#' transformed to generate four "X" variables.  The Outcome is a
+#' function of the original V variables.
+#'
+#' @param n Number of samples to generate
+#' @return A data frame with covariates and outcome
+#' @export
 gen_df_kang <- function(n=1000) {
-  as_tibble(rmvnorm(n, mean=rep(0,4), sigma=diag(4)),
-            .name_repair = "universal_quiet"  ) %>%
+  mvtnorm::rmvnorm(n, mean=rep(0,4), sigma=diag(4)) %>%
+  as.data.frame( ) %>%
     mutate(Y = 210 + 27.4*V1 + 13.7*(V2+V3+V4) + rnorm(n),
            e = rje::expit(-V1 + 0.5*V2 - 0.25*V3 - 0.1*V4)) %>%
     mutate(X1 = exp(V1/2),

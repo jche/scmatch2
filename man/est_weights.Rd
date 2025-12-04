@@ -6,22 +6,23 @@
 \usage{
 est_weights(
   matched_gps,
-  covs = attr(matched_gps, "covariates"),
-  scaling = attr(matched_gps, "settings")$scaling,
   est_method = c("scm", "average"),
-  metric = attr(matched_gps, "settings")$metric
+  covs = params(matched_gps)$covariates,
+  treatment = params(matched_gps)$treatment,
+  scaling = params(matched_gps)$scaling,
+  metric = params(matched_gps)$metric
 )
 }
 \arguments{
 \item{matched_gps}{Either a csm_matches object or a list of matched
 sets, with a tx unit in first row of each set.}
 
+\item{est_method}{"scm" or "average"}
+
 \item{covs}{List of covariates to calculate similarity scores on if
 using scm.}
 
 \item{scaling}{tibble with scaling for each covariate}
-
-\item{est_method}{"scm" or "average"}
 }
 \value{
 If passed an csm object, an updated csm object with

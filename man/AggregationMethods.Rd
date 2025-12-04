@@ -5,31 +5,62 @@
 \alias{agg_sc_units}
 \alias{agg_co_units}
 \alias{agg_avg_units}
-\title{aggregation methods for matched data}
+\title{Aggregation methods for matched data}
 \usage{
-agg_sc_units(scweights)
+agg_sc_units(
+  scweights,
+  covariates = get_x_vars(scweights),
+  treatment = "Z",
+  outcome = NULL
+)
 
-agg_co_units(scweights)
+agg_co_units(
+  scweights,
+  covariates = get_x_vars(scweights),
+  treatment = "Z",
+  outcome = NULL
+)
 
-agg_avg_units(scweights)
+agg_avg_units(
+  scweights,
+  covariates = get_x_vars(scweights),
+  treatment = "Z",
+  outcome = NULL
+)
 }
 \arguments{
-\item{scweights}{scm_matches object or list of sc weights (tibbles}
+\item{scweights}{Either a \code{csm_matches} object or a list/data frame
+of matching/synthetic-control weights where each subclass
+contains one treated row and its controls.}
+
+\item{covariates}{Character vector of covariate names. Defaults to
+\code{get_x_vars(scweights)}.}
+
+\item{treatment}{Name of the treatment indicator column.}
+
+\item{outcome}{Name of the outcome column.}
 }
 \value{
-data.frame with tx and corresponding control units.
+A \code{data.frame} with aggregated treated and control
+summaries.
 }
 \description{
-agg_sc_units weights to make pairs of tx and synthetic control
-units. Generally aggregate by cluster defined by treated unit,
-calculating the weighted average of the control units in the
-cluster for all variables that start with "X" or "Y" in the
-dataframes.
+These functions aggregate matched or
+synthetic-control–style output into unit-level summaries.
 }
 \details{
-agg_co_units Aggregates across the controls, grouping repeated
-controls used by multiple treated units
+\strong{\code{agg_sc_units()}}
+Aggregate weights within treated-unit subclass to make pairs of tx
+and corresponding synthetic control units. Generally aggregate by
+cluster defined by treated unit, calculating the weighted average
+of the control units in the cluster for all covariates any any
+provided outcomes
 
-agg_avg_units does simple average of controls within groups (e.g.,
-like CEM would do).
+\strong{\code{agg_co_units()}}
+Aggregates across control units, collecting repeated controls used
+across treated units and summing their weights.
+
+\strong{\code{agg_avg_units()}}
+Computes simple averages of controls within each subclass
+(CEM-style averaging).
 }

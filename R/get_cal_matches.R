@@ -2,8 +2,8 @@
 
 # Scale each by standard deviation, and exact match on binary or
 # categorical covariates.
-default_scaling <- function( df, covs ) {
-  df %>%
+default_scaling <- function( data, covs ) {
+  data %>%
     summarize(across(all_of(covs),
                      function(x) {
                        if (is.numeric(x)) 1/sd(x)
@@ -13,10 +13,16 @@ default_scaling <- function( df, covs ) {
 
 
 
-make_treatment_table <- function( df, matches, caliper ) {
+make_treatment_table <- function( matches ) {
+
+  caliper = params(matches)$caliper
+  treatment = params(matches)$treatment
 
   rs <- purrr::map_dfr( matches$matches,
                         function( blob ) {
+                          if ( is.null( blob[["weights"]] ) ) {
+                            blob$weights <- NA
+                          }
                           summarise( blob,
                                      id = id[[1]],
                                      subclass = subclass[[1]],
@@ -28,12 +34,10 @@ make_treatment_table <- function( df, matches, caliper ) {
 
   # store information about scaling and adaptive calipers
   adacalipers_df <- tibble(
-    id = df %>% filter(Z == 1) %>% pull(id),
+    id = names( matches$adacalipers ),
     adacal = matches$adacalipers )
 
   if ( nrow(rs) > 0 ) {
-
-
     rs <- full_join( rs, adacalipers_df, by = "id" ) %>%
       mutate( nc = ifelse( is.na(nc), 0, nc ),
               feasible = ifelse( !is.na(adacal) & adacal <= caliper, 1, 0 ),
@@ -65,48 +69,21 @@ make_treatment_table <- function( df, matches, caliper ) {
 #' specified covariates and distance metrics, then optionally weights
 #' these controls using synthetic control methods.
 #'
-#' @param df The data frame of data to be matched. Must contain
+#' @inheritParams gen_matches
+#'
+#' @param data The data frame of data to be matched. Must contain
 #'   treatment indicator and covariates for matching.
 #' @param covs Specification of covariates to use for matching. Can be
 #'   variable names, list of column numbers, or NULL.  If NULL, will
 #'   use covariate names found in the scaling parameter, or default to
 #'   all columns starting with "X".
 #'
-#' @param treatment Name of the column in \code{df} containing the
+#' @param treatment Name of the column in \code{data} containing the
 #'   treatment indicator (with values 0/1 or TRUE/FALSE).
 #'
 #' @param form Formula of form treatment ~ cov1 + cov2 + ...
 #'   specifying the treatment variable and covariates to use for
 #'   matching.  If not null, will override covs and treatment.
-#' @param metric A string specifying the distance metric. One of
-#'   "maximum", "euclidean", or "manhattan".
-#' @param caliper A numeric specifying the caliper size for matching.
-#'   Controls the maximum allowable distance between matched units.
-#' @param rad_method Method to determine the radius size for each
-#'   treated unit. Options include:
-#'   \itemize{
-#'     \item "adaptive": Uses the maximum of the caliper and the distance to nearest control
-#'     \item "fixed": Uses the specified caliper value
-#'     \item "1nn": Uses the distance to the nearest neighbor
-#'     \item "adaptive-5nn": Adaptive radius with cap at 5th nearest neighbor
-#'     \item "knn": Uses the distance to the kth nearest neighbor
-#'   }
-#' @param est_method Method for estimating weights for control units.
-#'   Options include:
-#'   \itemize{
-#'     \item "scm": Synthetic control method weighting
-#'     \item "scm_extrap": Synthetic control with extrapolation
-#'     \item "average": Simple average weighting
-#'   }
-#' @param scaling A vector of scaling constants for covariates (can
-#'   also be a single row data frame). These are often just the
-#'   inverses of covariate-specific standard deviations. Controls the
-#'   relative importance of different covariates in the distance
-#'   calculation.  If covs not supplied, will use name of this
-#'   parameter to identify covariates.
-#' @param id_name Name of column to look for ID values. If that column
-#'   is not found, a canonical \code{id} corresponding to row numbers
-#'   will be created.
 #' @param warn A logical indicating whether to warn about dropped
 #'   units (those that cannot be matched within the caliper).
 #' @param k Integer specifying the number of neighbors to use when
@@ -147,18 +124,19 @@ make_treatment_table <- function( df, matches, caliper ) {
 #' as.data.frame(mtch)
 #'
 #' @export
-get_cal_matches <- function( df,
+get_cal_matches <- function( data,
                              form = NULL,
                              covs = NULL,
                              treatment = NULL,
                              metric = c("maximum", "euclidean", "manhattan"),
                              caliper = 1,
-                             rad_method = c("adaptive", "fixed", "1nn","adaptive-5nn", "knn"),
+                             rad_method = c("adaptive", "fixed", "1nn", "knn"),
                              est_method = c("scm", "scm_extrap", "average"),
                              scaling = NULL,
                              id_name = "id",
                              warn = TRUE ,
-                             k = 5  ## for KNN matching
+                             k = 1,
+                             dm = NULL
 ) {
   metric <- match.arg(metric)
   rad_method <- match.arg(rad_method)
@@ -167,7 +145,7 @@ get_cal_matches <- function( df,
   # formula is of form treatment ~ covariates.
   # Extract these into 'treatment' and 'covs'
   if ( !is.null(form) ) {
-    mf <- model.frame( form, data = df )
+    mf <- model.frame( form, data = data )
     treatment <- colnames( mf )[1]
     covs <- colnames( mf )[ -1 ]
   } else if ( is.null( covs ) && !is.null(scaling) && !is.null(names(scaling)) ) {
@@ -175,7 +153,7 @@ get_cal_matches <- function( df,
     covs <- names( scaling )
   } else if ( is.null( covs ) ) {
     # Default to all columns starting with "X"
-    covs <- get_x_vars( df )
+    covs <- get_x_vars( data )
   }
 
   if ( is.null( treatment ) ) {
@@ -185,15 +163,15 @@ get_cal_matches <- function( df,
 
 
   # Add ID column if not present
-  if ( !( id_name %in% colnames(df) ) ) {
-    n_zeros <- nchar(as.character(nrow(df)))
-    df$id <- sprintf(paste0("U%0", n_zeros, "d"), 1:nrow(df))
+  if ( !( id_name %in% colnames(data) ) ) {
+    n_zeros <- nchar(as.character(nrow(data)))
+    data$id <- sprintf(paste0("U%0", n_zeros, "d"), 1:nrow(data))
   } else {
-    df$id = as.character(df[[id_name]])
+    data$id = as.character(data[[id_name]])
   }
 
   if ( is.null(scaling) ) {
-    scaling <- default_scaling( df, covs )
+    scaling <- default_scaling( data, covs )
   }
 
   scnames = names(scaling)
@@ -203,7 +181,7 @@ get_cal_matches <- function( df,
 
   ### use rad_method: generate matches
   # get caliper matches
-  scmatches <- gen_matches( df,
+  scmatches <- gen_matches( data,
                             covs = covs,
                             treatment = treatment,
                             scaling = scaling,
@@ -223,7 +201,7 @@ get_cal_matches <- function( df,
 
 
   # Make a tibble of treated units with calipers and number of controls, etc.
-  treatment_table <- make_treatment_table( df, scweights, caliper )
+  treatment_table <- make_treatment_table( scweights )
 
   # Possibly warn if treated units were lost
   unmatched_units <- filter( treatment_table, matched==0 )

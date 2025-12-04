@@ -4,7 +4,7 @@
 \alias{update_matches}
 \title{Update a matching call to change some parameters}
 \usage{
-update_matches(res, data, ...)
+update_matches(res, data, warn = TRUE, ...)
 }
 \arguments{
 \item{res}{A csm_matches object}

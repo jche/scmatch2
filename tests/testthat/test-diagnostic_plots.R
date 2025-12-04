@@ -13,7 +13,7 @@ test_that("diagnostic plots", {
       X2 = rnorm(n()),
       X3 = rnorm(n()) + Z )
 
-  res <- get_cal_matches(df = test_df,
+  res <- get_cal_matches(data = test_df,
                          covs = "X",
                          treatment = "Z",
                          metric = "maximum",

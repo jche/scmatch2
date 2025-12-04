@@ -29,7 +29,8 @@ sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
 ctr_dist = ctr_dist,
 prop_nc_unif = prop_nc_unif
 )
-}}
+}
+generate sample dataset from Hainmueller (2012), exactly}
 \usage{
 gen_df_hain(
   nt = 50,
@@ -40,33 +41,24 @@ gen_df_hain(
   ATE = 0
 )
 }
-\description{
-#' Generate a toy dataset with a single treatment effect
-#'
-#' @param ctr_dist Distance between the two control clusters
-#'
-#' @return A tibble with the toy dataset
-#' @export
-#'
-gen_one_toy <- function( nc = 500, nt = 100,
-ctr_dist = 0.5,
-prop_nc_unif = 1/3,
-f0_sd = 0.5 ){
-if ( nc < 5 ) {
-warning( "Very small control group in gen_one_toy!" )
+\arguments{
+\item{nt}{Number of treated units}
+
+\item{nc}{Number of control units}
+
+\item{sigma_e}{Error distribution for latent variable dictating
+treatment assignment.}
+
+\item{outcome}{Outcome function type}
 }
-gen_df_adv(
-nc=nc,
-nt=nt,
-f0_sd = f0_sd,
-tx_effect_fun = function(X1, X2) {3\emph{X1+3}X2},
-f0_fun = function(x,y) {
-matrix(c(x,y), ncol=2) \%>\%
-mvtnorm::dmvnorm( mean = c(0.5,0.5),
-sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
-},
-ctr_dist = ctr_dist,
-prop_nc_unif = prop_nc_unif
-)
+\description{
+note: generates a big population and samples nt/nco units paper
+settings:
+\itemize{
+\item n (total number of units): 300, 600, 1500
+\item r (ratio of co/tx units): 1,2,5
+\item sigma_e: n30 = low overlap, n100 = high overlap, chi5 = weird overlap
+\item outcome: "linear", "nl1", "nl2"
+\item sigma_y: 1
 }
 }
