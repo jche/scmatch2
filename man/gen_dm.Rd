@@ -5,15 +5,15 @@
 \title{Generate (#tx) by (#co) distance matrix}
 \usage{
 gen_dm(
-  df,
-  covs = get_x_vars(df),
+  data,
+  covs = get_x_vars(data),
   treatment = "Z",
   scaling = 1,
   metric = c("maximum", "euclidean", "manhattan")
 )
 }
 \arguments{
-\item{df}{dataframe contains at least covariates and treatments
+\item{data}{dataframe contains at least covariates and treatments
 specified by "covs" and "treatment" argument}
 
 \item{covs}{a vector of characters,

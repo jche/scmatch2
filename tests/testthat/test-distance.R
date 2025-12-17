@@ -17,11 +17,11 @@ test_that("Error when covariates or treatment variable specified in covs or trea
 })
 
 test_that("coerce_covs coerces T/F into 1/2, and turn factor types into numerics",{
-  covs <- data.frame(X1=as.factor(1:4),
+  covs <- data.frame( X1=as.factor(1:4),
                       X2=c(T,F,F,T))
   expected_coerced_covs <-
-    data.frame(X1=1:4,
-               X2=c(2,1,1,2))
+    data.frame(X1=1:4 - 1,
+               X2=c(2,1,1,2) - 1)
 
   actual_coerced_covs <- coerce_covs(covs)
 
@@ -83,5 +83,41 @@ test_that("Manual computation should match the gen_dm output",{
   # only check
   dimnames(actual_dm) <- NULL
   dimnames(expected_dm) <- NULL
+  attr( actual_dm, "covariates" ) <- NULL
   expect_equal(as.matrix(actual_dm), expected_dm, ignore_attr = FALSE)
 })
+
+
+
+
+
+test_that("Continueous scaling and categorical scaling align as expected",{
+  df <- tribble( ~X1, ~X2, ~Z,
+                 1, 1, 1,
+                 #1, 0, 1,
+                 #0, 1, 1,
+                 1, 1, 0,
+                 1.2, 1, 0,
+                 1, 0, 0,
+                 1.4, 1, 0,
+                 1.2, 0, 0 )
+
+  covs <- c("X1", "X2")
+  treatment <- "Z"
+
+  actual_dm <- CSM:::gen_dm(df, covs, treatment,
+                            scaling= 1 / c( 0.2, 0.5 ),
+                            metric = "maximum")
+
+  df$dist = c( NA, as.numeric( actual_dm ) )
+  df
+
+  #expect_equal( df$dist[[6]], df$dist[[3]] )
+  expect_equal( df$dist[[6]], df$dist[[4]] )
+
+})
+
+
+
+
+

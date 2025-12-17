@@ -2,26 +2,40 @@
 % Please edit documentation in R/csm_matches_object.R
 \name{result_table}
 \alias{result_table}
-\title{Get table of aggregated results, with rows for synthetic units if
-that was asked for}
+\title{Obtain table of aggregated results}
 \usage{
 result_table(
   csm,
-  return = c("all", "sc_units", "agg_co_units"),
+  return = c("all", "sc_units", "agg_co_units", "exact"),
+  outcome = NULL,
   feasible_only = FALSE,
-  nonzero_weight_only = FALSE
+  nonzero_weight_only = FALSE,
+  include_caliper = FALSE
 )
 }
 \arguments{
-\item{return}{Possible values: "sc_units", "agg_co_units", or
-"all". How to aggregate units, if at all, in making the result
-table.  Defaults to "all".}
+\item{csm}{A csm_matches object from a matching call.}
 
-\item{feasible_only}{TRUE means only return units which were
-matched without expanding the caliper.}
+\item{return}{How to aggregate units, if at all, in making the
+result table.  Possible values: "sc_units" (the synthetic control
+units), "agg_co_units" (the unique control units, with total
+weight across all their matches), or "all" (control units will be
+repeated if matched multiply). "exact" returns only exact matches
+(up to machine precision on distance). Defaults to "all".}
+
+\item{feasible_only}{TRUE means only return treated units and
+matched controls for units that could be matched without
+expanding the caliper.}
+
+\item{nonzero_weight_only}{TRUE means drop any control units with 0
+weight (e.g., due to scm weighting).}
+
+\item{include_caliper}{If TRUE, include columns for the caliper size
+and maximum distance for each treated unit.}
 }
 \value{
-dataframe
+dataframe of the treatment and control units.  This
+dataframe can be analyzed as an as-if experimental dataset.
 }
 \description{
 This method will give the controls as synthetic controls

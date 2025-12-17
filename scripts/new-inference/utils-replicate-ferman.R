@@ -87,7 +87,7 @@ generate_full_matched_table <- function(dat,
     k = M
   )
 
-  full_matched_table <- full_unit_table(mtch,
+  full_matched_table <- result_table(mtch,
                                 nonzero_weight_only = F )
   saveRDS(full_matched_table,
           file = here("scripts/new-inference/data/",file_name))

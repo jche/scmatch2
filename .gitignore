@@ -51,3 +51,5 @@ vignettes/*.pdf
 # Ongoing work
 bootstrap_failure_matching.png
 scipts/AI08-failure-bootstrap.R
+
+luke_scratch/

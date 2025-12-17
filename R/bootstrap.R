@@ -244,7 +244,7 @@ boot_SE <- function(
     boot_mtd = "sign"){
 
   if ( is.csm_matches(matches_table) ) {
-    matches_table <- full_unit_table(matches_table)
+    matches_table <- result_table(matches_table)
   }
 
   # Step 1: give uniform weight

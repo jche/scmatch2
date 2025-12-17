@@ -6,41 +6,35 @@
 
 #' get the radius size for each treated unit
 #'
-#' @param dm data
-#' @param rad_method Method for radius
+#' @param dm Distance metric, rows are treated units, columns are control units
+#' @param rad_method Method for determining radius size
 #' @param caliper Caliper size
+#' @param k For knn method, number of nearest neighbors
 #'
 #' @export
 get_radius_size <- function(dm,
                             rad_method,
                             caliper,
-                            k){
+                            k=1){
   ntx = nrow(dm)
+
   radius_sizes <- numeric(ntx)
   if (rad_method == "adaptive") {
-    # Adaptive: r = max(caliper, 1nn)
+    # Adaptive: r = max(caliper, knn)
     for (i in 1:ntx) {
       temp <- dm[i,]
       temp_sorted <- sort(temp)
-      radius_sizes[i] <- max(caliper, temp_sorted[1])
+      radius_sizes[i] <- max(caliper, temp_sorted[k])
     }
-  } else if (rad_method == "1nn") {
+  } else if (rad_method == "1nn" || (rad_method=="knn" && k==1) ) {
     radius_sizes <- apply(dm, 1, min)
-  } else if (rad_method == "adaptive-5nn"){
-    for (i in 1:ntx) {
-      temp <- dm[i,]
-      temp_sorted <- sort(temp)
-      adacal <- max(caliper, temp_sorted[1])
-      radius_sizes[i] <- min(adacal, temp_sorted[5])
-    }
   } else if (rad_method == "knn") {
     for (i in 1:ntx) {
       temp <- dm[i,]
       temp_sorted <- sort(temp)
       radius_sizes[i] <- temp_sorted[k]
     }
-  }
-  else {
+  } else {
     radius_sizes <- rep(caliper, nrow(dm))
   }
   return(radius_sizes)
@@ -50,16 +44,17 @@ get_radius_size <- function(dm,
 
 
 # matching method ---------------------------------------------------------
-# generate df of matched controls for each treated unit
-get_matched_co_from_dm_trimmed <- function(df, dm_trimmed, treatment) {
+
+# generate dataframes of matched controls for each treated unit
+get_matched_co_from_dm_trimmed <- function(data, dm_trimmed, treatment) {
   ntx <- nrow(dm_trimmed)
-  df_trt <- df %>%
+  data_trt <- data %>%
     filter(.data[[treatment]] == 1)
 
   # Add ID on the fly if needed, but try and use the one in the dataset.
-  IDs <- paste0( "tx", 1:nrow(df_trt) )
-  if ( "id" %in% colnames(df_trt) ) {
-    IDs <- df_trt$id
+  IDs <- paste0( "tx", 1:nrow(data_trt) )
+  if ( "id" %in% colnames(data_trt) ) {
+    IDs <- data_trt$id
   }
 
   # Unneeded I think
@@ -70,28 +65,32 @@ get_matched_co_from_dm_trimmed <- function(df, dm_trimmed, treatment) {
   map( 1:ntx, function(x) {
     # Step 1: get which co units are matched to each tx unit
     matched_obs <- which(!is.na(dm_trimmed[x,]))
+
     # if no matches, drop treated unit
     if (length(matched_obs) == 0) {
       return(NULL)
     }
 
-
     # for each matched co unit, record distance from tx unit
     distances <- dm_trimmed[x, matched_obs]
-    matched_rows <- df[names(matched_obs),] %>%
+    matched_rows <- data[names(matched_obs),] %>%
       ungroup() %>%
       mutate(dist = distances)
 
-    ## Step 2: get the treat uni
-    df_trt_x <- df_trt %>%
+    ## Step 2: get the treat unit
+    data_trt_x <- data_trt %>%
       ungroup() %>%
       slice(x)
 
-    df_tmp <- df_trt_x %>%
+    data_tmp <- data_trt_x %>%
       mutate(dist = 0) %>%
       rbind(matched_rows)
 
-    df_tmp %>%
+    #   if ( nrow( data_tmp ) > 100 ) {
+    #     browser()
+    #   }
+
+    data_tmp %>%
       mutate(subclass = IDs[[x]] )
   })
 }
@@ -124,23 +123,51 @@ set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
 #' Note: we allow controls to be repeatedly used (we match with
 #' replacement).
 #'
+#' Generally use the \code{get_cal_matches()} function instead, which
+#' wraps this.
 #'
-#' @param df A data frame containing all the listed covariates and the
-#'   treatment indicator.
-#' @param covs List of covariates names.
-#' @param treatment Variable in df that has treatment indicator (0/1
-#'   variable).
-#' @param scaling Scaling factor, defaults to 1.  Each covariate will
-#'   be scaled by scaling factor.  Can be a vector of length P, with P
-#'   being number of covariates.
-#' @param metric Character specifying the distance metric. One of
-#'   "maximum", "euclidean", "manhattan"
-#' @param caliper Caliper on the scaled distance. Usually set to 1;
-#'   control variable importance via the scaling paramter
-#' @param rad_method Method to determine the adaptive radius size for
-#'   each treated unit.  fixed means drop treated units with no
-#'   matches closer than caliper. 1nn means largest of closest control
-#'   and caliper.
+#' @param metric Distance metric: "maximum", "euclidean", or
+#'   "manhattan".
+#'
+#' @param caliper Caliper size. Sets the max allowed distance between
+#'   matches. Often 1. Scaling usually handles covariate importance.
+#'
+#' @param rad_method How to set the radius for each treated unit:
+#'   \itemize{
+#'     \item "adaptive": max(caliper, distance to nearest control)
+#'     \item "fixed": use caliper; drop treated with no controls inside it
+#'     \item "1nn": distance to nearest neighbor
+#'     \item "adaptive-5nn": adaptive with cap at 5th NN
+#'     \item "knn": distance to the k-th nearest neighbor
+#'   }
+#'
+#' @param est_method How to weight control units:
+#'   \itemize{
+#'     \item "scm": synthetic control weights
+#'     \item "scm_extrap": SCM with extrapolation
+#'     \item "average": simple average
+#'   }
+#'
+#' @param scaling Length-P vector of scaling constants (or a
+#'   single-row data frame). Each covariate is scaled by its value.
+#'   Often 1/sd. Defaults to 1. If covs not supplied, the argument
+#'   name is used to identify covariates.
+#'
+#' @param id_name Column name for unit IDs. If missing, an \code{id}
+#'   column using row numbers is created.
+#'
+#' @param data Data frame with covariates and treatment indicator.
+#'
+#' @param covs Covariate names.
+#'
+#' @param treatment Treatment indicator column (0/1).
+#'
+#' @param k For adaptive, number of units needed for minimum radius.
+#'   For "knn", number of neighbors. Defaults to 1.
+#'
+#' @param dm Optional treated-control distance matrix. Calipers are
+#'   applied but distances are not recomputed.
+#'
 #' @param ... Extra arguments
 #'
 #' @return A list of results.  matches: list of small datasets of
@@ -151,38 +178,61 @@ set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
 #' @export
 #'
 #' @examples
-#' df <- CSM:::gen_one_toy()
-#' mtch <- gen_matches(df, covs = c("X1", "X2"), treatment = "Z")
+#' data <- CSM:::gen_one_toy()
+#' mtch <- gen_matches(data, covs = c("X1", "X2"), treatment = "Z")
 #' names( mtch )
-gen_matches <- function(df,
-                        covs = get_x_vars(df),
-                        treatment = "Z",
-                        scaling=1,
-                        metric="maximum",
-                        caliper=1,
-                        rad_method = c("adaptive", "1nn", "fixed","adaptive-5nn", "knn"),
-                        k = 5,
-                        ...) {
+gen_matches <- function( data,
+                         covs = get_x_vars(data),
+                         treatment = "Z",
+                         scaling=1,
+                         metric="maximum",
+                         caliper=1,
+                         rad_method = c("adaptive", "1nn", "fixed", "knn"),
+                         id_name = NULL,
+                         k = 1,
+                         dm = NULL,
+                         ...) {
+  data <- data
 
   ### Step -1: set up some constants
   rad_method <- match.arg(rad_method)
   args <- list(...)
 
-  stopifnot( treatment %in% colnames(df) )
-  #stopifnot( all( covs %in% colnames(df) ) )
+  if ( is.numeric(covs) ) {
+    covs = colnames(data)[covs]
+  }
+
+  stopifnot( treatment %in% colnames(data) )
+  #stopifnot( all( covs %in% colnames(data) ) )
 
   # store helpful constants
-  ntx <- df %>% pull({{treatment}}) %>% sum()   # number of tx units
-  p   <- df %>% dplyr::select(all_of(covs)) %>% ncol()     # number of matched covariates
+  ntx <- data %>% pull({{treatment}}) %>% sum()   # number of tx units
+  p   <- data %>% dplyr::select(all_of(covs)) %>% ncol()     # number of matched covariates
 
-  ### step 0: generate distance matrix, and
-  #   store an uncapped version as well.
-  dm_uncapped <- dm <- gen_dm(df,
-                              covs=covs,
-                              treatment=treatment,
-                              scaling=scaling,
-                              metric=metric)
+  if ( !is.null( id_name ) ) {
+    stopifnot( id_name %in% colnames(data) )
+    data$id = data[[id_name]]
+  } else {
+    data <- data %>%
+      group_by( across( all_of( treatment ) ) ) %>%
+      mutate( id = paste0( ifelse( !.data[[treatment]], "co", "tx" ),
+                           row_number() ) ) %>%
+      ungroup()
+  }
+  data <- data %>%
+    dplyr::relocate( id )
 
+  ### step 0: generate distance matrix, and store an uncapped version
+  #   as well (if it is not passed in)
+  if ( is.null( dm ) ) {
+    dm_uncapped <- dm <- gen_dm(data,
+                                covs=covs,
+                                treatment=treatment,
+                                scaling=scaling,
+                                metric=metric)
+  } else {
+    dm_uncapped <- dm
+  }
 
   ### step 1: get the radius size for each treated unit
   radius_sizes <-
@@ -190,31 +240,41 @@ gen_matches <- function(df,
 
 
   ### step 2: remove all control units farther than caliper
-  # per tx unit (row), remove all co units (cols)
-  # farther than radius_sizes away
+  #   per tx unit (row), remove all co units (cols)
+  #.  farther than radius_sizes away
   dm_trimmed <-
     set_NA_to_unmatched_co(dm_uncapped, radius_sizes)
 
 
-  ### step 3: generate df of matched controls for
+  ### step 3: generate dataframes of matched controls for
   #   each treated unit
-  df_list <-
-    get_matched_co_from_dm_trimmed(df, dm_trimmed, treatment)
-  nulls = map_lgl(df_list, is.null)
+  data_list <-
+    get_matched_co_from_dm_trimmed(data, dm_trimmed, treatment)
+  nulls = map_lgl(data_list, is.null)
   radius_sizes[nulls] = NA
 
+  names( radius_sizes ) <- data %>%
+    filter(.data[[treatment]] == 1) %>%
+    pull(id)
 
-  res <- list(matches = df_list %>% discard(is.null),   # drop unmatched tx units
+  res <- list(matches = data_list %>% discard(is.null),   # drop unmatched tx units
               adacalipers = radius_sizes,
               dm_trimmed = dm_trimmed,
               dm_uncapped = dm_uncapped)
 
   class(res) <- "csm_matches"
-  attr( res, "settings" ) <- list( caliper = caliper,
-                                   rad_method = rad_method,
-                                   metric = metric,
-                                   scaling = scaling )
-  attr( res, "covariates" ) <- covs
+
+  settings <- list( caliper = caliper,
+                    rad_method = rad_method,
+                    metric = metric,
+                    scaling = scaling )
+  settings$treatment = treatment
+  settings$id_name = id_name
+  settings$k = k
+
+  attr( res, "settings" ) <- settings
+  attr( res, "covariates" ) <- attr( dm, "covariates" )
+
   return(res)
 }
 
@@ -239,11 +299,12 @@ gen_matches <- function(df,
 #'   for each control unit.
 #'
 #' @export
-est_weights <- function(matched_gps,
-                        covs = attr( matched_gps, "covariates" ),
-                        scaling = attr( matched_gps, "settings" )$scaling,
-                        est_method = c("scm", "average"),
-                        metric = attr( matched_gps, "settings" )$metric ) {
+est_weights <- function( matched_gps,
+                         est_method = c("scm", "average"),
+                         covs = params(matched_gps)$covariates,
+                         treatment = params(matched_gps)$treatment,
+                         scaling = params(matched_gps)$scaling,
+                         metric = params(matched_gps)$metric ) {
   #                          c("maximum", "euclidean", "manhattan")) {
 
   est_method = match.arg(est_method)
@@ -272,7 +333,7 @@ est_weights <- function(matched_gps,
     scweights <- map( matches,
                       function(x) {
                         x %>%
-                          group_by(Z) %>%
+                          group_by( across( all_of( treatment ) ) ) %>%
                           mutate(weights = 1/n()) %>%
                           ungroup()
                       })

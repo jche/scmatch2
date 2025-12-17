@@ -27,14 +27,14 @@ produce_histogram_w_j <- function(prop_nc_unif, xlim_range, ylim_range) {
     est_method = "scm"
   )
 
-  full_unit_table_mtch <-
-    full_unit_table(
+  result_table_mtch <-
+    result_table(
       mtch,
       nonzero_weight_only = FALSE
     )
 
   df_matched_controls <-
-    full_unit_table_mtch %>%
+    result_table_mtch %>%
     filter(Z == 0) %>%
     group_by(id) %>%
     summarise(w_j = sum(weights))
@@ -93,15 +93,15 @@ produce_histogram_times_matched <- function(prop_nc_unif, xlim_range, ylim_range
     est_method = "scm"
   )
 
-  full_unit_table_mtch_nonzero_weight <-
-    full_unit_table(
+  result_table_mtch_nonzero_weight <-
+    result_table(
       mtch,
       nonzero_weight_only = TRUE
     )
 
 
   tmp <-
-    full_unit_table_mtch_nonzero_weight %>%
+    result_table_mtch_nonzero_weight %>%
     filter(Z == 0) %>%
     group_by(id) %>%
     summarise(times_of_used = n())
@@ -156,15 +156,15 @@ produce_matched_control_plot <-
       est_method = "scm"
     )
 
-    full_unit_table_mtch_nonzero_weight <-
-      full_unit_table(
+    result_table_mtch_nonzero_weight <-
+      result_table(
         mtch,
         nonzero_weight_only = TRUE
       )
 
 
     tmp <-
-      full_unit_table_mtch_nonzero_weight %>%
+      result_table_mtch_nonzero_weight %>%
       filter(Z == 0) %>%
       group_by(id) %>%
       summarise(times_of_used = n())

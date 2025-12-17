@@ -290,7 +290,7 @@ get_matches_and_debiased_residuals <- function(
 #       rad_method = "knn",
 #       k = 8
 #     )
-#     df_dgp_with_matches <- full_unit_table(df_dgp_with_matches,
+#     df_dgp_with_matches <- result_table(df_dgp_with_matches,
 #                                            nonzero_weight_only = F)
 #     # df_dgp_with_matches <- get_NN_matches(df_dgp)
 #   } else {
@@ -367,7 +367,7 @@ get_se_AE <- function(preds_csm){
 
 calc_N_T_N_C <- function(preds_csm){
   if ( is.csm_matches( preds_csm ) ) {
-    preds_csm <- full_unit_table(preds_csm)
+    preds_csm <- result_table(preds_csm)
   }
 
   N_T <- nrow(preds_csm %>% filter(Z==T))

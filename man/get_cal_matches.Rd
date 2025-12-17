@@ -5,68 +5,75 @@
 \title{Caliper Synthetic Matching}
 \usage{
 get_cal_matches(
-  df,
-  covs = starts_with("X"),
-  treatment = "Z",
+  data,
+  form = NULL,
+  covs = NULL,
+  treatment = NULL,
   metric = c("maximum", "euclidean", "manhattan"),
   caliper = 1,
-  rad_method = c("adaptive", "fixed", "1nn", "adaptive-5nn", "knn"),
+  rad_method = c("adaptive", "fixed", "1nn", "knn"),
   est_method = c("scm", "scm_extrap", "average"),
-  scaling = default_scaling(df, covs),
+  scaling = NULL,
   id_name = "id",
   warn = TRUE,
-  k = 5
+  k = 1,
+  dm = NULL
 )
 }
 \arguments{
-\item{df}{The data frame of data to be matched. Must contain treatment
-indicator and covariates for matching.}
+\item{data}{The data frame of data to be matched. Must contain
+treatment indicator and covariates for matching.}
 
-\item{covs}{Specification of covariates to use for matching. Can be variable
-names or tidyselect helpers like \code{starts_with("X")}. Defaults to
-variables starting with "X".}
+\item{form}{Formula of form treatment ~ cov1 + cov2 + ...
+specifying the treatment variable and covariates to use for
+matching.  If not null, will override covs and treatment.}
 
-\item{treatment}{Name of the column in \code{df} containing the treatment
-indicator (0/1 or TRUE/FALSE). Defaults to "Z".}
+\item{covs}{Specification of covariates to use for matching. Can be
+variable names, list of column numbers, or NULL.  If NULL, will
+use covariate names found in the scaling parameter, or default to
+all columns starting with "X".}
 
-\item{metric}{A string specifying the distance metric. One of
-"maximum", "euclidean", or "manhattan".}
+\item{treatment}{Name of the column in \code{data} containing the
+treatment indicator (with values 0/1 or TRUE/FALSE).}
 
-\item{caliper}{A numeric specifying the caliper size for matching.
-Controls the maximum allowable distance between matched units.}
+\item{metric}{Distance metric: "maximum", "euclidean", or
+"manhattan".}
 
-\item{rad_method}{Method to determine the radius size for each treated unit.
-Options include:
+\item{caliper}{Caliper size. Sets the max allowed distance between
+matches. Often 1. Scaling usually handles covariate importance.}
+
+\item{rad_method}{How to set the radius for each treated unit:
 \itemize{
-\item "adaptive": Uses the maximum of the caliper and the distance to nearest control
-\item "fixed": Uses the specified caliper value
-\item "1nn": Uses the distance to the nearest neighbor
-\item "adaptive-5nn": Adaptive radius with cap at 5th nearest neighbor
-\item "knn": Uses the distance to the kth nearest neighbor
+\item "adaptive": max(caliper, distance to nearest control)
+\item "fixed": use caliper; drop treated with no controls inside it
+\item "1nn": distance to nearest neighbor
+\item "adaptive-5nn": adaptive with cap at 5th NN
+\item "knn": distance to the k-th nearest neighbor
 }}
 
-\item{est_method}{Method for estimating weights for control units.
-Options include:
+\item{est_method}{How to weight control units:
 \itemize{
-\item "scm": Synthetic control method weighting
-\item "scm_extrap": Synthetic control with extrapolation
-\item "average": Simple average weighting
+\item "scm": synthetic control weights
+\item "scm_extrap": SCM with extrapolation
+\item "average": simple average
 }}
 
-\item{scaling}{A vector of scaling constants for covariates (can
-also be a single row matrix). These are often just the inverses
-of covariate-specific standard deviations. Controls the relative
-importance of different covariates in the distance calculation.}
+\item{scaling}{Length-P vector of scaling constants (or a
+single-row data frame). Each covariate is scaled by its value.
+Often 1/sd. Defaults to 1. If covs not supplied, the argument
+name is used to identify covariates.}
 
-\item{id_name}{Name of column to look for ID values. If that
-column is not found, a canonical \code{id} corresponding to row
-numbers will be created.}
+\item{id_name}{Column name for unit IDs. If missing, an \code{id}
+column using row numbers is created.}
 
 \item{warn}{A logical indicating whether to warn about dropped
 units (those that cannot be matched within the caliper).}
 
 \item{k}{Integer specifying the number of neighbors to use when
 \code{rad_method = "knn"}.}
+
+\item{dm}{Optional treated-control distance matrix. Calipers are
+applied but distances are not recomputed.}
 }
 \value{
 An S3 object of class "csm_matches" containing:
@@ -77,15 +84,16 @@ An S3 object of class "csm_matches" containing:
 \item \code{dm_uncapped}: Original distance matrix without censoring
 \item \code{treatment_table}: Table of treated units with matching information
 }
-The object also has attributes storing the settings used for matching.
+The object also has attributes storing the settings used for
+matching.
 }
 \description{
 This is the core method of the CSM package. Conduct (adaptive)
 radius matching with optional synthetic step on the resulting sets
-of controls. The function creates a matched dataset by finding control
-units that are similar to treatment units based on specified covariates
-and distance metrics, then optionally weights these controls using synthetic
-control methods.
+of controls. The function creates a matched dataset by finding
+control units that are similar to treatment units based on
+specified covariates and distance metrics, then optionally weights
+these controls using synthetic control methods.
 }
 \examples{
 # Generate example data
@@ -108,7 +116,7 @@ as.data.frame(mtch)
 
 }
 \seealso{
-\code{\link{gen_matches}} for the underlying matching function,
-\code{\link{est_weights}} for weight calculation,
+\code{\link{gen_matches}} for the underlying matching
+function, \code{\link{est_weights}} for weight calculation,
 \code{\link{result_table}} for extracting results
 }

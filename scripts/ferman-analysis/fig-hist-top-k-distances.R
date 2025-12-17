@@ -1,4 +1,7 @@
 
+# Make histograms of the distances to the 1st, 2nd, and 3rd closest
+# units
+
 source( here::here( "scripts/ferman-analysis/02-core-ferman-analysis.R" ) )
 
 

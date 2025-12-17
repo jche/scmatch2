@@ -4,14 +4,16 @@
 \alias{get_radius_size}
 \title{get the radius size for each treated unit}
 \usage{
-get_radius_size(dm, rad_method, caliper, k)
+get_radius_size(dm, rad_method, caliper, k = 1)
 }
 \arguments{
-\item{dm}{data}
+\item{dm}{Distance metric, rows are treated units, columns are control units}
 
-\item{rad_method}{Method for radius}
+\item{rad_method}{Method for determining radius size}
 
 \item{caliper}{Caliper size}
+
+\item{k}{For knn method, number of nearest neighbors}
 }
 \description{
 get the radius size for each treated unit

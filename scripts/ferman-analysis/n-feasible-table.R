@@ -8,7 +8,7 @@ theme_set( theme_classic() )
 
 
 ## Number of used controls
-d <- full_unit_table(
+d <- result_table(
   ferman_scm,
   feasible_only = TRUE
 )

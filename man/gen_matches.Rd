@@ -5,42 +5,63 @@
 \title{Match treated units to control units}
 \usage{
 gen_matches(
-  df,
-  covs = get_x_vars(df),
+  data,
+  covs = get_x_vars(data),
   treatment = "Z",
   scaling = 1,
   metric = "maximum",
   caliper = 1,
-  rad_method = c("adaptive", "1nn", "fixed", "adaptive-5nn", "knn"),
-  k = 5,
+  rad_method = c("adaptive", "1nn", "fixed", "knn"),
+  id_name = NULL,
+  k = 1,
+  dm = NULL,
   ...
 )
 }
 \arguments{
-\item{df}{A data frame containing all the listed covariates and the
-treatment indicator.}
+\item{data}{Data frame with covariates and treatment indicator.}
 
-\item{covs}{List of covariates names.}
+\item{covs}{Covariate names.}
 
-\item{treatment}{Variable in df that has treatment indicator (0/1
-variable).}
+\item{treatment}{Treatment indicator column (0/1).}
 
-\item{scaling}{Scaling factor, defaults to 1.  Each covariate will
-be scaled by scaling factor.  Can be a vector of length P, with P
-being number of covariates.}
+\item{scaling}{Length-P vector of scaling constants (or a
+single-row data frame). Each covariate is scaled by its value.
+Often 1/sd. Defaults to 1. If covs not supplied, the argument
+name is used to identify covariates.}
 
-\item{metric}{Character specifying the distance metric. One of
-"maximum", "euclidean", "manhattan"}
+\item{metric}{Distance metric: "maximum", "euclidean", or
+"manhattan".}
 
-\item{caliper}{Caliper on the scaled distance. Usually set to 1;
-control variable importance via the scaling paramter}
+\item{caliper}{Caliper size. Sets the max allowed distance between
+matches. Often 1. Scaling usually handles covariate importance.}
 
-\item{rad_method}{Method to determine the adaptive radius size for
-each treated unit.  fixed means drop treated units with no
-matches closer than caliper. 1nn means largest of closest control
-and caliper.}
+\item{rad_method}{How to set the radius for each treated unit:
+\itemize{
+\item "adaptive": max(caliper, distance to nearest control)
+\item "fixed": use caliper; drop treated with no controls inside it
+\item "1nn": distance to nearest neighbor
+\item "adaptive-5nn": adaptive with cap at 5th NN
+\item "knn": distance to the k-th nearest neighbor
+}}
+
+\item{id_name}{Column name for unit IDs. If missing, an \code{id}
+column using row numbers is created.}
+
+\item{k}{For adaptive, number of units needed for minimum radius.
+For "knn", number of neighbors. Defaults to 1.}
+
+\item{dm}{Optional treated-control distance matrix. Calipers are
+applied but distances are not recomputed.}
 
 \item{...}{Extra arguments}
+
+\item{est_method}{How to weight control units:
+\itemize{
+\item "scm": synthetic control weights
+\item "scm_extrap": SCM with extrapolation
+\item "average": simple average
+}}
 }
 \value{
 A list of results.  matches: list of small datasets of
@@ -58,9 +79,12 @@ units
 \details{
 Note: we allow controls to be repeatedly used (we match with
 replacement).
+
+Generally use the \code{get_cal_matches()} function instead, which
+wraps this.
 }
 \examples{
-df <- CSM:::gen_one_toy()
-mtch <- gen_matches(df, covs = c("X1", "X2"), treatment = "Z")
+data <- CSM:::gen_one_toy()
+mtch <- gen_matches(data, covs = c("X1", "X2"), treatment = "Z")
 names( mtch )
 }

@@ -137,7 +137,7 @@ ggsave("figures/lalonde_love2.png", height=3, width=6)
 
 # FSATT results -----------------------------------------------------------
 
-feasible <- full_unit_table( calada_scm, feasible_only = TRUE )
+feasible <- result_table( calada_scm, feasible_only = TRUE )
 get_att_point_est(feasible)
 
 

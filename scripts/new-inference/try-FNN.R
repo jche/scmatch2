@@ -21,7 +21,7 @@ mtch <- get_cal_matches(
   k = k
 )
 
-full_table <- full_unit_table(mtch,
+full_table <- result_table(mtch,
                               nonzero_weight_only = F )
 saveRDS(mtch, file = here("scripts/new-inference/data/one-full-table.rds"))
 
