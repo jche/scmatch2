@@ -192,21 +192,21 @@ get_pooled_variance <- function(
 #'     sigma_hat = sigma_hat
 #'     )
 #'
-get_se_AE <- function(matches,
-                      outcome = "Y",
-                      treatment = "Z",
-                      var_weight_type = "ess_units"){
-  if ( is.csm_matches( matches ) ) {
-    matches <- full_unit_table(matches)
-  }
-
-  get_se_AE_table(
-    matches_table = matches,
-    outcome = outcome,
-    treatment = treatment,
-    var_weight_type = var_weight_type
-  )
-}
+# get_se_AE <- function(matches,
+#                       outcome = "Y",
+#                       treatment = "Z",
+#                       var_weight_type = "ess_units"){
+#   if ( is.csm_matches( matches ) ) {
+#     matches <- full_unit_table(matches)
+#   }
+#
+#   get_se_AE_table(
+#     matches_table = matches,
+#     outcome = outcome,
+#     treatment = treatment,
+#     var_weight_type = var_weight_type
+#   )
+# }
 
 
 #' Get the standard error using the OR bootstrap approach
