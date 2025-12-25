@@ -1,5 +1,40 @@
 # tests/testthat/test-estimate.R
 
+
+test_that("calc_N_T_N_C calculates N_T and ESS_C correctly with reused controls", {
+
+  # --- 1. Create Mock Data ---
+  # T1 matches C1 (w=1)
+  # T2 matches C1 (w=0.5) and C2 (w=0.5)
+  mock_matches_df <- tibble::tibble(
+    id = c("T1", "C1", "T2", "C1", "C2"),
+    Z = c(TRUE, FALSE, TRUE, FALSE, FALSE), # Must use TRUE/FALSE for Z==T filter
+    weights = c(1, 1, 1, 0.5, 0.5)
+  )
+
+  # --- 2. Hand Calculation ---
+  # N_T = 2 (T1, T2)
+  #
+  # Control weights (w_j):
+  # w_C1 = 1 + 0.5 = 1.5
+  # w_C2 = 0.5
+  #
+  # sum(w_j^2) = (1.5)^2 + (0.5)^2 = 2.25 + 0.25 = 2.5
+  # N_C_tilde = N_T^2 / sum(w_j^2) = 2^2 / 2.5 = 4 / 2.5 = 1.6
+
+  # --- 3. Run Function ---
+  result <- calc_N_T_N_C(mock_matches_df)
+
+  # --- 4. Check Results ---
+  expect_true(is.list(result))
+  expect_named(result, c("N_T", "N_C_tilde"))
+  expect_equal(result$N_T, 2)
+  expect_equal(result$N_C_tilde, 1.6)
+
+})
+
+
+
 test_that("agg_co_units works", {
     df1 <- data.frame(
       Z = c(1, 0, 0),
@@ -302,3 +337,193 @@ test_that("get_measurement_error_variance_OR calculates SE and related values co
   expect_true( result$SE > 0)  # SE should be positive
 })
 
+
+
+
+
+
+# Test het var estimation ---------
+# --- Test Data Setup ---
+
+# A "golden" mock data frame with good data
+# - s1: n=3, 2 controls. var(c(2, 4)) = 2
+# - s2: n=3, 2 controls. var(c(10, 14)) = 8
+# - s3: n=2 (will be filtered out by n() >= 3 filter)
+mock_matches_het <- tibble(
+  id = 1:8,
+  subclass = c("s1", "s1", "s1", "s2", "s2", "s2", "s3", "s3"),
+  Z =  c(1, 0, 0, 1, 0, 0, 1, 0),
+  Y =  c(10, 2, 4, 20, 10, 14, 30, 20),
+  weights = c(1, 0.5, 0.5, 1, 1, 0, 1, 1)
+)
+
+# An edge-case data frame where NO subclass meets the n() >= 3 criteria
+mock_matches_small <- tibble(
+  id = 1:4,
+  subclass = c("s1", "s1", "s2", "s2"),
+  Z =  c(1, 0, 1, 0),
+  Y =  c(10, 2, 20, 10),
+  weights = c(1, 1, 1, 1)
+)
+
+# An edge-case data frame where a subclass meets n() >= 3,
+# but has < 2 controls, so var() will return NA.
+mock_matches_one_control <- tibble(
+  id = 1:3,
+  subclass = c("s1", "s1", "s1"),
+  Z =  c(1, 1, 0),
+  Y =  c(10, 20, 4),
+  weights = c(1, 1, 1)
+)
+
+
+# --- Tests ---
+
+test_that("het_var: 'average' method calculates V_E and components correctly", {
+
+  result <- get_measurement_error_variance_het(
+    mock_matches_het,
+    outcome = "Y",
+    treatment = "Z",
+    cluster_comb_mtd = "average"
+  )
+
+  # --- Hand-calculated expected values ---
+  # N_T: id 1, 4, 7 (Z=1) -> 3
+  # ESS_C:
+  #   id 2 (co): w=0.5
+  #   id 3 (co): w=0.5
+  #   id 5 (co): w=1
+  #   id 6 (co): w=0
+  #   id 8 (co): w=1
+  #   sum_w_sq = 0.5^2 + 0.5^2 + 1^2 + 0^2 + 1^2 = 0.25 + 0.25 + 1 + 0 + 1 = 2.5
+  #   ESS_C = N_T^2 / sum_w_sq = 3^2 / 2.5 = 9 / 2.5 = 3.6
+  #
+  # cluster_var_df:
+  #   s1 (Y=c(2,4)), var = 2
+  #   s2 (Y=c(10,14)), var = 8
+  #   s3 is filtered out (n < 3)
+  #
+  # var_calc_df (summarized by id):
+  #   id=1 (Z=1, s1): total_wt=1, avg_var=2
+  #   id=2 (Z=0, s1): total_wt=0.5, avg_var=2
+  #   id=3 (Z=0, s1): total_wt=0.5, avg_var=2
+  #   id=4 (Z=1, s2): total_wt=1, avg_var=8
+  #   id=5 (Z=0, s2): total_wt=1, avg_var=8
+  #   id=6 (Z=0, s2): total_wt=0, avg_var=8
+  #   s3 units (id 7, 8) are filtered out
+  #
+  # V_E_het numerator (sum(total_wt^2 * avg_var_cluster)):
+  #   (1^2 * 2) + (0.5^2 * 2) + (0.5^2 * 2) + (1^2 * 8) + (1^2 * 8) + (0^2 * 8)
+  #   = 2 + (0.25 * 2) + (0.25 * 2) + 8 + 8 + 0
+  #   = 2 + 0.5 + 0.5 + 8 + 8 = 19
+  #
+  # V_E_het = 19 / N_T^2 = 19 / 3^2 = 19 / 9
+
+  expect_true(is.list(result))
+  expect_named(result, c("V_E", "sigma_hat", "N_T", "ESS_C", "var_calc_df"))
+
+  expect_equal(result$N_T, 3)
+  expect_equal(result$ESS_C, 3.6)
+  expect_equal(result$V_E, 19 / 9)
+
+  # sigma_hat comes from get_pooled_variance, which also filters controls (n() >= 2)
+  # s1 (Y=c(2,4)), var=2, nj=2, w_nj=ess(c(0.5, 0.5))=2
+  # s2 (Y=c(10,14)), var=8, nj=2, w_nj=ess(c(1,0))=1
+  # s3 (co) (Y=c(20)), nj=1 -> filtered out by get_pooled_variance
+  # weighted.mean(x = c(2, 8), w = c(2, 1)) = 4
+  expect_equal(result$sigma_hat, 2)
+})
+
+
+test_that("het_var: 'sample' method runs and respects seed", {
+
+  # Run 1
+  set.seed(123)
+  result_1 <- get_measurement_error_variance_het(
+    mock_matches_het,
+    cluster_comb_mtd = "sample"
+  )
+
+  # Run 2
+  set.seed(123)
+  result_2 <- get_measurement_error_variance_het(
+    mock_matches_het,
+    cluster_comb_mtd = "sample"
+  )
+
+  # Run 3 (different seed)
+  set.seed(456)
+  result_3 <- get_measurement_error_variance_het(
+    mock_matches_het,
+    cluster_comb_mtd = "sample"
+  )
+
+  expect_true(is.list(result_1))
+  expect_named(result_1, c("V_E", "sigma_hat", "N_T", "ESS_C", "var_calc_df"))
+  expect_true(result_1$V_E > 0)
+
+  # Check for reproducibility
+  expect_equal(result_1$V_E, result_2$V_E)
+
+  # Check that seed actually matters (this could randomly fail, but is unlikely)
+  expect_true(result_1$V_E != result_3$V_E)
+})
+
+
+test_that("het_var: errors on invalid 'cluster_comb_mtd'", {
+  expect_error(
+    get_measurement_error_variance_het(
+      mock_matches_het,
+      cluster_comb_mtd = "invalid_method"
+    ),
+    regexp = "Invalid value for `cluster_comb_mtd`"
+  )
+})
+
+
+test_that("het_var: handles no subclasses meeting n() >= 3 criteria", {
+
+  result <- get_measurement_error_variance_het(
+    mock_matches_small,
+    cluster_comb_mtd = "average"
+  )
+
+  # var_calc_df will be empty, so V_E numerator will be 0
+  expect_equal(result$V_E, 0)
+
+  # get_pooled_variance will also find no clusters (n() >= 2)
+  # so weighted.mean will get empty input and return NaN
+  expect_true(is.nan(result$sigma_hat))
+
+  # N_T and ESS_C are calculated on the full table
+  # N_T = 2 (id 1, 3)
+  # ESS_C: w_i = c(1, 1). sum_w_sq = 1^2 + 1^2 = 2. ESS_C = 2^2 / 2 = 2
+  expect_equal(result$N_T, 2)
+  expect_equal(result$ESS_C, 2)
+})
+
+
+test_that("het_var: handles subclasses with < 2 controls (var = NA)", {
+
+  result <- get_measurement_error_variance_het(
+    mock_matches_one_control,
+    cluster_comb_mtd = "average"
+  )
+
+  # s1 passes n() >= 3, but has 1 control.
+  # calculate_subclass_variances will get Y=c(4)
+  # var(4) is NA.
+  # This NA will propagate through avg_var_cluster
+  # V_E_het will be NA
+  expect_true(is.na(result$V_E))
+
+  # get_pooled_variance will filter s1 out (needs >= 2 controls)
+  # It will return NaN
+  expect_true(is.nan(result$sigma_hat))
+
+  # N_T = 2 (id 1, 2)
+  # ESS_C: w_i = c(1). sum_w_sq = 1^2 = 1. ESS_C = 2^2 / 1 = 4
+  expect_equal(result$N_T, 2)
+  expect_equal(result$ESS_C, 4)
+})
