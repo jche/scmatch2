@@ -1,4 +1,4 @@
-# Simulation script: scripts/sims/sim_toy.R
+# Simulation script: scripts/sims-bias_mse/sim_toy.R
 # Same as sim_adversarial, but it's actually the toy example used in the paper!
 
 require(tidyverse)

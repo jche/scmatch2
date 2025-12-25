@@ -1,4 +1,4 @@
-# Simulation script: scripts/sims/sim_toy_new_methods.R
+# Simulation script: scripts/sims-bias_mse/sim_toy_new_methods.R
 # Run the three new methods on the same seeds as the main simulation
 
 require(tidyverse)

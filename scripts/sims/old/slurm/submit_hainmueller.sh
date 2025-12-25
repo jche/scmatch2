@@ -29,6 +29,6 @@ echo "========================================="
 cd ${project_dir}
 
 # Run R script
-Rscript scripts/sims/canonical_run_single_iteration.R ${sim_type} ${SLURM_ARRAY_TASK_ID}
+Rscript scripts/sims-bias_mse/canonical_run_single_iteration.R ${sim_type} ${SLURM_ARRAY_TASK_ID}
 
 echo "Finished at: $(date)"
