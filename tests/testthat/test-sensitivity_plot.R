@@ -118,7 +118,7 @@ test_that("caliper sensitivity plot works", {
 
 
   plt <- caliper_sensitivity_plot( tbl, outcome="YY", test_df, R = R, min_cal = 0, max_cal = 3 )
-  expect_true( is_ggplot(plt) )
+  expect_true( expect_true(inherits(plt, "ggplot")) )
 
   plt2 <- caliper_sensitivity_plot( res, outcome="YY", test_df, R = R, min_cal = 0, max_cal = 3 )
   expect_equal( attr( plt, "table" ),
@@ -136,7 +136,7 @@ test_that("caliper sensitivity plot works", {
   # SHould have full ribbon on plot
   plt2 <- caliper_sensitivity_plot( atts, outcome="YY", focus="ATT", test_df, R = R, min_cal = 0, max_cal = 3 )
   plt2
-  expect_true( is_ggplot(plt2) )
+  expect_true( expect_true(inherits(plt2, "ggplot")) )
 
 
 
