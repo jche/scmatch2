@@ -86,33 +86,63 @@ collect_results_to_csv <- function(combined_csv = here::here("toy-sim/data/combi
 }
 
 # -------------------------------------------------------------------
-# Core: Generate toy df using gen_df_adv (as user requested)
+# Core: Generate toy df (choose fixed vs random mixture for treated/controls)
 # -------------------------------------------------------------------
 
-make_csm_toy_df <- function(nc = 500, nt = 100, f0_sd = 0.5, prop_nc_unif = 1/3, ctr_dist = 0.5, seed = NULL) {
+make_csm_toy_df <- function(
+    nc = 500, nt = 100,
+    f0_sd = 0.5,
+    prop_nc_unif = 1/3,
+    ctr_dist = 0.5,
+    seed = NULL,
+    mixture_fixed = FALSE
+) {
   if (!is.null(seed)) set.seed(seed)
 
-  f0_fun <- function(x, y) {
-    matrix(c(x, y), ncol = 2) %>%
-      mvtnorm::dmvnorm(mean = c(0.5, 0.5), sigma = matrix(c(1, 0.8, 0.8, 1), 2)) * 20
+  # --- original (x,y) versions ---
+  f0_fun_xy <- function(x, y) {
+    mvtnorm::dmvnorm(
+      cbind(x, y),
+      mean  = c(0.5, 0.5),
+      sigma = matrix(c(1, 0.8, 0.8, 1), 2, 2)
+    ) * 20
   }
 
-  tx_effect_fun <- function(X1, X2) { 3 * X1 + 3 * X2 }
+  tx_effect_fun_xy <- function(x, y) { 3 * x + 3 * y }
 
-  df <- gen_df_adv(
-    nc = nc, nt = nt, f0_sd = f0_sd,
-    tx_effect_fun = tx_effect_fun,
-    f0_fun = f0_fun,
-    ctr_dist = ctr_dist,
-    prop_nc_unif = prop_nc_unif
-  )
+  # --- wrappers for gen_df_adv_k (matrix input) ---
+  f0_fun_mat <- function(X) {
+    X <- as.matrix(X)
+    f0_fun_xy(X[, 1], X[, 2])
+  }
 
-  # IMPORTANT: many inference utilities (and your estimate_ATT checks) assume 0/1 treatment.
-  # gen_df_adv uses TRUE/FALSE; convert to 0/1 for consistency.
-  df <- df %>% mutate(Z = as.integer(Z))
+  tx_effect_fun_mat <- function(X) {
+    X <- as.matrix(X)
+    tx_effect_fun_xy(X[, 1], X[, 2])
+  }
 
-  df
+  df <- if (isTRUE(mixture_fixed)) {
+    gen_df_adv(
+      nc = nc, nt = nt, f0_sd = f0_sd,
+      tx_effect_fun = tx_effect_fun_xy,
+      f0_fun = f0_fun_xy,
+      ctr_dist = ctr_dist,
+      prop_nc_unif = prop_nc_unif
+    )
+  } else {
+    gen_df_adv_k(
+      nc = nc, nt = nt, k = 2,
+      f0_sd = f0_sd,
+      tx_effect_fun = tx_effect_fun_mat,
+      f0_fun = f0_fun_mat,
+      ctr_dist = ctr_dist,
+      prop_nc_unif = prop_nc_unif
+    )
+  }
+
+  df %>% mutate(Z = as.integer(Z))
 }
+
 
 # -------------------------------------------------------------------
 # Scaling for toy: follow your snippet

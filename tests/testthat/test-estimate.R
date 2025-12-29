@@ -175,11 +175,9 @@ test_that("get_att_point_est errors when treatment column is not binary-present 
 })
 
 
-test_that("get_att_point_est behavior on csm_matches: sc_units must contain outcome if we want ATT", {
-
+test_that("get_att_point_est behavior on csm_matches: return='all' must contain outcome", {
   set.seed(123)
   dat <- gen_one_toy(nt = 10, nc = 30)
-
   mtch <- get_cal_matches(
     dat,
     treatment = "Z",
@@ -189,30 +187,25 @@ test_that("get_att_point_est behavior on csm_matches: sc_units must contain outc
     rad_method = "adaptive",
     est_method = "scm"
   )
-
   expect_true(is.csm_matches(mtch))
 
-  # Verify what sc_units contains
+  # Verify what sc_units contains (does NOT have Y)
   sc_tbl <- result_table(mtch, return = "sc_units")
   expect_true(all(c("Z", "weights") %in% names(sc_tbl)))
+  expect_false("Y" %in% names(sc_tbl))
 
-  # This is the key regression test:
-  # If sc_units does NOT contain outcome by default, get_att_point_est(mtch) should error.
-  # (This matches the error you saw: all(c(treatment,outcome) %in% names(matched_df)) is not TRUE)
-  has_Y <- "Y" %in% names(sc_tbl)
+  # Verify what return="all" contains (DOES have Y)
+  all_tbl <- result_table(mtch, return = "all")
+  expect_true(all(c("Z", "Y", "weights") %in% names(all_tbl)))
 
-  if (!has_Y) {
-    expect_error(
-      get_att_point_est(mtch, treatment = "Z", outcome = "Y"),
-      regexp = "all\\(c\\(treatment, outcome\\) %in% names\\(matched_df\\)\\)"
-    )
-  } else {
-    # If your implementation already includes Y in sc_units, then it should run.
-    est <- get_att_point_est(mtch, treatment = "Z", outcome = "Y")
-    expect_true(is.numeric(est) && length(est) == 1)
-  }
+  # get_att_point_est uses return="all", so it SHOULD work
+  est <- get_att_point_est(mtch, treatment = "Z", outcome = "Y")
+  expect_true(is.numeric(est) && length(est) == 1)
+  expect_false(is.na(est))
+
+  # The point: sc_units alone is insufficient, but return="all" works
+  # This documents that get_att_point_est correctly uses return="all"
 })
-
 
 test_that("get_att_point_est equals weighted diff computed directly from result_table(all)", {
 
