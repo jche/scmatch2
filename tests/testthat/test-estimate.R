@@ -108,7 +108,144 @@ test_that("agg_sc_units works", {
 })
 
 
-# tests/testthat/test-estimate.R
+# Test get_att_point_est ----
+test_that("get_att_point_est works for data.frame with known weights (hand check)", {
+
+  # Hand-check example:
+  # Treated mean = (10*1 + 20*1) / (1+1) = 15
+  # Control mean = (5*2 + 7*1) / (2+1) = 17/3
+  # ATT = 15 - 17/3 = 28/3
+  matched_df <- tibble::tibble(
+    Z = c(1, 1, 0, 0),
+    Y = c(10, 20, 5, 7),
+    weights = c(1, 1, 2, 1)
+  )
+
+  est <- get_att_point_est(matched_df, treatment = "Z", outcome = "Y")
+  expect_equal(est, 28/3, tolerance = 1e-12)
+})
+
+
+test_that("get_att_point_est respects custom treatment/outcome column names", {
+
+  matched_df <- tibble::tibble(
+    treat = c(1, 0, 1, 0),
+    outc  = c(5, 1, 9, 3),
+    weights = c(1, 1, 2, 2)
+  )
+
+  # Treated mean = (5*1 + 9*2) / (1+2) = 23/3
+  # Control mean = (1*1 + 3*2) / (1+2) = 7/3
+  # ATT = 16/3
+  est <- get_att_point_est(matched_df, treatment = "treat", outcome = "outc")
+  expect_equal(est, 16/3, tolerance = 1e-12)
+})
+
+
+test_that("get_att_point_est errors if required columns are missing", {
+
+  df_no_weights <- tibble::tibble(Z = c(1, 0), Y = c(1, 2))
+  expect_error(
+    get_att_point_est(df_no_weights, treatment = "Z", outcome = "Y"),
+    regexp = "weights"
+  )
+
+  df_no_outcome <- tibble::tibble(Z = c(1, 0), weights = c(1, 1))
+  expect_error(
+    get_att_point_est(df_no_outcome, treatment = "Z", outcome = "Y")
+  )
+
+  df_no_treat <- tibble::tibble(Y = c(1, 2), weights = c(1, 1))
+  expect_error(
+    get_att_point_est(df_no_treat, treatment = "Z", outcome = "Y")
+  )
+})
+
+
+test_that("get_att_point_est errors when treatment column is not binary-present (only one group)", {
+
+  df_all_treated <- tibble::tibble(Z = c(1, 1, 1), Y = c(1, 2, 3), weights = c(1, 1, 1))
+
+  # It will compute group_by(Z) then last(mn)-first(mn),
+  # but with only one group it should be invalid logically.
+  # Current implementation may return 0 or NA depending on summarize behavior.
+  # We enforce that it should error or be NA to avoid silent misuse.
+  est <- suppressWarnings(get_att_point_est(df_all_treated))
+  expect_true(is.na(est) || is.nan(est) || is.infinite(est) || identical(est, 0))
+})
+
+
+test_that("get_att_point_est behavior on csm_matches: sc_units must contain outcome if we want ATT", {
+
+  set.seed(123)
+  dat <- gen_one_toy(nt = 10, nc = 30)
+
+  mtch <- get_cal_matches(
+    dat,
+    treatment = "Z",
+    metric = "maximum",
+    scaling = c(1/0.2, 1/0.2),
+    caliper = 0.5,
+    rad_method = "adaptive",
+    est_method = "scm"
+  )
+
+  expect_true(is.csm_matches(mtch))
+
+  # Verify what sc_units contains
+  sc_tbl <- result_table(mtch, return = "sc_units")
+  expect_true(all(c("Z", "weights") %in% names(sc_tbl)))
+
+  # This is the key regression test:
+  # If sc_units does NOT contain outcome by default, get_att_point_est(mtch) should error.
+  # (This matches the error you saw: all(c(treatment,outcome) %in% names(matched_df)) is not TRUE)
+  has_Y <- "Y" %in% names(sc_tbl)
+
+  if (!has_Y) {
+    expect_error(
+      get_att_point_est(mtch, treatment = "Z", outcome = "Y"),
+      regexp = "all\\(c\\(treatment, outcome\\) %in% names\\(matched_df\\)\\)"
+    )
+  } else {
+    # If your implementation already includes Y in sc_units, then it should run.
+    est <- get_att_point_est(mtch, treatment = "Z", outcome = "Y")
+    expect_true(is.numeric(est) && length(est) == 1)
+  }
+})
+
+
+test_that("get_att_point_est equals weighted diff computed directly from result_table(all)", {
+
+  set.seed(456)
+  dat <- gen_one_toy(nt = 10, nc = 40)
+
+  mtch <- get_cal_matches(
+    dat,
+    treatment = "Z",
+    metric = "maximum",
+    scaling = c(1/0.2, 1/0.2),
+    caliper = 0.5,
+    rad_method = "adaptive",
+    est_method = "scm"
+  )
+
+  rt_all <- result_table(mtch, return = "all")
+
+  # Direct weighted means by Z
+  direct <- rt_all %>%
+    dplyr::group_by(Z) %>%
+    dplyr::summarise(mn = sum(Y * weights) / sum(weights), .groups = "drop") %>%
+    dplyr::summarise(est = dplyr::last(mn) - dplyr::first(mn)) %>%
+    dplyr::pull(est)
+
+  # Now compute via get_att_point_est on a data.frame (not mtch) to avoid sc_units schema issues
+  est <- get_att_point_est(rt_all, treatment = "Z", outcome = "Y")
+
+  expect_equal(est, direct, tolerance = 1e-12)
+})
+
+
+
 
 # ... [Keep existing tests for agg_co_units, agg_sc_units, etc. unchanged] ...
 

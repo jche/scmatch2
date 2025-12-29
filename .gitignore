@@ -38,6 +38,8 @@ vignettes/*.pdf
 # Cluster logs
 /logs/
 /scripts/inference-scripts/logs/
+/scripts/sims-variance/logs/
+/scripts/sims-variance-knn5avg/logs/
 
 # Research paper results
 /tables

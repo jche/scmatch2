@@ -28,8 +28,10 @@ get_est_att_from_wt <- function(data,
 get_att_point_est <- function(matched_df, treatment = "Z", outcome = "Y") {
 
   if ( is.csm_matches(matched_df) ) {
-    matched_df <- result_table( matched_df, "sc_units" )
+    # IMPORTANT: use 'all' so we keep outcome column (Y)
+    matched_df <- result_table(matched_df, return = "all")
   }
+
   stopifnot( all( c(treatment, outcome) %in% names(matched_df) ) )
   stopifnot( "weights" %in% names(matched_df) )
 
@@ -37,11 +39,12 @@ get_att_point_est <- function(matched_df, treatment = "Z", outcome = "Y") {
   matched_df$Y = matched_df[[outcome]]
 
   matched_df %>%
-    group_by(Z) %>%
-    summarize(mn = sum(Y*weights) / sum(weights)) %>%
-    summarize(est = last(mn) - first(mn)) %>%
-    pull(est)
+    dplyr::group_by(Z) %>%
+    dplyr::summarize(mn = sum(Y*weights) / sum(weights), .groups="drop") %>%
+    dplyr::summarize(est = dplyr::last(mn) - dplyr::first(mn), .groups="drop") %>%
+    dplyr::pull(est)
 }
+
 
 # get_att_ests_from_wt<-
 #   function(df, input_wt)
