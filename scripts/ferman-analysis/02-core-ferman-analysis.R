@@ -25,7 +25,7 @@ covariate_caliper <- c(rep(0.2, 3), 1/1000)
 scaling <- 1/covariate_caliper
 scaling
 
-ferman_scm <- ferman_for_analysis %>%
+ferman_csm <- ferman_for_analysis %>%
   get_cal_matches(
     covs = match_covs,
     treatment = "Z",

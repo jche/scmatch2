@@ -20,7 +20,7 @@ source(here::here("scripts/ferman-analysis/02-core-ferman-analysis.R"))
 if(!dir.exists(here::here("figures/"))) dir.create(here::here("figures/"), recursive = TRUE)
 
 
-summary( ferman_scm )
+summary( ferman_csm )
 
 
 # -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
@@ -31,7 +31,7 @@ summary( ferman_scm )
 covs_names <- c( paste0("X", 1:3, " (200", 7:9, " score)"),
                  "X4 (pct Sao Paolo)")
 
-p_love <- love_plot(ferman_scm,
+p_love <- love_plot(ferman_csm,
                     covs = c("y2007", "y2008", "y2009", "is_sao_paolo"),
                     covs_names = covs_names ) +
   labs(title = "Covariate Balance (Ferman)")
@@ -46,7 +46,7 @@ ggsave(here::here("figures/ferman_love.pdf"), plot = p_love, height = 3, width =
 # 1.(b) Look at how distances are distributed after matching ----
 # -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
 
-dplt <- distance_density_plot( ferman_scm ) +
+dplt <- distance_density_plot( ferman_csm ) +
   theme(legend.position = "bottom")
 
 dplt
@@ -61,16 +61,16 @@ ggsave(here::here("figures/ferman_distance_density.pdf"), plot = dplt, width = 6
 # 2. Comparison of Methods Table ----
 # -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
 
-ss <- sensitivity_table( ferman_scm, outcome="Y",
+ss <- sensitivity_table( ferman_csm, outcome="Y",
                          include_distances = TRUE )
 
 ss
 
 
-plt <- ess_plot( ferman_scm )
+plt <- ess_plot( ferman_csm )
 plt
 
-plt <- ess_plot( ferman_scm, feasible_only = TRUE )
+plt <- ess_plot( ferman_csm, feasible_only = TRUE )
 plt
 
 
@@ -80,7 +80,7 @@ plt
 # -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
 
 
-p_dist_all <- caliper_distance_plot( ferman_scm, tops = c(1, 3, 6) )
+p_dist_all <- caliper_distance_plot( ferman_csm, tops = c(1, 3, 6) )
 p_dist_all
 
 ggsave(here::here("figures/ferman_top_k_distances.pdf"), plot = p_dist_all, width = 7, height = 3.5)
@@ -93,7 +93,7 @@ ggsave(here::here("figures/ferman_top_k_distances.pdf"), plot = p_dist_all, widt
 # 4. SATT / Caliper Trade-off Plot - Cumulative (FSATT -> SATT) ----
 # -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*---
 
-plot_max_cal <- feasible_plot(ferman_scm, caliper_plot = "both")
+plot_max_cal <- feasible_plot(ferman_csm, caliper_plot = "both")
 p_satt = plot_max_cal$plot_SATT
 plot_max_cal = plot_max_cal$plot_max_caliper_size
 
@@ -110,7 +110,7 @@ ggsave(here::here("figures/ferman_fsatt_tradeoff.pdf"), plot = p_tradeoff_all, w
 
 
 # Note: Bit computationally intensive
-plt <- caliper_sensitivity_plot( ferman_scm, ferman_for_analysis,
+plt <- caliper_sensitivity_plot( ferman_csm, ferman_for_analysis,
                                  focus = "FATT",
                                  R = 11,
                                  min_cal = 0, max_cal = 1 )
