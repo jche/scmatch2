@@ -820,6 +820,22 @@ estimate_ATT <- function(
     }
   }
 
+  # return blank results df if no units matched
+  if ( nrow(matches_df) == 0 ) {
+    result <- tibble(
+      ATT = NA,
+      SE = NA,
+      N_T = NA,
+      ESS_C = NA,
+      t = NA,
+      V = NA,
+      V_E = NA,
+      V_P = NA,
+      sigma_hat = NA
+    )
+    return(result)
+  }
+
   if ( n_distinct( matches_df[[treatment]] ) != 2 ) {
     stop(glue::glue( "treatment variable `{treatment}` must be binary (0/1)") )
   }

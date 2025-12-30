@@ -118,11 +118,6 @@ plt <- caliper_sensitivity_plot( ferman_scm, ferman_for_analysis,
 plt
 
 
-# bug: caliper_sensitivity_table() --> sensitivity_table() calls
-#  estimate_ATT(feasible_only=T), which fails if nothing is feasible
-
-
-
 ggsave( plt, filename = here::here( "figures/ferman_caliper_sensitivity_plot.pdf"),
         width = 7, height = 5 )
 
