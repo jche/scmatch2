@@ -1,4 +1,4 @@
-# Simulation script: scripts/sims/sim_toy_new_methods_sequential.R
+# Simulation script: scripts/sims-bias_mse/sim_toy_new_methods_sequential.R
 # Run the three new methods sequentially with detailed timing
 
 require(tidyverse)

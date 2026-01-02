@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # Run a single iteration of the comprehensive simulation (+ toy)
 # Usage:
-# Rscript scripts/sims/canonical_run_single_iteration.R <sim_type> <iteration_id> [methods...]
+# Rscript scripts/sims-bias_mse/canonical_run_single_iteration.R <sim_type> <iteration_id> [methods...]
 # sim_type: one of 'acic','hainmueller','kang','toy'
 # iteration_id: integer
 # methods: optional list and/or comma-separated names (see supported list below)
@@ -94,7 +94,7 @@ SL.library2  <- c("SL.glm", "SL.glmnet", "SL.randomForest", "SL.xgboost")
 SL.library3Q <- c("SL.glm", "tmle.SL.dbarts2", "SL.glmnet")
 SL.library3g <- c("SL.glm", "tmle.SL.dbarts.k.5", "SL.gam")
 
-output_dir <- file.path("data", "outputs", "sims", sim_type)
+output_dir <- file.path("data", "outputs", "sims-bias_mse", sim_type)
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 # --- seeds --------------------------------------------------------------------

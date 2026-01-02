@@ -1,9 +1,9 @@
 #!/usr/bin/env Rscript
 # Demo: run a single iteration with fast methods and print a tiny summary
 # Usage examples (from project root):
-#   Rscript scripts/sims/demo_run_single_iter_fast.R
-#   Rscript scripts/sims/demo_run_single_iter_fast.R hainmueller 1 "diff,bal1,ps_lm"
-#   Rscript scripts/sims/demo_run_single_iter_fast.R toy 3 diff bal1 or_lm ps_lm
+#   Rscript scripts/sims-bias_mse/demo_run_single_iter_fast.R
+#   Rscript scripts/sims-bias_mse/demo_run_single_iter_fast.R hainmueller 1 "diff,bal1,ps_lm"
+#   Rscript scripts/sims-bias_mse/demo_run_single_iter_fast.R toy 3 diff bal1 or_lm ps_lm
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -27,7 +27,7 @@ cat(sprintf("methods    : %s\n", if (length(methods)) paste(methods, collapse = 
 cat("==================================\n\n")
 
 # Build the command; prefer system2 with vector args for safety
-runner <- "scripts/sims/run_single_iteration.R"
+runner <- "scripts/sims-bias_mse/run_single_iteration.R"
 if (!file.exists(runner)) {
   stop(sprintf("Cannot find %s. Run this demo from the project root.", runner))
 }
@@ -40,7 +40,7 @@ if (!identical(status, 0L)) {
 }
 
 # Where the script writes results:
-out_file <- file.path("data", "outputs", "sims", sim, sprintf("iter_%04d.csv", id))
+out_file <- file.path("data", "outputs", "sims-bias_mse", sim, sprintf("iter_%04d.csv", id))
 if (!file.exists(out_file)) {
   stop(sprintf("Result file not found: %s\nCheck the output_dir in run_single_iteration.R.", out_file))
 }

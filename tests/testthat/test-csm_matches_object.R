@@ -1,4 +1,4 @@
-
+# tests/testthat/test-csm_matches_object.R
 
 # Test the various functionalities of the csm_matches_object
 
@@ -120,4 +120,32 @@ test_that("basic object functionality", {
 })
 
 
+test_that("result_table schemas are consistent across return modes", {
 
+  set.seed(4044440)
+  dat <- gen_one_toy(nt = 5)
+
+  mtch <- get_cal_matches(dat,
+                          treatment = "Z",
+                          metric = "maximum",
+                          scaling = c(1/0.2, 1/0.2),
+                          caliper = 0.25,
+                          rad_method = "adaptive",
+                          est_method = "scm")
+
+  # all table should contain outcome columns from matches
+  rt_all <- result_table(mtch, return = "all")
+  expect_true(all(c("id","subclass","weights","Z") %in% names(rt_all)))
+  expect_true("Y" %in% names(rt_all))   # if gen_one_toy includes Y; if not, adjust to your outcome column
+
+  # sc_units often drops Y unless explicitly requested
+  rt_sc <- result_table(mtch, return = "sc_units")
+  expect_true(all(c("id","subclass","weights","Z") %in% names(rt_sc)))
+
+  # If your design is: sc_units doesn't include outcome by default:
+  expect_false("Y" %in% names(rt_sc))
+
+  # But should include outcome if asked
+  rt_sc_y <- result_table(mtch, return = "sc_units", outcome = "Y")
+  expect_true("Y" %in% names(rt_sc_y))
+})

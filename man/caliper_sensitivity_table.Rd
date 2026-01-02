@@ -24,7 +24,7 @@ caliper_sensitivity_plot(
   min_cal = 0.05,
   max_cal = 5,
   R = 30,
-  focus = c("FATT", "ATT", "FATT_1nn", "ATT_1nn", "FATT_raw", "ATT_raw"),
+  focus = NULL,
   lines = c("FATT", "ATT", "FATT_1nn", "ATT_1nn", "FATT_raw", "ATT_raw")
 )
 
@@ -36,7 +36,7 @@ caliper_sensitivity_plot_stats(
   max_cal = 5,
   R = 30,
   vars = c("ESS_C", "mean_dist", "SE_star"),
-  focus = c("FATT", "ATT", "FATT_1nn", "ATT_1nn", "FATT_raw", "ATT_raw"),
+  focus = NULL,
   lines = c("FATT", "ATT", "FATT_1nn", "ATT_1nn", "FATT_raw", "ATT_raw")
 )
 }

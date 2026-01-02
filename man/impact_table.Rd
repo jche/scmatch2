@@ -4,7 +4,7 @@
 \alias{impact_table}
 \title{Obtain impact table}
 \usage{
-impact_table(scm)
+impact_table(scm, outcome)
 }
 \arguments{
 \item{scm}{A csm_matches object from a matching call.}
@@ -13,9 +13,9 @@ impact_table(scm)
 }
 \value{
 dataframe with one row per treated unit, with columns:
-subclass, max_dist, outcome (estimated impact), weight (nominal
-precision of the impact estimate, calculated as 1 + 1/ess_C, nC
-(number of controls used).
+subclass, max_dist, outcome (estimated impact), precision
+(nominal precision of the impact estimate, calculated as 1/(1 +
+1/ess_C), nC (number of controls used).
 }
 \description{
 This table summarizes the estimated impact for each treated unit,

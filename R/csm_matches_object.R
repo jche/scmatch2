@@ -1,4 +1,4 @@
-
+# R/csm_matches_object.R
 # The various methods for the csm_matches object
 
 
@@ -428,6 +428,21 @@ result_table <- function( csm,
   }
 
   rs
+}
+
+
+
+# Backward compatible alias
+full_unit_table <- function(csm,
+                            feasible_only = FALSE,
+                            nonzero_weight_only = FALSE,
+                            ...) {
+  result_table(
+    csm,
+    return = "all",
+    feasible_only = feasible_only,
+    nonzero_weight_only = nonzero_weight_only
+  )
 }
 
 

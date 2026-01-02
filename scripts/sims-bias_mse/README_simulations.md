@@ -1,6 +1,6 @@
 # Simulation Workflow Guide
 
-This folder (`scripts/sims/`) contains all scripts used to reproduce the simulation experiments in **CSM**.
+This folder (`scripts/sims-bias_mse/`) contains all scripts used to reproduce the simulation experiments in **CSM**.
 
 The workflow supports three usage modes:
 
@@ -13,7 +13,7 @@ The workflow supports three usage modes:
 ## ⚙️ Folder structure
 
 ```
-scripts/sims/
+scripts/sims-bias_mse/
 ├── run_single_iteration.R      # core script: runs one iteration for one DGP
 ├── run_local_all.R             # runs all DGPs sequentially (local CPU)
 ├── run_slurm_all.sh            # SLURM array job (for HPC)
@@ -24,7 +24,7 @@ scripts/sims/
 Output directories:
 
 ```
-data/outputs/sims/<sim_type>/
+data/outputs/sims-bias_mse/<sim_type>/
   ├── iter_0001.csv             # per-iteration results
   ├── iter_0002.csv
   └── ...
@@ -39,7 +39,7 @@ where `<sim_type>` ∈ `{acic, hainmueller, kang, toy}`.
 For a minimal sanity check (≈ 10 seconds):
 
 ```
-Rscript scripts/sims/demo_run_single_iter_fast.R
+Rscript scripts/sims-bias_mse/demo_run_single_iter_fast.R
 ```
 
 This runs the `toy` DGP for one iteration using only fast estimators  
@@ -48,7 +48,7 @@ This runs the `toy` DGP for one iteration using only fast estimators
 Alternatively, **you can open the script in RStudio and run all lines interactively**  
 to see the workflow step by step.
 
-Output → `data/outputs/sims/toy/iter_0001.csv`.
+Output → `data/outputs/sims-bias_mse/toy/iter_0001.csv`.
 
 ---
 
@@ -57,18 +57,18 @@ Output → `data/outputs/sims/toy/iter_0001.csv`.
 Run several iterations for all DGPs sequentially:
 
 ```
-Rscript scripts/sims/run_local_all.R 5
+Rscript scripts/sims-bias_mse/run_local_all.R 5
 ```
 
 - `5` = number of iterations (default = 5).  
 - Optional list of methods (space or comma separated):
 
 ```
-Rscript scripts/sims/run_local_all.R 3 diff bal1 or_lm ps_lm
+Rscript scripts/sims-bias_mse/run_local_all.R 3 diff bal1 or_lm ps_lm
 ```
 
 Results for each DGP are saved to  
-`data/outputs/sims/<sim_type>/iter_####.csv`.
+`data/outputs/sims-bias_mse/<sim_type>/iter_####.csv`.
 
 ---
 
@@ -77,7 +77,7 @@ Results for each DGP are saved to
 Submit the array job:
 
 ```
-cd scripts/sims
+cd scripts/sims-bias_mse
 sbatch run_slurm_all.sh
 ```
 
@@ -120,7 +120,7 @@ directly in RStudio** to interactively inspect summaries.
 Creates combined files:
 
 ```
-data/outputs/sims/<sim_type>_combined.csv
+data/outputs/sims-bias_mse/<sim_type>_combined.csv
 ```
 
 and copies summarized results to:
@@ -164,7 +164,7 @@ Before running on your own system:
 2. Make sure the following directories exist (the scripts will create them if not):
 
 ```
-data/outputs/sims/
+data/outputs/sims-bias_mse/
 logs/
 ```
 
@@ -181,9 +181,9 @@ Rscript -e "library(CSM); library(twang); library(kbal)"
 
 | Step | Command | Purpose |
 |------|----------|----------|
-| Quick check | `Rscript scripts/sims/demo_run_single_iter_fast.R` or run in RStudio | Verify environment |
-| Local dev run | `Rscript scripts/sims/run_local_all.R 3` | Run small replication locally |
-| Cluster run | `sbatch scripts/sims/run_slurm_all.sh` | Full-scale SLURM job array |
+| Quick check | `Rscript scripts/sims-bias_mse/demo_run_single_iter_fast.R` or run in RStudio | Verify environment |
+| Local dev run | `Rscript scripts/sims-bias_mse/run_local_all.R 3` | Run small replication locally |
+| Cluster run | `sbatch scripts/sims-bias_mse/run_slurm_all.sh` | Full-scale SLURM job array |
 | Combine results | `Rscript scripts/analysis/collect_slurm_results.R` or run interactively | Summarize all outputs |
 | Make figures | run `scripts/figs/fig_sim_canonicals.R` / `scripts/figs/fig_sim_toy.R` | Generate simulation plots |
 
@@ -195,13 +195,13 @@ Rscript -e "library(CSM); library(twang); library(kbal)"
 
 ```
 export METHODS="diff,bal1,or_lm,ps_lm"
-sbatch scripts/sims/run_slurm_all.sh
+sbatch scripts/sims-bias_mse/run_slurm_all.sh
 ```
 
 - To debug interactively, try running one iteration manually:
 
 ```
-Rscript scripts/sims/run_single_iteration.R hainmueller 1 diff bal1
+Rscript scripts/sims-bias_mse/run_single_iteration.R hainmueller 1 diff bal1
 ```
 
 ---

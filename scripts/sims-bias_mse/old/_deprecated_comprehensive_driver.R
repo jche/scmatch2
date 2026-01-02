@@ -1,4 +1,4 @@
-# scripts/sims/canonical_run_comprehensive_simulation.R
+# scripts/sims-bias_mse/canonical_run_comprehensive_simulation.R
 # Modular function to run ALL methods (old + new) on any simulation DGP
 
 #' Run comprehensive simulation with all methods

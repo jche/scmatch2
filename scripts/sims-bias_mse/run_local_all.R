@@ -1,11 +1,11 @@
-# scripts/sims/run_local_all.R
-# Local runner: iterate run_single_iteration.R for chosen sims.
+# scripts/sims-bias_mse/run_local_all.R
+# Local runner: iterate run_single_iteration.R for chosen sims-bias_mse.
 # Usage:
-#   Rscript scripts/sims/run_local_all.R [n_iter] [methods...]
+#   Rscript scripts/sims-bias_mse/run_local_all.R [n_iter] [methods...]
 # Examples:
-#   Rscript scripts/sims/run_local_all.R                 # 5 iters, all methods
-#   Rscript scripts/sims/run_local_all.R 3 diff twang    # 3 iters, only diff & twang
-#   Rscript scripts/sims/run_local_all.R 10 "ps,dr"      # 10 iters, PS + doubly-robust groups
+#   Rscript scripts/sims-bias_mse/run_local_all.R                 # 5 iters, all methods
+#   Rscript scripts/sims-bias_mse/run_local_all.R 3 diff twang    # 3 iters, only diff & twang
+#   Rscript scripts/sims-bias_mse/run_local_all.R 10 "ps,dr"      # 10 iters, PS + doubly-robust groups
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -39,13 +39,13 @@ run_many <- function(sim, n_iter = 5L, method_suffix = "") {
                   sim, n_iter,
                   if (nzchar(method_suffix)) paste0(" with methods ", paste(methods, collapse = ", ")) else " (all methods)"))
   for (i in seq_len(n_iter)) {
-    cmd <- sprintf("Rscript scripts/sims/run_single_iteration.R %s %d%s", sim, i, method_suffix)
+    cmd <- sprintf("Rscript scripts/sims-bias_mse/run_single_iteration.R %s %d%s", sim, i, method_suffix)
     status <- system(cmd)
     if (status != 0) stop(sprintf("Failed on %s iteration %d", sim, i))
   }
 }
 
-sims <- c("acic","hainmueller","kang","toy")
-for (s in sims) run_many(s, n_iter = n_iter, method_suffix = method_suffix)
+sims-bias_mse <- c("acic","hainmueller","kang","toy")
+for (s in sims-bias_mse) run_many(s, n_iter = n_iter, method_suffix = method_suffix)
 
 message("All local runs complete.")

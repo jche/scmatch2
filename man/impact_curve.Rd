@@ -4,7 +4,7 @@
 \alias{impact_curve}
 \title{Impact curve plot}
 \usage{
-impact_curve(scm, outcome)
+impact_curve(scm, outcome, min_dist = TRUE, jitter = FALSE)
 }
 \arguments{
 \item{scm}{A csm_matches object}

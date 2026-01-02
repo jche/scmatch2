@@ -3,10 +3,10 @@
 library(tidyverse)
 source("scripts/analysis/plot_sim.R")
 
-# canonical sims ----------------------------------------------------------
-res_acic <- read_csv("data/outputs/sims/acic_combined.csv")
-res_hain <- read_csv("data/outputs/sims/hainmueller_combined.csv")
-res_kang <- read_csv("data/outputs/sims/kang_combined.csv")
+# canonical sims-bias_mse ----------------------------------------------------------
+res_acic <- read_csv("data/outputs/sims-bias_mse/acic_combined.csv")
+res_hain <- read_csv("data/outputs/sims-bias_mse/hainmueller_combined.csv")
+res_kang <- read_csv("data/outputs/sims-bias_mse/kang_combined.csv")
 
 res <- list(res_kang, res_hain, res_acic) %>%
   map_dfr(function(d) {

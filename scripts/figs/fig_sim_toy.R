@@ -3,7 +3,7 @@
 library(tidyverse)
 source("scripts/analysis/plot_sim.R")
 
-res_toy <- readr::read_csv("data/outputs/sims/toy_combined.csv")
+res_toy <- readr::read_csv("data/outputs/sims-bias_mse/toy_combined.csv")
 
 org_df_toy <- res_toy %>%
   select(-bal2) %>%
