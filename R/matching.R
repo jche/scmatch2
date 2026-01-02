@@ -13,10 +13,11 @@
 #'
 #' @export
 get_radius_size <- function(dm,
-                            rad_method,
+                            rad_method = c("adaptive", "fixed", "1nn", "knn", "knn-capped"),
                             caliper,
                             k=1){
   ntx = nrow(dm)
+  rad_method <- match.arg(rad_method)
 
   radius_sizes <- numeric(ntx)
   if (rad_method == "adaptive") {
@@ -25,6 +26,13 @@ get_radius_size <- function(dm,
       temp <- dm[i,]
       temp_sorted <- sort(temp)
       radius_sizes[i] <- max(caliper, temp_sorted[k])
+    }
+  } else if (rad_method == "knn-capped" ) {
+    # knn with caliper max
+    for (i in 1:ntx) {
+      temp <- dm[i,]
+      temp_sorted <- sort(temp)
+      radius_sizes[i] <- min( caliper, temp_sorted[k] )
     }
   } else if (rad_method == "1nn" || (rad_method=="knn" && k==1) ) {
     radius_sizes <- apply(dm, 1, min)
@@ -35,6 +43,7 @@ get_radius_size <- function(dm,
       radius_sizes[i] <- temp_sorted[k]
     }
   } else {
+    # fixed
     radius_sizes <- rep(caliper, nrow(dm))
   }
   return(radius_sizes)
@@ -185,9 +194,9 @@ gen_matches <- function( data,
                          covs = get_x_vars(data),
                          treatment = "Z",
                          scaling=1,
-                         metric="maximum",
+                         metric = c("maximum", "euclidean", "manhattan"),
                          caliper=1,
-                         rad_method = c("adaptive", "1nn", "fixed", "knn"),
+                         rad_method = c("adaptive", "fixed", "1nn", "knn", "knn-capped"),
                          id_name = NULL,
                          k = 1,
                          dm = NULL,
@@ -196,6 +205,8 @@ gen_matches <- function( data,
 
   ### Step -1: set up some constants
   rad_method <- match.arg(rad_method)
+  metric <- match.arg(metric)
+
   args <- list(...)
 
   if ( is.numeric(covs) ) {

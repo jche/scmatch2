@@ -28,6 +28,7 @@ make_treatment_table <- function( matches ) {
                                      subclass = subclass[[1]],
                                      nc = n() - 1,
                                      ess = sum(weights[-1])^2 / sum( weights[-1]^2  ),
+                                     min_dist = min(dist[-1]),
                                      max_dist = max(dist) )
                         }
   )
@@ -130,7 +131,7 @@ get_cal_matches <- function( data,
                              treatment = NULL,
                              metric = c("maximum", "euclidean", "manhattan"),
                              caliper = 1,
-                             rad_method = c("adaptive", "fixed", "1nn", "knn"),
+                             rad_method = c("adaptive", "fixed", "1nn", "knn", "knn-capped"),
                              est_method = c("scm", "scm_extrap", "average"),
                              scaling = NULL,
                              id_name = "id",

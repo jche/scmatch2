@@ -2,7 +2,7 @@
 % Please edit documentation in R/csm_matches_object.R
 \name{feasible_units}
 \alias{feasible_units}
-\title{Return table of treated units}
+\title{Return table of feasible treated units}
 \usage{
 feasible_units(csm)
 }
@@ -11,5 +11,5 @@ Dataframe of all the treated units (not controls) that were
 matched within a caliper.
 }
 \description{
-Return table of treated units
+Return those treated units with controls within the set caliper.
 }

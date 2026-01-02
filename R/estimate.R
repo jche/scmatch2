@@ -1,42 +1,41 @@
 # R/estimate.R
 
 
-# functions for estimating effects
-# The following two functions should be combined
-#   once we get to know the input of get_att_point_est
-get_est_att_from_wt <- function(data,
-                                input_wt){
-  data_est_att <- data %>%
-    cbind(wt=input_wt) %>%
-    group_by(Z) %>%
-    summarise(Y_wtd = weighted.mean(Y,wt))
-
-  est_att <- diff(data_est_att$Y_wtd)
-  return(est_att)
-}
-
 
 #' Estimate the ATT from a matched dataframe
 #'
 #' Given a matched dataset, calculate the estimated ATT
 #'
-#' @param matched_df A matched dataset, either the dataframe of
-#'   treatment and control units, or a csm_matches object.  If
-#'   dataframe, needs the treatment, outcome, and a "weights" column.
+#' @param csm A matched dataset, either the dataframe of treatment and
+#'   control units, or a csm_matches object.  If dataframe, needs the
+#'   treatment, outcome, and a "weights" column.
+#' @param Either name of weight column or a numeric vector of weights
+#'   can be provided.
 #'
-#' @export
-get_att_point_est <- function(matched_df, treatment = "Z", outcome = "Y") {
+#' @noRd
+get_att_point_est <- function(csm,
+                              treatment = "Z",
+                              outcome = "Y",
+                              weights = "weights") {
 
-  if ( is.csm_matches(matched_df) ) {
-    matched_df <- result_table( matched_df, "sc_units" )
+
+  if ( is.csm_matches(csm) ) {
+    csm <- result_table( csm, "sc_units", outcome=outcome )
   }
-  stopifnot( all( c(treatment, outcome) %in% names(matched_df) ) )
-  stopifnot( "weights" %in% names(matched_df) )
+  if ( is.numeric( weights ) ) {
+    csm$weights <- weights
+  } else if ( weights != "weights" ) {
+    stopifnot( weights %in% names(csm) )
+    csm$weights <- csm[[weights]]
+  }
 
-  matched_df$Z = matched_df[[treatment]]
-  matched_df$Y = matched_df[[outcome]]
+  stopifnot( all( c(treatment, outcome) %in% names(csm) ) )
+  stopifnot( "weights" %in% names(csm) )
 
-  matched_df %>%
+  csm$Z = csm[[treatment]]
+  csm$Y = csm[[outcome]]
+
+  csm %>%
     group_by(Z) %>%
     summarize(mn = sum(Y*weights) / sum(weights)) %>%
     summarize(est = last(mn) - first(mn)) %>%
@@ -61,13 +60,22 @@ calc_N_T_N_C <- function(preds_csm, treatment){
     filter(.data[[treatment]]==0) %>%
     group_by(id) %>%
     summarise(w_i = sum(weights), .groups="drop")
-  N_C_tilde <- N_T^2 / sum(tmp$w_i^2)
+
+  N_C_tilde <- ess( tmp$w_i )
+
   return(list(N_T = N_T,
               N_C_tilde = N_C_tilde ))
 }
 
 
-
+#' Effective Sample Size
+#'
+#' Calculate the effective sample size given a vector of unit weights
+#'
+#' @param weights A numeric vector of weights
+#' @return The effective sample size
+#' @export
+#'
 ess <- function( weights ) {
   sum( weights )^2  / sum( weights^2 )
 }
@@ -79,15 +87,15 @@ ess <- function( weights ) {
 #' @return A data frame with subclass variances
 calculate_subclass_variances <-
   function(matches_filtered, outcome = "Y") {
-  matches_filtered %>%
-    group_by(subclass) %>%
-    summarise(
-      nj = n(),
-      w_nj = ess(weights),
-      var_cluster = var(!!sym(outcome)),
-      .groups = "drop"
-    )
-}
+    matches_filtered %>%
+      group_by(subclass) %>%
+      summarise(
+        nj = n(),
+        w_nj = ess(weights),
+        var_cluster = var(!!sym(outcome)),
+        .groups = "drop"
+      )
+  }
 
 #' Calculate the weighted average variance
 #' NOTE: Could weight by nj, w_nj, or 1.  w_nj takes into account how
@@ -104,20 +112,20 @@ calculate_subclass_variances <-
 calculate_weighted_variance <-
   function(cluster_var_df,
            var_weight_type = "num_units") {
-  if (var_weight_type == "num_units"){ # number of units in the subclass
-    weight = cluster_var_df$nj
-  }else if (var_weight_type == "ess_units"){ # effective size of units in the subclass
-    weight = cluster_var_df$w_nj
-  }else if (var_weight_type == "uniform"){
-    weight = rep(1, nrow(cluster_var_df))
-  }else {
-    stop("var_weight_type must be one of num_units, ess_units,
+    if (var_weight_type == "num_units"){ # number of units in the subclass
+      weight = cluster_var_df$nj
+    }else if (var_weight_type == "ess_units"){ # effective size of units in the subclass
+      weight = cluster_var_df$w_nj
+    }else if (var_weight_type == "uniform"){
+      weight = rep(1, nrow(cluster_var_df))
+    }else {
+      stop("var_weight_type must be one of num_units, ess_units,
          uniform")
-  }
+    }
     var_cluster <- cluster_var_df$var_cluster
     weighted_var = weighted.mean(var_cluster, w = weight)
-  return( weighted_var )
-}
+    return( weighted_var )
+  }
 
 #' Calculate the standard error estimate
 #'
@@ -174,29 +182,29 @@ get_pooled_variance <- function(
 # #' @return A tibble with SE, sigma_hat, N_T, and N_C_tilde
 # #' @export
 # get_se_AE_table <- function(
-#     matches_table,
-  #   outcome = "Y",
-  #   treatment = "Z",
-  #   var_weight_type = "ess_units") {
-  #
-  # weighted_var <- get_pooled_variance(
-  #   matches_table = matches_table,
-  #   outcome = outcome,
-  #   treatment = treatment,
-  #   var_weight_type = var_weight_type)
-  #
-  # sigma_hat <- sqrt(weighted_var)
-  #
-  # # Step 4: Calculate N_T and effective size of controls (N_C_tilde)
-  # Ns <- calc_N_T_N_C(matches_table)
-  #
-  # # Step 5: Calculate the plug-in standard error
-  # SE <- get_plug_in_SE(
-  #   N_T = Ns$N_T,
-  #   ESS_C = Ns$N_C_tilde,
-  #   sigma_hat = sigma_hat
-  #   )
-  #
+    #     matches_table,
+#   outcome = "Y",
+#   treatment = "Z",
+#   var_weight_type = "ess_units") {
+#
+# weighted_var <- get_pooled_variance(
+#   matches_table = matches_table,
+#   outcome = outcome,
+#   treatment = treatment,
+#   var_weight_type = var_weight_type)
+#
+# sigma_hat <- sqrt(weighted_var)
+#
+# # Step 4: Calculate N_T and effective size of controls (N_C_tilde)
+# Ns <- calc_N_T_N_C(matches_table)
+#
+# # Step 5: Calculate the plug-in standard error
+# SE <- get_plug_in_SE(
+#   N_T = Ns$N_T,
+#   ESS_C = Ns$N_C_tilde,
+#   sigma_hat = sigma_hat
+#   )
+#
 
 
 
@@ -383,7 +391,7 @@ get_measurement_error_variance <- function(
 #'
 estimate_ATT <- function(
     matches,
-    outcome = "Y",
+    outcome = NULL,
     treatment = "Z",
     var_weight_type = "ess_units",
     variance_method = "pooled",
@@ -405,9 +413,28 @@ estimate_ATT <- function(
     }
   }
 
+
   if ( n_distinct( matches_df[[treatment]] ) != 2 ) {
     stop(glue::glue( "treatment variable `{treatment}` must be binary (0/1)") )
   }
+
+  if ( is.null(outcome) ) {
+    if ( variance_method != "pooled" ) {
+      stop( glue::glue( "outcome must be specified when using {variance_method} variance method") )
+    }
+
+    matches_df$Y = 0
+    v_e_result <- get_measurement_error_variance(
+      matches_table = matches_df,
+      outcome = "Y",
+      treatment = treatment,
+      var_weight_type = var_weight_type
+    )
+    tt <- tibble( N_T = v_e_result$N_T,
+                  ESS_C = v_e_result$ESS_C )
+    return( tt )
+  }
+
 
   # Get measurement error variance estimate (V_E) using specified method
   if (variance_method == "pooled") {

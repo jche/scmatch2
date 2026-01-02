@@ -9,7 +9,8 @@
 caliper_sensitivity_table(
   csm,
   data,
-  outcome = "Y",
+  outcome = NULL,
+  include_distances = TRUE,
   min_cal = 0.05,
   max_cal = 5,
   R = 30
@@ -18,7 +19,8 @@ caliper_sensitivity_table(
 caliper_sensitivity_plot(
   csm,
   data,
-  outcome = "Y",
+  outcome = NULL,
+  include_distances = TRUE,
   min_cal = 0.05,
   max_cal = 5,
   R = 30,
@@ -29,10 +31,11 @@ caliper_sensitivity_plot(
 caliper_sensitivity_plot_stats(
   csm,
   data,
-  outcome = "Y",
+  outcome = NULL,
   min_cal = 0.05,
   max_cal = 5,
   R = 30,
+  vars = c("ESS_C", "mean_dist", "SE_star"),
   focus = c("FATT", "ATT", "FATT_1nn", "ATT_1nn", "FATT_raw", "ATT_raw"),
   lines = c("FATT", "ATT", "FATT_1nn", "ATT_1nn", "FATT_raw", "ATT_raw")
 )
@@ -42,8 +45,8 @@ caliper_sensitivity_plot_stats(
 \code{\link[=caliper_sensitivity_plot]{caliper_sensitivity_plot()}} or
 \code{\link[=caliper_sensitivity_plot_stats]{caliper_sensitivity_plot_stats()}} (or anything with the
 sensitivity table as an attribute) OR a table with the relevant
-columns (focus, lines, caliper, ATT, SE, ESS_C). This allows
-calls to the plot methods without recalculating everything.}
+columns (focus, lines, caliper, ESS_C, etc.). This allows calls
+to the different plot methods without recalculating everything.}
 
 \item{data}{The data the csm_matches object was fit to. (One could
 put in alternate data here, if the covariates aligned.)}
@@ -60,10 +63,7 @@ for.}
 \item{lines}{Which estimates to show as lines on the plot.}
 }
 \value{
-Either a table of results, or a ggplot object of the
-specified sensitivity plot.  All generated plots have an
-attribute of "table" that holds the data used to make the plot,
-and these can be fed back into these methods to change the plot.
+A tibble of results.
 }
 \description{
 To generate the sensitivity table, method will run caliper from a

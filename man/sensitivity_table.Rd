@@ -6,10 +6,10 @@
 \usage{
 sensitivity_table(
   csm,
-  outcome = "Y",
+  outcome = NULL,
   feasible_only = FALSE,
   include_variances = FALSE,
-  include_distances = FALSE
+  include_distances = TRUE
 )
 }
 \arguments{

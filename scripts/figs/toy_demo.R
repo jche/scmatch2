@@ -4,6 +4,8 @@
 # Actually calculates various impact estimates based on various
 # matching processes.
 
+library( tidyverse )
+library( CSM )
 
 source( here::here( "scripts/datagen/gen_six_points.R") )
 
@@ -33,13 +35,13 @@ true_att
 #   what CSM is supposed to do
 good_wt <- c(1,1,0,0,1,1)
 (good_est_att <-
-    CSM:::get_est_att_from_wt(data=df_six_points,
-                        input_wt=good_wt))
+    CSM:::get_att_point_est(df_six_points,
+                        weights=good_wt))
 
 diff_wt <- c(1,1,rep(1/2,4))
 (diff_est <-
-    CSM:::get_est_att_from_wt(data=df_six_points,
-                        input_wt=diff_wt))
+    CSM:::get_att_point_est(df_six_points,
+                        weights=diff_wt))
 
 
 # estimated ATT if you match to all controls
@@ -50,8 +52,8 @@ diff_wt <- c(1,1,rep(1/2,4))
 # wt = 1/3 for 5th, 6th unit (good controls)
 # weighted sum of Y in 1st, 2nd - weighted sum of Y in 3rd-6th units
 bad_wt <- c(1,1,2/3,2/3,1/3,1/3)
-(bad_est_att <- CSM:::get_est_att_from_wt(data=df_six_points,
-                    input_wt=bad_wt))
+(bad_est_att <- CSM:::get_att_point_est(df_six_points,
+                    weights=bad_wt))
 
 ## SBW1
 covs <- c("X1", "X2")
@@ -63,8 +65,8 @@ m_bal_1 <- optweight(zform1,
                    estimand = "ATT")
 m_bal_1$weights[3:6] * 0.5
 (bal_1_est_att <-
-    CSM:::get_est_att_from_wt(data=df_six_points,
-                        input_wt=m_bal_1$weights))
+    CSM:::get_att_point_est(df_six_points,
+                        weights=m_bal_1$weights))
 zform2 <- as.formula("Z ~ X1*X2")
 m_bal_2 <- optweight(zform2,
                      data = df_six_points,
@@ -73,8 +75,8 @@ m_bal_2 <- optweight(zform2,
 m_bal_1$weights[3:6]
 m_bal_2$weights[3:6]
 (bal_2_est_att <-
-    CSM:::get_est_att_from_wt(data=df_six_points,
-                        input_wt=m_bal_2$weights))
+    CSM:::get_att_point_est(df_six_points,
+                        weights=m_bal_2$weights))
 
 
 # (bal_est_att = get_att_bal(df_six_points,
@@ -99,20 +101,18 @@ wtd_centers_df
 # Result (wtd_X1, wtd_X2) are close in trt and control group
 
 ### Step 2: make it work on CSM
-# source("R/matching.R")
-load_all()
+
 cal_matches <- get_cal_matches(df_six_points,
                 covs=c("X1","X2"),
                 treatment = "Z",
                 metric = c("maximum"), # semi-important
                 caliper = 1,  # impt: caliper
-                cal_method = "adaptive", # not important
+                rad_method = "adaptive", # not important
                 est_method = "scm", # impt: weighting method
-                return = "all",
-                dist_scaling = 1 # impt: scaling matrix
+                scaling = 1 # impt: scaling matrix
                 )
 
-CSM_est <- get_att_point_est(cal_matches)
+CSM_est <- get_att_point_est(cal_matches, outcome="Y")
 
 ### Step 2.5: Choose Mtd_Comp, and make it work
 covs <- c("X1", "X2")
@@ -123,6 +123,8 @@ zform2 <- as.formula(paste0("Z ~ (", paste0(covs, collapse="+"), ")^2"))
 #                    tols = rep(0.01, length(covs)),
 #                    estimand = "ATT")
 # m_bal$weights
+
+source( here::here( "scripts/wrappers.R" ) )
 
 bal2 = get_att_bal(df_six_points, zform2,
                    rep(0.1, length(covs) + choose(length(covs), 2)))

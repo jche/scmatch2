@@ -25,12 +25,13 @@
 #'
 #' @export
 sensitivity_table <- function( csm,
-                               outcome = "Y",
+                               outcome = NULL,
                                feasible_only = FALSE,
                                include_variances = FALSE,
-                               include_distances = FALSE ) {
+                               include_distances = TRUE ) {
 
   args = attr( csm, "settings" )
+
 
   if ( !feasible_only && args$rad_method != "adaptive" ) {
     stop( "Before calling sensitivity_table, refit csm object to adaptive radii so sensitivity_table can obtain full result table" )
@@ -100,7 +101,7 @@ sensitivity_table <- function( csm,
                      .id = "Estimate" )
   }
 
-  if ( !include_variances ) {
+  if ( !is.null(outcome) && !include_variances ) {
     rs <- rs %>%
       dplyr::select( -V, -V_E, -V_P )
   }
@@ -129,6 +130,22 @@ sensitivity_table <- function( csm,
 
   rs <- arrange( rs, Estimate )
 
+  if ( feasible_only ) {
+    target = "FATT_raw"
+  } else {
+    target = "ATT_raw"
+  }
+
+  rs <- rs %>%
+    mutate(
+      SE_star = sqrt( 1/N_T + 1/ESS_C )
+    ) %>%
+    mutate( SE_ratio = SE_star / SE_star[ Estimate == target ],
+            bias_ratio = mean_dist / mean_dist[ Estimate == target ] )
+
+  #    ratio = mean_dist / SE_star ) %>%
+  #  mutate( ratio = ratio / ratio[ Estimate == target ] )
+
   rs
 }
 
@@ -152,31 +169,29 @@ sensitivity_table <- function( csm,
 #'   [caliper_sensitivity_plot()] or
 #'   [caliper_sensitivity_plot_stats()] (or anything with the
 #'   sensitivity table as an attribute) OR a table with the relevant
-#'   columns (focus, lines, caliper, ATT, SE, ESS_C). This allows
-#'   calls to the plot methods without recalculating everything.
+#'   columns (focus, lines, caliper, ESS_C, etc.). This allows calls
+#'   to the different plot methods without recalculating everything.
 #' @param data The data the csm_matches object was fit to. (One could
 #'   put in alternate data here, if the covariates aligned.)
 #' @param min_cal Minimum caliper to try
 #' @param max_cal Maximum caliper to try
 #' @param R Number of calipers to try between min and max
 #'
-#' @return Either a table of results, or a ggplot object of the
-#'   specified sensitivity plot.  All generated plots have an
-#'   attribute of "table" that holds the data used to make the plot,
-#'   and these can be fed back into these methods to change the plot.
+#' @return A tibble of results.
 #'
 #' @export
 caliper_sensitivity_table <- function( csm,
                                        data,
-                                       outcome = "Y",
+                                       outcome = NULL,
+                                       include_distances = TRUE,
                                        min_cal = 0.05,
                                        max_cal = 5,
                                        R = 30 ) {
 
   # Short circuit if the object happens to be prior plot or something
-  # with table.
+  # with a table attribute.
   if ( is.data.frame( csm ) ) {
-    stopifnot( all( c( "caliper", "Estimate", "ATT", "SE", "ESS_C" ) %in% colnames(csm) ) )
+    #stopifnot( all( c( "caliper", "Estimate", "ATT", "SE", "ESS_C" ) %in% colnames(csm) ) )
     return( csm )
   }
   st = attr( csm, "table" )
@@ -208,6 +223,7 @@ caliper_sensitivity_table <- function( csm,
     set_names( cals ) %>%
     purrr::map_dfr( sensitivity_table,
                     outcome = outcome,
+                    include_distances = include_distances,
                     .id = "caliper" ) %>%
     dplyr::mutate( caliper = as.numeric( caliper ) ) %>%
     dplyr::relocate( caliper )
@@ -218,8 +234,9 @@ caliper_sensitivity_table <- function( csm,
 }
 
 
-pick_lines <- function( sens_table ) {
 
+
+pick_lines <- function( sens_table ) {
 
   sens_table <- sens_table %>%
     mutate( feasible = ifelse( Estimate %in% c("FATT","FATT_raw", "FATT_1nn"),
@@ -234,7 +251,7 @@ pick_lines <- function( sens_table ) {
 }
 
 
-sens_table_stats <- function() {
+sens_table_legend <- function() {
   list( scale_color_manual( values = c( "Feasible" = "blue",
                                         "All" = "orange" ) ),
         scale_linetype_manual( values = c( "Synth" = "solid",
@@ -262,45 +279,63 @@ sens_table_stats <- function() {
 #' @export
 caliper_sensitivity_plot <- function( csm,
                                       data,
-                                      outcome = "Y",
+                                      outcome = NULL,
+                                      include_distances = TRUE,
                                       min_cal = 0.05,
                                       max_cal = 5,
                                       R = 30,
-                                      focus = c( "FATT", "ATT", "FATT_1nn", "ATT_1nn",
-                                                 "FATT_raw", "ATT_raw" ),
+                                      focus = NULL,
                                       lines = c( "FATT", "ATT", "FATT_1nn", "ATT_1nn",
                                                  "FATT_raw", "ATT_raw" ) ) {
 
   sens_table <- caliper_sensitivity_table( csm,
                                            data,
                                            outcome = outcome,
+                                           include_distances = include_distances,
                                            min_cal = min_cal,
                                            max_cal = max_cal,
                                            R = R )
 
+  if ( !( "ATT" %in% colnames(sens_table) ) ) {
+    if ( is.csm_matches( csm ) ) {
+      stop( "ATT estimate not found in csm_matches object---rerun sensitivity table with specified outcome" )
+    } else {
+      stop( "ATT estimate not found in table---rerun sensitivity table with specified outcome" )
+    }
+  }
+
+  stopifnot( all( c( "caliper", "Estimate", "ATT", "SE", "ESS_C" ) %in% colnames(sens_table) ) )
+
 
   sens_table = pick_lines( sens_table )
-  focus = match.arg( focus )
+  #focus = match.arg( focus )
 
   lines = filter( sens_table, Estimate %in% lines )
-  atts = filter( sens_table, Estimate == focus )
 
-  plt <- ggplot( atts, aes( x=caliper,
-                            y=ATT ) ) +
-    geom_hline( yintercept = 0, color="black" ) +
-    geom_ribbon( aes( ymin=ATT-2*SE, ymax=ATT+2*SE ), alpha=0.2 ) +
-    geom_line( data=lines,
-               aes( col = feasible,
-                    linetype = weight,
-                    group = Estimate ) ) +
-    geom_line( data=atts,
-               aes( col = feasible,
-                    linetype = weight,
-                    group = Estimate ),
-               lwd=2 ) +
-    sens_table_stats()
+  plt <- ggplot( lines, aes( x=caliper,
+                             y=ATT ) ) +
+    geom_hline( yintercept = 0, color="black" )
+
+  if ( !is.null( focus ) ) {
+    atts = filter( sens_table, Estimate %in% focus )
+
+    plt <- plt +
+      geom_ribbon( data=atts, aes( ymin=ATT-2*SE, ymax=ATT+2*SE ), alpha=0.2 ) +
+      geom_line( data=atts,
+                 aes( col = feasible,
+                      linetype = weight,
+                      group = Estimate ),
+                 lwd=2 )
+  }
+
+  plt <- plt + geom_line( data=lines,
+                          aes( col = feasible,
+                               linetype = weight,
+                               group = Estimate ) ) +
+    sens_table_legend()
 
   attr( plt, "table" ) <- sens_table
+
   return( plt )
 
 }
@@ -316,12 +351,12 @@ caliper_sensitivity_plot <- function( csm,
 #' @export
 caliper_sensitivity_plot_stats <- function( csm,
                                             data,
-                                            outcome = "Y",
+                                            outcome = NULL,
                                             min_cal = 0.05,
                                             max_cal = 5,
                                             R = 30,
-                                            focus = c( "FATT", "ATT", "FATT_1nn", "ATT_1nn",
-                                                       "FATT_raw", "ATT_raw" ),
+                                            vars = c( "ESS_C", "mean_dist", "SE_star" ),
+                                            focus = NULL,
                                             lines = c( "FATT", "ATT", "FATT_1nn", "ATT_1nn",
                                                        "FATT_raw", "ATT_raw" ) ) {
 
@@ -334,20 +369,16 @@ caliper_sensitivity_plot_stats <- function( csm,
 
 
   sens_table = pick_lines( sens_table )
-  focus = match.arg( focus )
-
-
 
   tblL <- sens_table %>%
-    pivot_longer( cols = c(ATT, SE, ESS_C),
+    pivot_longer( cols = all_of( vars ),
                   names_to = "Metric",
                   values_to = "Value" )
 
-  tblL$Metric = factor( tblL$Metric, levels = c( "ATT", "SE", "ESS_C" ),
+  tblL$Metric = factor( tblL$Metric, levels = vars,
                         ordered = TRUE )
 
   lines = filter( tblL, Estimate %in% lines )
-  atts = filter( tblL, Estimate == focus )
 
   cc = sens_table$caliper[[1]]
 
@@ -356,10 +387,16 @@ caliper_sensitivity_plot_stats <- function( csm,
                              col = feasible, linetype=weight, group = Estimate ) ) +
     facet_wrap( ~ Metric, scales = "free_y", nrow=1 ) +
     geom_line() +
-    geom_line( data=atts, lwd=2 ) +
-    geom_blank(data = data.frame(Metric = "ESS_C", feasible = "All", Estimate = "FATT", weight="Synth", caliper = cc, Value = 0)) +
-    geom_blank(data = data.frame(Metric = "SE", feasible = "All", Estimate = "FATT", weight="Synth", caliper = cc, Value = 0)) +
-    sens_table_stats()
+    #geom_blank(data = data.frame(Metric = "ESS_C", feasible = "All", Estimate = "FATT", weight="Synth", caliper = cc, Value = 0)) +
+    #geom_blank(data = data.frame(Metric = "SE", feasible = "All", Estimate = "FATT", weight="Synth", caliper = cc, Value = 0)) +
+    geom_hline( yintercept = 0, color="black" ) +
+    sens_table_legend()
+
+  if ( !is.null( focus ) ) {
+    atts = filter( tblL, Estimate == focus )
+    plt <- plt +
+      geom_line( data=atts, lwd=2 )
+  }
 
   attr( plt, "table" ) <- sens_table
 

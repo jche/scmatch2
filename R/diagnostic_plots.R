@@ -4,7 +4,8 @@ library(latex2exp)
 # functions to generate diagnostic plots
 create_toy_df_plot <- function(toy_df) {
   toy_df_plot <- toy_df %>%
-    mutate(Z = factor(Z, levels = c(FALSE, TRUE), labels = c("Control", "Treatment"))) %>%
+    mutate(Z = factor(Z, levels = c(FALSE, TRUE),
+                      labels = c("Control", "Treatment"))) %>%
     ggplot(aes(x = X1, y = X2, col=as.factor(Z))) +
     geom_point() +
     # scale_color_continuous(low = "blue", high = "orange") +
@@ -179,7 +180,7 @@ get_distance_table <- function( scm,
 
   nn_dists <- scm %>%
     result_table() %>%
-    group_by(Z,subclass) %>%
+    group_by( .data[[treatment]], ,subclass) %>%
     filter(dist == min(dist)) %>%
     mutate(weights = 1/n()) %>%
     ungroup() %>%
@@ -208,8 +209,8 @@ get_distance_table <- function( scm,
   if ( long_table ) {
     dist_table <- dist_table %>%
       pivot_longer( c( `SCM`, `average`, `closest` ),
-                  names_to = "method", values_to="distance" ) %>%
-    mutate(method = factor( method, levels = c( "SCM", "Average", "closest" ) ) )
+                    names_to = "method", values_to="distance" ) %>%
+      mutate(method = factor( method, levels = c( "SCM", "average", "closest" ) ) )
   }
 
 
@@ -738,33 +739,33 @@ love_plot <- function( csm, covs = NULL, covs_names = NULL, B=NA ) {
     theme_classic() +
     make_tx_axis( love_steps$order )
 
-    if (!is.na(B)) {
-      # bootstrap dists of FSATT and SATT
-      boot_fsatt <- attr(csm, "scweights") %>%
-        bind_rows() %>%
-        filter(subclass %in% feasible_subclasses) %>%
-        agg_co_units() %>%
-        boot_bayesian_covs(covs=covs, B=B) %>%
-        pivot_longer(everything()) %>%
-        group_by(name) %>%
-        summarize(q025 = quantile(value, 0.025),
-                  q975 = quantile(value, 0.975)) %>%
-        mutate(order = n_feasible+1)
+  if (!is.na(B)) {
+    # bootstrap dists of FSATT and SATT
+    boot_fsatt <- attr(csm, "scweights") %>%
+      bind_rows() %>%
+      filter(subclass %in% feasible_subclasses) %>%
+      agg_co_units() %>%
+      boot_bayesian_covs(covs=covs, B=B) %>%
+      pivot_longer(everything()) %>%
+      group_by(name) %>%
+      summarize(q025 = quantile(value, 0.025),
+                q975 = quantile(value, 0.975)) %>%
+      mutate(order = n_feasible+1)
 
-      boot_satt <- attr(csm, "scweights") %>%
-        agg_co_units() %>%
-        boot_bayesian_covs(covs=covs, B=B) %>%
-        pivot_longer(everything()) %>%
-        group_by(name) %>%
-        summarize(q025 = quantile(value, 0.025),
-                  q975 = quantile(value, 0.975)) %>%
-        mutate(order = max(love_steps$order))
+    boot_satt <- attr(csm, "scweights") %>%
+      agg_co_units() %>%
+      boot_bayesian_covs(covs=covs, B=B) %>%
+      pivot_longer(everything()) %>%
+      group_by(name) %>%
+      summarize(q025 = quantile(value, 0.025),
+                q975 = quantile(value, 0.975)) %>%
+      mutate(order = max(love_steps$order))
 
-      p <- p +
-        geom_errorbar(data=bind_rows(boot_fsatt, boot_satt),
-                      aes(ymin=q025, ymax=q975),
-                      width = 1)
-    }
+    p <- p +
+      geom_errorbar(data=bind_rows(boot_fsatt, boot_satt),
+                    aes(ymin=q025, ymax=q975),
+                    width = 1)
+  }
 
   return(p)
 
@@ -804,5 +805,61 @@ love_plot2 <- function(res, covs, B=NA) {
          x = "Total number of treated units used",
          color = "Z") +
     theme_classic()
+}
+
+
+
+# Impact curve ----
+
+
+#' Impact curve plot
+#'
+#' Plot the relationship between maximum distance in matched set and
+#' the outcome difference within matched sets.
+#'
+#' @param scm A csm_matches object
+#' @param outcome The name of the outcome variable to plot.
+#'
+#' @return A ggplot object showing the impact curve. Also has an
+#'   attribute "table" with the underlying data used to create the
+#'   plot.
+#' @export
+impact_curve <- function( scm, outcome, min_dist = TRUE, jitter = FALSE ) {
+
+  if ( is.csm_matches( scm ) ) {
+    rsb = impact_table( scm=scm, outcome=outcome )
+  } else {
+    rsb = scm
+  }
+
+  ATT = mean( rsb$outcome )
+
+  if ( min_dist ) {
+    plt <- ggplot( rsb, aes( x = min_dist, y = outcome ) )
+    x_lab = "Minimum Distance in Matched Set"
+  } else {
+    plt <- ggplot( rsb, aes( x = max_dist, y = outcome ) )
+    x_lab = "Maximum Distance in Matched Set"
+  }
+
+  if ( jitter ) {
+    plt <- plt +
+      geom_jitter( aes( size = precision ), alpha = 0.25, width = 0.02, height = 0.02 )
+  } else {
+    plt <- plt +
+      geom_point( aes( size = precision ), alpha = 0.25 )
+  }
+
+  plt <- plt +
+    geom_smooth( method = "loess" ) +
+    scale_size( range = c( 1.5, 3 ) ) +
+    labs( x = x_lab,
+          y = "Impact" ) +
+    theme_minimal() +
+    geom_hline( yintercept = ATT )
+
+  attr( plt, "table" ) <- rsb
+
+  return( plt )
 }
 

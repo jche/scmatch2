@@ -206,12 +206,18 @@ test_that("get_measurement_error_variance calculates SE components correctly", {
   expect_true("N_T" %in% names(result))
   expect_true("ESS_C" %in% names(result)) # Formerly N_C_tilde
 
-  # Check numeric accuracy
-  # Note: sqrt(V_E) is equivalent to the old 'SE' output
-  expect_true( abs(sqrt(result$V_E) - 0.7652451) < 0.01 )
   expect_type(result$sigma_hat, "double")
   expect_true(result$sigma_hat > 0)  # sigma_hat should be positive
+
+  # Check numeric accuracy
+  # Note: sqrt(V_E) is equivalent to the old 'SE' output
+
+  # NOTE: The mock matching dataset has a subclass with no control units and three treated ones.  I am not sure what is going on there, or what changed to make this test now fail. -Luke
+  # TODO: Investigate why this test value changed.
+  expect_true( abs(sqrt(result$V_E) - 0.7652451) < 0.01 )
+
 })
+
 
 test_that("get_measurement_error_variance handles single subclass case", {
   mock_matches <- data.frame(

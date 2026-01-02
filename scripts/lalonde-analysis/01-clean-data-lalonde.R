@@ -6,7 +6,16 @@ library(here)
 
 # Load data based on the example script preference
 # Note: Adjust path if your project root differs, assuming standard structure
-load(file = here::here("data/inputs/lalonde_w_cps_cos.RData"))
+#load(file = here::here("data/inputs/lalonde_w_cps_cos.RData"))
+
+load(file = here::here("data/inputs/lalonde_w_cps.RData"))
+
+# Do control side adjustment
+lalonde_df <- lalonde_df %>%
+  filter( Z == 0 ) %>%
+  mutate( Z = as.numeric( dataset == "NSWD" ) )
+
+table( lalonde_df$dataset, lalonde_df$Z )
 
 # In the loaded RData, the dataframe is usually named 'lalonde_df'
 # We apply the renaming logic from example-lalonde.R

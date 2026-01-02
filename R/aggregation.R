@@ -146,7 +146,7 @@ agg_avg_units <- function(scweights,
   cc = c( covariates, outcome )
 
   rs <- scweights %>%
-    group_by(subclass, Z) %>%
+    group_by( subclass, .data[[treatment]] ) %>%
     summarize( across( all_of( cc ),
                      ~sum(.x * 1/n())),
                .groups = "drop_last" ) %>%

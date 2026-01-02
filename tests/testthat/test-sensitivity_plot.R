@@ -118,6 +118,9 @@ test_that("caliper sensitivity plot works", {
 
 
   plt <- caliper_sensitivity_plot( tbl, outcome="YY", test_df, R = R, min_cal = 0, max_cal = 3 )
+  if ( FALSE ) {
+    plt
+  }
   expect_true( is_ggplot(plt) )
 
   plt2 <- caliper_sensitivity_plot( res, outcome="YY", test_df, R = R, min_cal = 0, max_cal = 3 )
@@ -126,6 +129,10 @@ test_that("caliper sensitivity plot works", {
 
 
   plt3 <- caliper_sensitivity_plot_stats(plt2)
+  plt3
+
+  plt3 <- caliper_sensitivity_plot_stats(plt2,
+                                         vars = c("ATT", "SE", "ESS_C" ) )
   plt3
 
   atts <- attr( plt3, "table" )
@@ -139,6 +146,10 @@ test_that("caliper sensitivity plot works", {
   expect_true( is_ggplot(plt2) )
 
 
-
+  # can facet with multiple foci
+  plt2 <- caliper_sensitivity_plot( atts, outcome="YY", focus=c("ATT", "FATT"), test_df, R = R, min_cal = 0, max_cal = 3 ) +
+    facet_wrap( ~ feasible )
+  plt2
+  expect_true( is_ggplot(plt2) )
 
 })
