@@ -118,14 +118,10 @@ test_that("caliper sensitivity plot works", {
 
 
   plt <- caliper_sensitivity_plot( tbl, outcome="YY", test_df, R = R, min_cal = 0, max_cal = 3 )
-<<<<<<< HEAD
   if ( FALSE ) {
     plt
   }
-  expect_true( is_ggplot(plt) )
-=======
-  expect_true( expect_true(inherits(plt, "ggplot")) )
->>>>>>> 8e37b3db1fa4cfa990aeea83339e5e2b49ed247e
+  expect_true(inherits(plt, "ggplot"))
 
   plt2 <- caliper_sensitivity_plot( res, outcome="YY", test_df, R = R, min_cal = 0, max_cal = 3 )
   expect_equal( attr( plt, "table" ),

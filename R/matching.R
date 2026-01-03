@@ -6,14 +6,20 @@
 
 #' get the radius size for each treated unit
 #'
-#' @param dm Distance metric, rows are treated units, columns are control units
-#' @param rad_method Method for determining radius size
+#' @param dm Distance metric, rows are treated units, columns are
+#'   control units
+#' @param rad_method Method for determining radius size. Options are:
+#'   "adaptive" -- grow caliper to capture at least k units,
+#'   "targeted" -- shrink caliper to target k units, but also grow so
+#'   there is at least 1 unit, "fixed" -- use caliper as is, "1nn" or
+#'   "knn" -- set caliper to kth nearest neighbor, "knn-capped" --
+#'   distance to k-th nearest neighbor but capped at caliper.
 #' @param caliper Caliper size
 #' @param k For knn method, number of nearest neighbors
 #'
 #' @export
 get_radius_size <- function(dm,
-                            rad_method = c("adaptive", "fixed", "1nn", "knn", "knn-capped"),
+                            rad_method = c("adaptive", "targeted", "fixed", "1nn", "knn", "knn-capped"),
                             caliper,
                             k=1){
   ntx = nrow(dm)
@@ -26,6 +32,13 @@ get_radius_size <- function(dm,
       temp <- dm[i,]
       temp_sorted <- sort(temp)
       radius_sizes[i] <- max(caliper, temp_sorted[k])
+    }
+  } else if (rad_method == "targeted") {
+    # Targeted: r = min(caliper, knn), but at least min 1nn
+    for (i in 1:ntx) {
+      temp <- dm[i,]
+      temp_sorted <- sort(temp)
+      radius_sizes[i] <- max( min( caliper, temp_sorted[k] ), temp_sorted[1] )
     }
   } else if (rad_method == "knn-capped" ) {
     # knn with caliper max
