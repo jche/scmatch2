@@ -32,8 +32,8 @@ covs_names <- c( paste0("X", 1:3, " (200", 7:9, " score)"),
                  "X4 (pct Sao Paolo)")
 
 p_love <- love_plot(ferman_csm,
-                    covs = c("y2007", "y2008", "y2009", "is_sao_paolo"),
-                    covs_names = covs_names ) +
+                    covs = c("y2007", "y2008", "y2009"),
+                    covs_names = covs_names[1:3] ) +
   labs(title = "Covariate Balance (Ferman)")
 
 p_love
@@ -110,7 +110,13 @@ ggsave(here::here("figures/ferman_fsatt_tradeoff.pdf"), plot = p_tradeoff_all, w
 
 
 # Note: Bit computationally intensive
-plt <- caliper_sensitivity_plot( ferman_csm, ferman_for_analysis,
+sens_tbl <- caliper_sensitivity_table( ferman_csm, ferman_for_analysis,
+                                       outcome="Y",
+                                 R = 11,
+                                 min_cal = 0, max_cal = 1 )
+
+
+plt <- caliper_sensitivity_plot( sens_tbl,
                                  focus = "FATT",
                                  R = 11,
                                  min_cal = 0, max_cal = 1 )
