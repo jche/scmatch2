@@ -116,7 +116,9 @@ test_that("id and subclass ID make sense", {
   res$treatment_table
   # Expect subclass all starts with U in treatment table:
   expect_true( all( grepl( "^U", res$treatment_table$subclass ) ) )
+  expect_true( all( res$treatment_table$min_dist <= res$treatment_table$max_dist ) )
 
+  expect_true( all( res$treatment_table$min_dist == res$treatment_table$max_dist | res$nc > 1 ) )
 
   rs <- result_table( res, "agg" )
   rs

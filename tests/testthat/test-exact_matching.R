@@ -28,7 +28,10 @@ test_that("exact matching defaults work", {
                       10, 10, 1, 6,
 
                       10, 15, 0, 1,
-                      10, 15, 1, 6
+                      10, 15, 1, 6,
+
+                      20, 20, 1, 5,
+                      20, 20.5, 0, 2
 
   ) %>%
     group_by( Z ) %>%
@@ -49,6 +52,21 @@ test_that("exact matching defaults work", {
   rs
   expect_equal( nrow( rs ), 4 )
   expect_equal( rs$dist, c(0,0,0,0) )
+
+  expect_output( summary( res ) )
+
+  res <- get_cal_matches(data=test_df,
+                         Z ~ X1 + X2,
+                         rad_method = "fixed",
+                         scaling = 1,
+                         caliper = 1, warn=FALSE )
+  rs <- result_table(res)
+  rs
+  rs2 <- result_table( res, return = "exact" )
+  rs2
+
+  expect_equal( nrow( rs2 ), 4 )
+  expect_equal( as.numeric(rs2$dist), c(0,0,0,0) )
 
   expect_output( summary( res ) )
 
@@ -98,4 +116,8 @@ test_that("exact matching defaults work", {
 
   tb = result_table( res, "exact" )
   expect_equal( nrow(tb), 0 )
+
+
+
+
 })

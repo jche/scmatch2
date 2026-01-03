@@ -97,7 +97,7 @@ print.csm_matches <- function(x, ...) {
 
     mex <- mtch %>%
       filter( abs(dist) < 10*.Machine$double.eps )
-    n_exact = n_distinct( mex$id )
+    n_exact = n_distinct( mex$subclass )
   } else {
     nco = 0
     n_exact = 0
@@ -137,7 +137,7 @@ print.csm_matches <- function(x, ...) {
   }
   cal <- settings$cal
 
-  tco = dim( x )[[2]]
+  tco = dim( x$dm_uncapped )[[2]]
 
   if ( is.null( settings$est_method) ) {
     settings$est_method = "none"
@@ -183,7 +183,7 @@ summary.csm_matches <- function(x, outcome = NULL, ... ) {
   rsC = filter( rs, .data[[tx_var]] == 0 )
 
   nunique1 = length( unique( rsC$id ) )
-  nunique2 = length( unique( rsC$id[ rsC$weights > 0 ] ) )
+  nunique2 = length( unique( rsC$id[ rsC$weights > 0.000000001 ] ) )
   cat( glue::glue( "{nunique1} unique control units matched, {nunique2} with non-zero weight" ) )
   cat( "\n" )
 
@@ -200,28 +200,26 @@ summary.csm_matches <- function(x, outcome = NULL, ... ) {
 
   cat( "Subclass sizes (before weighting):\n" )
   tb = as.numeric( table( rsC$subclass ) )
-  max = max( tb )
+  tbtb = table( tb )
 
-  # Get first existing value at least as big as 7 from tb
-  bigs <- tb[tb >= 7]
+  if ( length( tbtb ) > 7 ) {
+    max = max( tb )
 
-  if ( length(bigs) > 0 ) {
-    first_val <- sort(bigs)[[1]]
+    # Get first existing value at least as big as 7 from tb
+    first_val = as.numeric( names( tbtb )[[5]] )
+
     tb[ tb >= first_val ] = first_val
 
     tbtb = table( tb )
-    if ( as.character(first_val) %in% names(tbtb) ) {
-      w = which( names(tbtb) == "7" )
-      names(tbtb)[w] = paste0( "7-", max )
-    }
-  } else {
-    tbtb = table( tb )
+    w = which( names(tbtb) == as.character(first_val) )
+    names(tbtb)[w] = paste0( first_val, "-", max )
+
   }
 
   print(tbtb)
 
   cat( "Subclass sizes (after weighting):" )
-  rs0 = filter( rsC, weights > 0 )
+  rs0 = filter( rsC, weights > 0.000000001 )
   tb = table( table( rs0$subclass ) )
   print( tb )
 
@@ -235,7 +233,7 @@ summary.csm_matches <- function(x, outcome = NULL, ... ) {
 
   cat( "Summary of aggregated control weights\n" )
   rs2 = result_table( x, return = "agg_co_units" ) %>%
-    filter( weights > 0 )
+    filter( weights > 0.000000001 )
   print( summary( rs2$weights ) )
 
   return( invisible( list(
@@ -252,11 +250,13 @@ summary.csm_matches <- function(x, outcome = NULL, ... ) {
 #' @export
 caliper_table <- function( csm ) {
   csm$treatment_table %>%
-    dplyr::select( id, subclass, feasible, max_dist, adacal )
+    dplyr::select( id, subclass, feasible, min_dist, max_dist, adacal )
 }
 
 
-#' Return table of treated units
+#' Return table of feasible treated units
+#'
+#' Return those treated units with controls within the set caliper.
 #'
 #' @return Dataframe of all the treated units (not controls) that were
 #'   matched within a caliper.
@@ -286,7 +286,7 @@ feasible_unit_subclass <- function( csm ) {
 }
 
 
-#' Obtain rows of treatment table for treated units that were not matched
+#' Obtain table of treated units that were not matched
 #'
 #' @return dataframe, one row per treated unit.
 #'
@@ -296,6 +296,40 @@ unmatched_units <- function( csm ) {
     filter( matched == 0 ) %>%
     dplyr::select( -matched, -feasible )
 }
+
+
+#' Obtain impact table
+#'
+#' This table summarizes the estimated impact for each treated unit,
+#' along with the effective sample size of the controls used.
+#'
+#' @param scm A csm_matches object from a matching call.
+#' @param outcome Name of the outcome variable.
+#' @return dataframe with one row per treated unit, with columns:
+#'   subclass, max_dist, outcome (estimated impact), precision
+#'   (nominal precision of the impact estimate, calculated as 1/(1 +
+#'   1/ess_C), nC (number of controls used).
+#' @export
+#'
+#'
+impact_table <- function( scm, outcome ) {
+
+  tx_var = attr( scm, "settings" )$treatment
+
+  rr = result_table( scm, include_caliper = TRUE, nonzero_weight_only = TRUE )
+
+  rr$Y = ifelse( rr[[tx_var]], 1, -1 ) * rr[[ outcome ]]
+
+  rsb <- rr %>%
+    group_by( subclass, min_dist, max_dist ) %>%
+    summarize( outcome = sum( Y * weights ),
+               precision = 1 / (1 + 1/ess(weights[.data[[tx_var]]==0])),
+               nC = n() - 1,
+               .groups = "drop" )
+
+  rsb
+}
+
 
 
 #' Obtain table of aggregated results
@@ -328,11 +362,28 @@ unmatched_units <- function( csm ) {
 result_table <- function( csm,
                           return = c( "all", "sc_units", "agg_co_units", "exact" ),
                           outcome = NULL,
+                          id = NULL,
                           feasible_only = FALSE,
                           nonzero_weight_only = FALSE,
                           include_caliper = FALSE ) {
 
   return = match.arg( return )
+
+  if ( !is.csm_matches( csm ) ) {
+    stop( "Input csm must be a csm_matches object." )
+  }
+
+  keep = rep( TRUE, length( csm$matches ) )
+
+  if ( feasible_only ) {
+    keep[ csm$treatment_table$feasible != 1 ] <- FALSE
+  }
+
+  if ( !is.null( id ) ) {
+    keep[ !csm$treatment_table$id %in% id ] <- FALSE
+  }
+
+  csm$matches <- csm$matches[ keep ]
 
   # Swap result type if asked
   rs <- switch(return,
@@ -340,7 +391,7 @@ result_table <- function( csm,
                agg_co_units = agg_co_units(csm,outcome=outcome),
                all          = bind_rows(csm$matches),
                exact        = bind_rows(csm$matches) %>%
-                 filter( abs(dist) < 10*.Machine$double.eps )
+                 filter( abs(dist) < 100*.Machine$double.eps )
   )
 
   # Deal with empty result table if nothing is matched.
@@ -355,6 +406,7 @@ result_table <- function( csm,
 
 
   if ( return == "exact" ) {
+    # recalculate subgroup sizes and drop empty ones
     rs <- rs %>%
       group_by( subclass ) %>%
       mutate( nc = n() - 1 ) %>%
@@ -363,19 +415,15 @@ result_table <- function( csm,
       dplyr::select( -nc )
   }
 
-  if ( feasible_only ) {
-    fs = feasible_unit_subclass(csm)
-    rs <- filter( rs, subclass %in% fs )
-  }
 
   if ( nonzero_weight_only ) {
-    rs <- filter( rs, weights > 0 )
+    rs <- filter( rs, weights > 0.000000001 )
   }
 
   if ( include_caliper ) {
     rs <- rs %>%
       left_join( caliper_table( csm ) %>%
-                   dplyr::select( -id, -max_dist ),
+                   dplyr::select( -id ),
                  by = "subclass" )
   }
 
@@ -462,39 +510,46 @@ params <- function( csm ) {
 }
 
 
-#' Return result table for listed treated units
+
+#' Get the table of treated units
 #'
 #' @param csm A csm_matches object
-#' @param id list of ids for treated units
-#' @param nonzero_weight_only TRUE means drop any control units with 0
-#'   weight (e.g., due to scm weighting).
-#' @return Dataframe of matches
+#' @param id Optional list of ids for treated units
+#' @param threshold Optional distance threshold for treated units;
+#'   return only units below this threshold unless "bad" is set to
+#'   TRUE.
+#' @param bad If TRUE, return only treated units above the threshold.
+#'   If bad is TRUE and threshold is NULL, return treated units above
+#'   the set caliper.
+#'
+#' @return Dataframe of treated units
+#'
 #' @export
-get_match_sets <- function( csm, id,
-                            nonzero_weight_only = TRUE ) {
-  id_list = id
-  rs <- result_table( csm )
-
-  if ( nonzero_weight_only ) {
-    rs <- rs %>%
-      filter( weights > 0 )
+treatment_table <- function( csm, id = NULL, threshold = NULL,
+                             bad = FALSE ) {
+  tt <- csm$treatment_table
+  if ( !is.null( id ) ) {
+    tt <- tt %>%
+      filter( id %in% id )
   }
-
-  tx_id = csm$treatment_table %>%
-    filter( id %in% id_list ) %>%
-    pull( subclass )
-
-  tx_var = attr( csm, "settings" )$treatment
-
-  bad_rs <- rs %>%
-    filter( subclass %in% tx_id  ) %>%
-    left_join( csm$treatment_table %>%
-                 select( subclass, adacal ),
-               by = "subclass"  ) %>%
-    arrange( -adacal, subclass, -.data[[tx_var]] )
-
-  bad_rs
+  if ( bad || !is.null( threshold ) ) {
+    if ( bad ) {
+      if ( is.null( threshold ) ) {
+        threshold = attr( csm, "settings" )$caliper
+      }
+      tt <- tt %>%
+        filter( adacal > threshold )
+    } else {
+      tt <- tt %>%
+        filter( adacal <= threshold )
+    }
+    }
+  tt
 }
+
+
+
+
 
 
 #' Return result table for the bad matches
@@ -508,12 +563,7 @@ get_match_sets <- function( csm, id,
 #' @export
 bad_matches <- function( csm, threshold,
                          nonzero_weight_only = TRUE ) {
-  rs <- result_table( csm )
-
-  if ( nonzero_weight_only ) {
-    rs <- rs %>%
-      filter( weights > 0 )
-  }
+  rs <- result_table( csm, nonzero_weight_only = nonzero_weight_only  )
 
   tx_id = csm$treatment_table %>%
     filter( adacal > threshold ) %>%

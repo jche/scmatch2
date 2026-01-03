@@ -4,7 +4,12 @@
 \alias{get_radius_size}
 \title{get the radius size for each treated unit}
 \usage{
-get_radius_size(dm, rad_method, caliper, k = 1)
+get_radius_size(
+  dm,
+  rad_method = c("adaptive", "fixed", "1nn", "knn", "knn-capped"),
+  caliper,
+  k = 1
+)
 }
 \arguments{
 \item{dm}{Distance metric, rows are treated units, columns are control units}

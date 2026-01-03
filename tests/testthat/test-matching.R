@@ -238,15 +238,47 @@ test_that("gen_match adaptive caliper", {
 
 test_that("get_radius_size should get the correct output",{
   caliper=1
-  dm = t(matrix(c(1.5, 2, # should have radius_size 1.5
-                  1.3, 0.9, # should have radius_size 1
-                  0.9,0.5), # should have radius_size 1
-                nrow=2) )
+  dm = matrix(c(1.5, 2, 1.6, 1.5,
+                  1.3, 1.9, 1.8, 0.7,
+                  0.9, 0.5, 0.3, 0.2),
+                byrow = TRUE, nrow=3)
+  dm
   res <- get_radius_size(dm=dm,
                          rad_method="adaptive",
                          caliper=caliper)
+  res
   expected_res <- c(1.5, 1, 1)
   expect_equal(res, expected_res)
+
+  res <- get_radius_size(dm=dm,
+                         rad_method="knn")
+  res
+  expect_equal( res, apply(dm,1,min) )
+
+  res2 <- get_radius_size(dm=dm,
+                          rad_method="1nn")
+  expect_equal( res2, res )
+
+
+  res2 <- get_radius_size(dm=dm,
+                          rad_method="knn-capped", caliper = 1)
+  res2
+  expect_equal( res2, pmin( apply(dm,1,min), 1 ) )
+
+
+  res <- get_radius_size(dm=dm,
+                         rad_method="knn", k = 2)
+  res
+  expect_equal( res, apply(dm,1,function(x) sort(x)[2] ) )
+
+  res <- get_radius_size(dm=dm,
+                         rad_method="targeted",
+                         caliper = 1, k = 2)
+  res
+  expect_equal( res, c( 1.5, 1.0, 0.3 ) )
+
+
+
 })
 
 

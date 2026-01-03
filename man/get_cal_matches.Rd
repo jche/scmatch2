@@ -11,7 +11,7 @@ get_cal_matches(
   treatment = NULL,
   metric = c("maximum", "euclidean", "manhattan"),
   caliper = 1,
-  rad_method = c("adaptive", "fixed", "1nn", "knn"),
+  rad_method = c("adaptive", "fixed", "1nn", "knn", "knn-capped"),
   est_method = c("scm", "scm_extrap", "average"),
   scaling = NULL,
   id_name = "id",

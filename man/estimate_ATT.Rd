@@ -6,7 +6,7 @@
 \usage{
 estimate_ATT(
   matches,
-  outcome = "Y",
+  outcome = NULL,
   treatment = "Z",
   var_weight_type = "ess_units",
   variance_method = "pooled",

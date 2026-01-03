@@ -110,7 +110,7 @@ test_that("basic object functionality", {
   )
   expect_output(
     summary( mtch ),
-    "0 treated units matched to 0 of 4 control units"
+    "0 treated units matched to 0 of 500 control units"
   )
 
   tt = CSM:::unmatched_units(mtch)

@@ -59,7 +59,9 @@ synth_lp <- function(X1, X0, V) {
 }
 
 
-# main function: generates SC weights
+# main function: generates SC weights for a single treated unit
+#
+# This function will get mapped across the matched sets.
 gen_sc_weights <- function(d,
                            match_cols,
                            scaling,
@@ -101,12 +103,11 @@ gen_sc_weights <- function(d,
     }
   }
 
-
-
   X1 = d_cov[1,] %>%
     as.numeric()
   X0 = d_cov[-1,] %>%
     as.matrix()
+
   if (metric == "maximum") {
     sol <- synth_lp(X1 = X1,
                     X0 =X0,
@@ -127,6 +128,10 @@ gen_sc_weights <- function(d,
   } else if (metric == "manhattan") {
     stop("Linear program for L1-distance minimization is not currently implemented.")
   }
+
+  # Drop tiny weights
+  sol[ sol < 1e-6 ] <- 0
+  sol <- sol / sum(sol)
 
   d %>%
     mutate(unit = c("tx1", paste0("c", 1:(n()-1))),

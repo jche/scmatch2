@@ -1,19 +1,26 @@
+
+
+
 #' Get Matched Matrix
 #'
-#' Converts a full matched table into a matrix where each row corresponds to a treated unit
-#' and each column contains the IDs of matched control units. Missing values (if any) are filled with `NA`.
-#' Fixed version that properly handles control reuse across subclasses.
+#' Converts a full matched table into a matrix where each row
+#' corresponds to a treated unit and each column contains the IDs of
+#' matched control units. Missing values (if any) are filled with
+#' `NA`. Fixed version that properly handles control reuse across
+#' subclasses.
 #'
-#' @param full_matched_table A data frame containing the matched data. Must include the columns:
+#' @param full_matched_table A data frame containing the matched data.
+#'   Must include the columns:
 #' \itemize{
 #'   \item{\code{id}: Unique identifiers for each unit.}
 #'   \item{\code{Z}: Indicator for treated (\code{1}) or control (\code{0}) units.}
 #'   \item{\code{subclass}: Subclass assignments for matching.}
 #' }
 #'
-#' @return A matrix where:
-#' \item{Rows}{Represent treated units (indexed by their IDs).}
-#' \item{Columns}{Contain IDs of matched control units for each treated unit. Missing matches are filled with \code{NA}.}
+#' @return A matrix where: \item{Rows}{Represent treated units
+#'   (indexed by their IDs).} \item{Columns}{Contain IDs of matched
+#'   control units for each treated unit. Missing matches are filled
+#'   with \code{NA}.}
 #'
 #' @export
 get_matched_matrix <- function(full_matched_table) {
@@ -57,18 +64,21 @@ get_matched_matrix <- function(full_matched_table) {
   return(matched_matrix)
 }
 
-#' ============================================================================
-#' METRIC 1: PAIRWISE SHARED CONTROLS (Original metric, renamed for clarity)
-#' ============================================================================
+# ============================================================================
+# METRIC 1: PAIRWISE SHARED CONTROLS (Original metric, renamed for clarity)
+# ============================================================================
 
 #' Compute Pairwise Shared Controls
 #'
-#' Computes the number of shared control neighbors between each pair of treated units
-#' based on a given matched matrix. This creates a pairwise comparison matrix.
+#' Computes the number of shared control neighbors between each pair
+#' of treated units based on a given matched matrix. This creates a
+#' pairwise comparison matrix.
 #'
-#' @param matched_matrix A matrix where rows are treated units and columns contain control IDs
+#' @param matched_matrix A matrix where rows are treated units and
+#'   columns contain control IDs
 #'
-#' @return A symmetric matrix where entry [i,j] is the count of shared controls between treated units i and j
+#' @return A symmetric matrix where entry i,j is the count of shared
+#'   controls between treated units i and j
 #'
 #' @export
 compute_pairwise_shared_controls <- function(matched_matrix) {
@@ -127,23 +137,24 @@ compute_pairwise_overlap_statistics <- function(pairwise_shared_matrix) {
   )
 }
 
-#' ============================================================================
-#' METRIC 2: MEAN CONTROL REUSE (Mean of K(j))
-#' ============================================================================
+# ============================================================================
+# METRIC 2: MEAN CONTROL REUSE (Mean of K(j))
+# ============================================================================
 
 #' Compute Mean Control Reuse
 #'
-#' Calculates the mean of K(j), where K(j) is the number of times each control
-#' is matched to a treated unit. This metric ranges from 1 (no reuse) to n_T
-#' (all controls used by all treated).
+#' Calculates the mean of K(j), where K(j) is the number of times each
+#' control is matched to a treated unit. This metric ranges from 1 (no
+#' reuse) to n_T (all controls used by all treated).
 #'
-#' @param matched_matrix A matrix where rows are treated units and columns contain control IDs
+#' @param matched_matrix A matrix where rows are treated units and
+#'   columns contain control IDs
 #'
-#' @return A list containing:
-#' \item{mean_reuse}{Mean number of times a control is matched}
-#' \item{median_reuse}{Median number of times a control is matched}
-#' \item{max_reuse}{Maximum number of times a control is matched}
-#' \item{control_reuse_counts}{Named vector of reuse counts for each control}
+#' @return A list containing: \item{mean_reuse}{Mean number of times a
+#'   control is matched} \item{median_reuse}{Median number of times a
+#'   control is matched} \item{max_reuse}{Maximum number of times a
+#'   control is matched} \item{control_reuse_counts}{Named vector of
+#'   reuse counts for each control}
 #'
 #' @export
 compute_mean_control_reuse <- function(matched_matrix) {
@@ -172,25 +183,27 @@ compute_mean_control_reuse <- function(matched_matrix) {
   )
 }
 
-#' ============================================================================
-#' METRIC 3: SHARED CONTROLS PER TREATED UNIT
-#' ============================================================================
+# ============================================================================
+# METRIC 3: SHARED CONTROLS PER TREATED UNIT
+# ============================================================================
 
 #' Compute Shared Controls Per Treated
 #'
-#' For each treated unit, calculates how many of its matched controls are
-#' shared with at least one other treated unit. This metric ranges from 0
-#' (no sharing) to k (all k matched controls are shared), where k is the
-#' number of matches per treated unit.
+#' For each treated unit, calculates how many of its matched controls
+#' are shared with at least one other treated unit. This metric ranges
+#' from 0 (no sharing) to k (all k matched controls are shared), where
+#' k is the number of matches per treated unit.
 #'
-#' @param matched_matrix A matrix where rows are treated units and columns contain control IDs
+#' @param matched_matrix A matrix where rows are treated units and
+#'   columns contain control IDs
 #'
-#' @return A list containing:
-#' \item{mean_shared}{Mean number of shared controls per treated unit}
-#' \item{median_shared}{Median number of shared controls per treated unit}
-#' \item{prop_shared}{Mean proportion of controls that are shared}
-#' \item{max_shared}{Maximum number of shared controls for any treated unit}
-#' \item{shared_per_treated}{Vector of shared control counts for each treated unit}
+#' @return A list containing: \item{mean_shared}{Mean number of shared
+#'   controls per treated unit} \item{median_shared}{Median number of
+#'   shared controls per treated unit} \item{prop_shared}{Mean
+#'   proportion of controls that are shared} \item{max_shared}{Maximum
+#'   number of shared controls for any treated unit}
+#'   \item{shared_per_treated}{Vector of shared control counts for
+#'   each treated unit}
 #'
 #' @export
 compute_shared_controls_per_treated <- function(matched_matrix) {
