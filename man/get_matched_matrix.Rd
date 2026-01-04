@@ -7,7 +7,8 @@
 get_matched_matrix(full_matched_table)
 }
 \arguments{
-\item{full_matched_table}{A data frame containing the matched data. Must include the columns:
+\item{full_matched_table}{A data frame containing the matched data.
+Must include the columns:
 \itemize{
 \item{\code{id}: Unique identifiers for each unit.}
 \item{\code{Z}: Indicator for treated (\code{1}) or control (\code{0}) units.}
@@ -15,12 +16,15 @@ get_matched_matrix(full_matched_table)
 }}
 }
 \value{
-A matrix where:
-\item{Rows}{Represent treated units (indexed by their IDs).}
-\item{Columns}{Contain IDs of matched control units for each treated unit. Missing matches are filled with \code{NA}.}
+A matrix where: \item{Rows}{Represent treated units
+(indexed by their IDs).} \item{Columns}{Contain IDs of matched
+control units for each treated unit. Missing matches are filled
+with \code{NA}.}
 }
 \description{
-Converts a full matched table into a matrix where each row corresponds to a treated unit
-and each column contains the IDs of matched control units. Missing values (if any) are filled with \code{NA}.
-Fixed version that properly handles control reuse across subclasses.
+Converts a full matched table into a matrix where each row
+corresponds to a treated unit and each column contains the IDs of
+matched control units. Missing values (if any) are filled with
+\code{NA}. Fixed version that properly handles control reuse across
+subclasses.
 }
