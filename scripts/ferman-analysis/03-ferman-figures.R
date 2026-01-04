@@ -67,6 +67,27 @@ ss <- sensitivity_table( ferman_csm, outcome="Y",
 ss
 
 
+s_fin <- ss %>% dplyr::select( Estimate, ATT, SE ) %>%
+  mutate( feasible = ifelse( grepl( "FATT", Estimate ), "Feasible", "All" ),
+          method = case_when(
+            grepl( "1nn", Estimate ) ~ "1-NN",
+            grepl( "raw", Estimate ) ~ "Average",
+            TRUE ~ "CSM"
+          ) ) %>%
+  dplyr::select( feasible, method, ATT, SE ) %>%
+  pivot_wider( names_from = c( feasible ),
+               values_from = c( ATT, SE ), names_vary = "slowest" )
+
+s_fin
+
+# Table of point estimates in the paper
+# TODO: Add in the 1-nn SEs --- need to use some other method to get them than our variance estimator?
+library( xtable )
+
+print( xtable( s_fin, digits=3 ), include.rownames = FALSE )
+
+
+
 plt <- ess_plot( ferman_csm )
 plt
 

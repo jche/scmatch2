@@ -20,8 +20,9 @@ lalonde_df <- lalonde_df %>%
 
 dim( lalonde_df )
 
-
 skimr::skim( lalonde_df )
+
+
 
 # EXPLORING WHICH VARIABLES ARE IMPORTANT ----
 
@@ -80,49 +81,9 @@ ggplot( lalonde_df, aes( x=logit_p, fill=as.factor(Z) ) ) +
   ggtitle( "Propensity Score Distribution by Treatment Group" )
 
 
-# Trying same thing with twang ----
-
-if ( FALSE ) {
-
-  # twang GBM propensity score model
-  ps_twang <- ps(
-    formula = Z ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8,
-    data = as.data.frame( lalonde_df ),
-    n.trees = 5000,
-    interaction.depth = 3,
-    shrinkage = 0.01,
-    perm.test.iters = 0,
-    stop.method = c("es.mean", "ks.max"),
-    estimand = "ATE",
-    verbose = FALSE
-  )
-
-  # pick stopping rule (use es.mean by default)
-  stop_rule <- "es.mean"
-
-  # get propensity scores
-  lalonde_df$pscore <- twang::get.weights(ps_twang, stop.method = stop_rule)
-
-  # covariate importance (relative influence from GBM)
-  var_imp <- summary(ps_twang, stop.method = stop_rule)$rel.inf %>%
-    as_tibble() %>%
-    rename(var = var, rel_inf = rel.inf) %>%
-    arrange(desc(rel_inf))
-
-  var_imp
-
-  # optional: plot balance + influence
-  plot(ps_twang, plots = 1, stop.method = stop_rule)  # balance
-  plot(ps_twang, plots = 3, stop.method = stop_rule)  # relative influence
-
-}
-
 
 
 # MATCHING SETTINGS
-
-METRIC <- "maximum" # "euclidean"
-CAL_METHOD <- "adaptive" # The paper uses adaptive caliper: c_t = max{1, d_t}
 
 
 # Scaling setup matches the paper's V matrix:
@@ -136,7 +97,7 @@ DIST_SCALING <- tibble(
   X6 = 1/2,    # Average years of education (Caliper of 2 years)
   X7 = 1/5000, # Average earnings, 1974 (Caliper of $5,000)
   X8 = 1/1400,  # Average earnings, 1975 (Caliper of $5,000)
-  COLL = 5/7,
+  COLL = 1/2,
   logit_p = 1 / 0.35
 )
 
@@ -146,8 +107,8 @@ lalonde_scm <- lalonde_df %>%
   get_cal_matches(
     form = Z ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + COLL + logit_p,
     caliper = 1,
-    metric = METRIC,
-    rad_method = CAL_METHOD,
+    metric = "maximum",
+    rad_method = "adaptive",
     scaling = DIST_SCALING,
     est_method = "scm"
   )
@@ -165,3 +126,9 @@ CALIPER = 0.552
 lalonde_scm <- update_matches( lalonde_scm, lalonde_df, caliper = CALIPER )
 lalonde_scm
 
+
+# Looking at nearest neighbor matching ----
+
+nn_scm <- update_matches( lalonde_scm, lalonde_df, rad_method="knn",
+                          est_method = "average", k=1 )
+summary( nn_scm )
