@@ -323,19 +323,60 @@ test_that("get_matched_co_from_dm should get the correct output",{
   res <- CSM:::get_matched_co_from_dm_trimmed(data=test_df,
                                               dm_trimmed=dm_trimmed,
                                               treatment=treatment)
-  res_values <- as.matrix(res[[1]])
-  expected_res <-
-    data.frame(
-      Z = c(1, 0, 0),
-      X = c(0, 0.5, 0.8),
-      dist = c(0, 0.5, 0.8),
-      subclass = c("tx1", "tx1", "tx1")
-    )
-  rownames(expected_res) <- c('1','2','3')
-  expect_equal(res_values, as.matrix(expected_res))
+  # Convert the actual result (list element) to a standard data frame
+  actual_df <- as.data.frame(res[[1]])
+
+  # Ensure row names are removed/reset on both for a clean comparison
+  rownames(actual_df) <- NULL
+  rownames(expected_res) <- NULL
+
+  expect_equal(actual_df, expected_res)
 })
 
+test_that("get_matched_co_from_dm_trimmed handles duplicate covariates (bootstrap ties) correctly", {
 
+  # 1. Setup: Create a dataset where control 2 and control 3 are identical in X
+  # but have unique IDs (simulating a bootstrap draw with re-id)
+  test_df <- tibble(
+    id = c("tx1", "co1", "co2"),
+    X  = c(0.5, 0.6, 0.6), # Tied covariate values
+    W  = c(1, 0, 0),       # Treatment indicator
+    Y  = c(10, 11, 12)     # Distinct outcomes
+  )
+
+  # 2. Setup: Distance matrix where Treated 1 matches both controls
+  # dm_trimmed rows = treated, columns = controls
+  dm_trimmed <- matrix(c(0.1, 0.1), nrow = 1)
+  # In your CSM logic, column names often refer to the original control indices
+  colnames(dm_trimmed) <- c("2", "3")
+
+  # 3. Execution
+  res <- get_matched_co_from_dm_trimmed(test_df, dm_trimmed, "W")
+
+  # 4. Assertions
+  # Check that the list returned is valid
+  expect_type(res, "list")
+  expect_length(res, 1)
+
+  match_table <- res[[1]]
+
+  # A. Check for NAs: The core issue you reported
+  expect_false(any(is.na(match_table$id)),
+               info = "IDs should not be NA. If NA, row name indexing is likely broken.")
+  expect_false(any(is.na(match_table$X)),
+               info = "Covariates should not be NA.")
+
+  # B. Check structure: 1 Treated + 2 Controls = 3 Rows
+  expect_equal(nrow(match_table), 3)
+
+  # C. Check Content: Ensure Control 'co2' (row 3 of match_table) has the correct Y
+  # If indexing is broken, row 3 might accidentally be a copy of row 2
+  expect_equal(match_table$id, c("tx1", "co1", "co2"))
+  expect_equal(match_table$Y, c(10, 11, 12))
+
+  # D. Check subclass assignment
+  expect_true(all(match_table$subclass == "tx1"))
+})
 
 
 test_that("est_weights works fine", {
@@ -374,6 +415,7 @@ test_that("est_weights works fine", {
   expect_equal( scweights, scweights2$matches )
 
 })
+
 
 
 

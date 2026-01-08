@@ -67,58 +67,48 @@ get_radius_size <- function(dm,
 
 # matching method ---------------------------------------------------------
 
-# generate dataframes of matched controls for each treated unit
-get_matched_co_from_dm_trimmed <- function(data, dm_trimmed, treatment) {
+
+get_matched_co_from_dm_trimmed <- function (data, dm_trimmed, treatment)
+{
   ntx <- nrow(dm_trimmed)
-  data_trt <- data %>%
-    filter(.data[[treatment]] == 1)
 
-  # Add ID on the fly if needed, but try and use the one in the dataset.
-  IDs <- paste0( "tx", 1:nrow(data_trt) )
-  if ( "id" %in% colnames(data_trt) ) {
-    IDs <- data_trt$id
-  }
+  # Separate data into Trt and Co pools.
+  # IMPORTANT: The order here MUST match the column order of the distance matrix.
+  data_trt <- data %>% dplyr::filter(.data[[treatment]] == 1)
+  data_co  <- data %>% dplyr::filter(.data[[treatment]] == 0)
 
-  # Unneeded I think
-  #for (x in 1:ntx){
-  #  matched_obs <- which(!is.na(dm_trimmed[x,]))
-  #}
+  # Extract IDs
+  IDs <- if ("id" %in% colnames(data_trt)) data_trt$id else paste0("tx", 1:nrow(data_trt))
 
-  purrr::map( 1:ntx, function(x) {
-    # Step 1: get which co units are matched to each tx unit
-    matched_obs <- which(!is.na(dm_trimmed[x,]))
+  purrr::map(1:ntx, function(x) {
+    # matched_obs contains the INTEGER indices of the columns in dm_trimmed
+    matched_obs <- which(!is.na(dm_trimmed[x, ]))
 
-    # if no matches, drop treated unit
     if (length(matched_obs) == 0) {
       return(NULL)
     }
 
-    # for each matched co unit, record distance from tx unit
-    distances <- dm_trimmed[x, matched_obs]
-    matched_rows <- data[names(matched_obs),] %>%
-      ungroup() %>%
-      mutate(dist = distances)
+    # Extract the distances for these indices
+    distances <- as.numeric(dm_trimmed[x, matched_obs])
 
-    ## Step 2: get the treat unit
+    # POSITIONAL FIX:
+    # Instead of data[names(matched_obs), ], we use slice on data_co.
+    # Because dm_trimmed columns correspond to the controls in order,
+    # matched_obs (the column indices) are the row positions in data_co.
+    matched_rows <- data_co %>%
+      dplyr::slice(matched_obs) %>%
+      dplyr::mutate(dist = distances)
+
+    # Get the treated unit for this subclass
     data_trt_x <- data_trt %>%
-      ungroup() %>%
-      slice(x)
+      dplyr::slice(x) %>%
+      dplyr::mutate(dist = 0)
 
-    data_tmp <- data_trt_x %>%
-      mutate(dist = 0) %>%
-      rbind(matched_rows)
-
-    #   if ( nrow( data_tmp ) > 100 ) {
-    #     browser()
-    #   }
-
-    data_tmp %>%
-      mutate(subclass = IDs[[x]] )
+    # Combine and add subclass label
+    rbind(data_trt_x, matched_rows) %>%
+      dplyr::mutate(subclass = as.character(IDs[[x]]))
   })
 }
-
-
-
 
 set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
   ntx <- nrow(dm_uncapped)
