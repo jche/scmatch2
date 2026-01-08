@@ -1,5 +1,31 @@
 
+test_that("CSM functions work without user loading purrr", {
 
+  # Create dummy data for a minimal run
+  N1 <- 10
+  N0 <- 40
+  df_test <- data.frame(
+    X = runif(N1 + N0),
+    W = c(rep(1, N1), rep(0, N0)),
+    Y = rnorm(N1 + N0)
+  )
+
+  # 3. Attempt the call.
+  # If map_lgl is not properly imported into CSM's namespace,
+  # this will throw the 'could not find function' error.
+  expect_error(
+    get_cal_matches(df_test,
+                    covs = "X",
+                    treatment = "W",
+                    metric = "euclidean",
+                    caliper = 1,
+                    scaling = 1,
+                    rad_method = "knn",
+                    est_method = "average",
+                    k = 5),
+    NA # This means 'expect NO error'
+  )
+})
 
 test_that("get_cal_matches works well", {
 

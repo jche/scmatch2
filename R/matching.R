@@ -84,7 +84,7 @@ get_matched_co_from_dm_trimmed <- function(data, dm_trimmed, treatment) {
   #  matched_obs <- which(!is.na(dm_trimmed[x,]))
   #}
 
-  map( 1:ntx, function(x) {
+  purrr::map( 1:ntx, function(x) {
     # Step 1: get which co units are matched to each tx unit
     matched_obs <- which(!is.na(dm_trimmed[x,]))
 
@@ -197,6 +197,7 @@ set_NA_to_unmatched_co <- function(dm_uncapped, radius_sizes){
 #'   of adaptive calipers for each treated unit.  dm_trimmed: distance
 #'   matrix with control units farther than caliper censored with NA
 #'   dm_uncapped: distance matrix without any control units censored.
+#' @importFrom purrr map_lgl map discard
 #' @export
 #'
 #' @examples
@@ -274,14 +275,14 @@ gen_matches <- function( data,
   #   each treated unit
   data_list <-
     get_matched_co_from_dm_trimmed(data, dm_trimmed, treatment)
-  nulls = map_lgl(data_list, is.null)
+  nulls = purrr::map_lgl(data_list, is.null)
   radius_sizes[nulls] = NA
 
   names( radius_sizes ) <- data %>%
     filter(.data[[treatment]] == 1) %>%
     pull(id)
 
-  res <- list(matches = data_list %>% discard(is.null),   # drop unmatched tx units
+  res <- list(matches = data_list %>% purrr::discard(is.null),   # drop unmatched tx units
               adacalipers = radius_sizes,
               dm_trimmed = dm_trimmed,
               dm_uncapped = dm_uncapped)
@@ -345,7 +346,7 @@ est_weights <- function( matched_gps,
     #          so I still don't mess with them here.
     match_cols <- covs
 
-    scweights <- map( matches,
+    scweights <- purrr::map( matches,
                       ~gen_sc_weights(.x, match_cols,
                                       scaling,
                                       metric),
@@ -354,7 +355,7 @@ est_weights <- function( matched_gps,
     #   a) what type of matched_gps is required
     #   b) whether match_cols can be ignored
   } else if (est_method == "average") {
-    scweights <- map( matches,
+    scweights <- purrr::map( matches,
                       function(x) {
                         x %>%
                           group_by( across( all_of( treatment ) ) ) %>%
