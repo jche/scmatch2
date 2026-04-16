@@ -325,8 +325,15 @@ test_that("get_matched_co_from_dm should get the correct output",{
                                               treatment=treatment)
   # Convert the actual result (list element) to a standard data frame
   actual_df <- as.data.frame(res[[1]])
-
+  actual_df
   # Ensure row names are removed/reset on both for a clean comparison
+
+  expected_res <- data.frame(
+    Z = c(1, 0, 0),
+    X = c(0, 0.5, 0.8),
+    dist = c( 0, 0.5, 0.8 ),
+    subclass = c("tx1", "tx1", "tx1") )
+  expected_res
   rownames(actual_df) <- NULL
   rownames(expected_res) <- NULL
 
