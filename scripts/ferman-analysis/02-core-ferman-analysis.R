@@ -11,6 +11,9 @@ ferman_for_analysis <-
 
 match_covs = c("y2007", "y2008", "y2009", "is_sao_paolo")
 
+ferman_for_analysis %>%
+  dplyr::select( all_of( c( match_covs, "Z", "Y" ) ) )
+
 # Summarize all the match covariates, calculating mean and sd for each
 covs_summary <- ferman_for_analysis %>%
   pivot_longer(all_of(match_covs), names_to = "covariate", values_to = "value") %>%
