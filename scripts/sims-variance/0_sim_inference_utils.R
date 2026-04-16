@@ -409,11 +409,11 @@ toy_match_infer <- function(
 sim_master <- function(iteration, N = 600, overlap_label, error_label = "homoskedastic", k_dim = 2, grid_id = 1, ...) {
   # Overlap knob: prop of uniform controls
   prop_nc_unif_values <- c(
-    very_low   = 2/3,
-    low        = 1/2,
+    very_high   = 2/3,
+    high        = 1/2,
     mid        = 1/3,
-    high       = 1/5,
-    very_high  = 1/10
+    low       = 1/5,
+    very_low  = 1/10
   )
   prop_nc_unif <- prop_nc_unif_values[[overlap_label]]
   if (is.null(prop_nc_unif)) stop("Unknown overlap_label: ", overlap_label)

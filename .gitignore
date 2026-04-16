@@ -52,6 +52,7 @@ vignettes/*.pdf
 
 # Ongoing work
 bootstrap_failure_matching.png
-scipts/AI08-failure-bootstrap.R
+scripts/AI08-failure-bootstrap.R
+scripts/sims-AI08
 
 luke_scratch/
