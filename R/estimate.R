@@ -564,7 +564,7 @@ get_total_variance <- function(
       ... # Pass M, covs, scaling, metric, etc.
     )
     # Unpack complex object
-    v_e_result <- v_e_result_list %>% select(-var_calc_df)
+    v_e_result <- v_e_result_list %>% dplyr::select(-var_calc_df)
 
 
     V_E <- v_e_result_list$V_E
@@ -591,7 +591,7 @@ get_total_variance <- function(
   # First, get the predicted counterfactual outcomes for each treated unit
   tx_units <- matches_df %>%
     filter(!!sym(treatment) == 1) %>%
-    select(id, subclass, !!sym(outcome)) %>%
+    dplyr::select(id, subclass, !!sym(outcome)) %>%
     rename(Y_t = !!sym(outcome))
 
   # Get the weighted control outcomes for each subclass (Y_hat(0))
@@ -906,7 +906,7 @@ estimate_ATT <- function(
   # First, get the predicted counterfactual outcomes for each treated unit
   tx_units <- matches_df %>%
     filter(!!sym(treatment) == 1) %>%
-    select(id, subclass, !!sym(outcome)) %>%
+    dplyr::select(id, subclass, !!sym(outcome)) %>%
     rename(Y_t = !!sym(outcome))
 
   # Get the weighted control outcomes for each subclass (Y_hat(0))

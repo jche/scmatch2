@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+
 # Demo: run a single iteration with fast methods and print a tiny summary
 # Usage examples (from project root):
 #   Rscript scripts/sims-bias_mse/demo_run_single_iter_fast.R

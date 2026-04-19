@@ -657,7 +657,7 @@ get_diff_scm_co_and_tx <- function(res, covs){
   stopifnot( is.csm_matches(res) )
 
   ada = res$treatment_table %>%
-    select(id, adacal) %>%
+    dplyr::select(id, adacal) %>%
     mutate( id = as.character(id) )
   df_diff_scm_co_and_tx <- result_table(res) %>%
     left_join(ada,

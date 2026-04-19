@@ -238,7 +238,7 @@ gen_df_adv_k <- function(nc, nt, k, # Added k
 
   # --- Crucial change for function calling ---
   # Select the X columns into a matrix to pass to functions
-  X_matrix <- dat %>% select(all_of(paste0("X", 1:k))) %>% as.matrix()
+  X_matrix <- dat %>% dplyr::select(all_of(paste0("X", 1:k))) %>% as.matrix()
   # ---
 
   f0_vals <- f0_fun(X_matrix)

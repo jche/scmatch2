@@ -125,7 +125,7 @@ sensitivity_table <- function( csm,
       right_join(tibble(method = base_methods,
                         Estimate = paste0( "F", dplt$Estimate ) ),
                  by = "method") %>%   # ensures 3 rows (NA if none)
-      select(Estimate, mean, median)
+      dplyr::select(Estimate, mean, median)
 
     all_dists = bind_rows( dplt, dplt_feas )
 
@@ -136,7 +136,7 @@ sensitivity_table <- function( csm,
 
     rs <- rs %>%
       left_join( all_dists, by = "Estimate" ) %>%
-      select( Estimate, everything() )
+      dplyr::select( Estimate, everything() )
 
   }
 
