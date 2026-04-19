@@ -573,7 +573,7 @@ bad_matches <- function( csm, threshold,
   bad_rs <- rs %>%
     filter( subclass %in% tx_id  ) %>%
     left_join( csm$treatment_table %>%
-                 select( subclass, adacal ),
+                 dplyr::select( subclass, adacal ),
                by = "subclass"  ) %>%
     arrange( -adacal, subclass, -.data[[tx_var]] )
 

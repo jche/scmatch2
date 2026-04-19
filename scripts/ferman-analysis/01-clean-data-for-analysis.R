@@ -14,7 +14,7 @@ hist(data_ferman$y2008 - data_ferman$OBJETIVA2008)
 
 ferman_for_analysis <-
   data_ferman %>%
-  select(starts_with("y20"),
+  dplyr::select(starts_with("y20"),
          Control,
          UF) %>%
   filter(if_all(starts_with("y20"), ~ !is.na(.x))) %>%
@@ -24,6 +24,11 @@ ferman_for_analysis <-
          is_sao_paolo = as.numeric(UF == 35))
 # UF == 35 means Sao Paolo
 # UF == 33 means Rio
+
+ferman_for_analysis$id <- paste0(
+  "sch",
+  sprintf("%0*d", nchar(nrow(ferman_for_analysis)), 1:nrow(ferman_for_analysis))
+)
 
 saveRDS(ferman_for_analysis,
         file = here::here( "scripts/ferman-analysis/data/ferman_for_analysis.rds" ))

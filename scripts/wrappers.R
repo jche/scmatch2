@@ -351,8 +351,24 @@ get_cem_matches <- function(
                                   paste0(grep("^X", names(data), value=T),
                                          collapse="+"))),
     num_bins,
+    cutpoints = NULL,
     est_method = c("average", "scm"),
     return = c("sc_units", "agg_co_units", "all"), warn = TRUE ) {
+
+  if ( is.character(Z_FORMULA)) {
+    Z_FORMULA <- as.formula(paste0( "Z~",
+                                    paste0(covs,collapse="+")) )
+  }
+
+  if ( is.null( cutpoints ) ) {
+    cutpoints = num_bins
+  }
+
+  if ( !( "id" %in% names(data) ) ) {
+    data <- data %>%
+      mutate(id = as.character(1:n()))
+  }
+
 
   est_method <- match.arg(est_method)
   return <- match.arg(return)
@@ -364,7 +380,7 @@ get_cem_matches <- function(
     method = "cem",
     estimand = "ATT",
     grouping = NULL,   # exact match factor covariates
-    cutpoints = num_bins,
+    cutpoints = cutpoints,
     k2k = F)   # not 1:1 matching
   m.data3 <- MatchIt::match.data(m.out3)
   # print(glue("Number of tx units kept: {sum(m.data3$Z)}"))
@@ -393,12 +409,16 @@ get_cem_matches <- function(
           select(-subclass_new, -weights))
 
   # calculate scaling
-  scaling = data %>%
-    summarize(across(all_of(covs),
-                     function(x) {
-                       if (is.numeric(x)) num_bins / (max(x) - min(x))
-                       else 1000
-                     }))
+  if ( is.list( cutpoints ) ) {
+    scaling = map_dbl(cutpoints, ~ mean(diff(.x)))
+  } else {
+    scaling = data %>%
+      summarize(across(all_of(covs),
+                       function(x) {
+                         if (is.numeric(x)) num_bins / (max(x) - min(x))
+                         else 1000
+                       }))
+  }
 
   # estimate outcomes within cells
   scweights <- est_weights(matched_gps = cem_matched_gps,
