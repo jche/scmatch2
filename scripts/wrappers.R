@@ -118,13 +118,13 @@ get_att_or_bart <- function(d,
 
   m_bart <- bart(x.train = d %>%
                    filter(Z==0) %>%
-                   select( all_of(covs) ),
+                   dplyr::select( all_of(covs) ),
                  y.train = d %>%
                    filter(Z==0) %>%
                    pull(Y),
                  x.test = d %>%
                    filter(Z==1) %>%
-                   select(all_of(covs)),
+                   dplyr::select(all_of(covs)),
                  verbose=F)
 
   # output ATT estimate
@@ -154,10 +154,10 @@ get_att_ps_bart <- function(d,
   require( dbarts )
 
   m_bart <- bart(x.train = d %>%
-                   select(all_of(covs)),
+                   dplyr::select(all_of(covs)),
                  y.train = d$Z %>% as.numeric(),
                  x.test = d %>%
-                   select(all_of(covs)),
+                   dplyr::select(all_of(covs)),
                  verbose=F)
 
   # output ATT estimate
@@ -180,7 +180,7 @@ get_att_tmle <- function(d,
   tmle <- tmle(Y = d$Y,
                A = as.numeric(d$Z),
                W = d %>%
-                 select(all_of(covs)),
+                 dplyr::select(all_of(covs)),
                Q.SL.library = Q.SL.library,
                g.SL.library = g.SL.library,
                V.Q = 5, V.g = 5, V.Delta = 5, V.Z = 5)
@@ -198,7 +198,7 @@ get_att_aipw <- function(d,
     new(Y = d$Y,
         A = d$Z,
         W = d %>%
-          select(all_of(covs)),
+          dplyr::select(all_of(covs)),
         Q.SL.library = Q.SL.library,
         g.SL.library = g.SL.library,
         k_split = 5,
@@ -220,6 +220,7 @@ get_att_csm <- function(d,
                         est_method = "scm") {
   preds_csm <- get_cal_matches(
     data = d,
+    treatment = "Z",
     metric = metric,
     scaling = scaling,
     rad_method = rad_method,
@@ -406,7 +407,7 @@ get_cem_matches <- function(
     }) %>%
     map(~.x %>%
           mutate(subclass = subclass_new) %>%
-          select(-subclass_new, -weights))
+          dplyr::select(-subclass_new, -weights))
 
   # calculate scaling
   if ( is.list( cutpoints ) ) {
@@ -475,6 +476,7 @@ get_att_cem <- function(d,
     preds_infeasible <- d %>%
       filter(!Z | !(id %in% attr(preds_feasible, "feasible_units"))) %>%
       get_cal_matches(.,
+                      treatment = "Z",
                       metric = "maximum",
                       rad_method = "1nn",
                       est_method = est_method,
@@ -499,6 +501,7 @@ get_att_1nn <- function(d, scaling) {
 
   preds_1nn <- get_cal_matches(
     data = d,
+    treatment = "Z",
     metric = "maximum",
     rad_method = "1nn",
     est_method = "average",
@@ -506,102 +509,6 @@ get_att_1nn <- function(d, scaling) {
 
   # get ATT estimate:
   get_att_diff( preds_1nn )
-}
-
-
-
-
-
-run_all_methods <- function( data, skip_slow = TRUE, num_bins = 5, extrapolate = TRUE ) {
-
-  bal <- CSM:::get_att_bal(data,
-                           form=as.formula('Z ~ X1+X2'),
-                           tols=c(0.01, 0.01))
-
-  bal_int <- CSM:::get_att_bal(data,
-                               form=as.formula('Z ~ X1*X2'),
-                               tols=c(0.01, 0.01, 0.1))
-
-  or_lm <- CSM:::get_att_or_lm(data, form=as.formula('Y ~ X1*X2'))
-
-  or_bart <- CSM:::get_att_or_bart(data, covs=c("X1", "X2"))
-
-  lm_ps <- CSM:::get_att_ps_lm(data, form=as.formula('Z ~ X1*X2'))
-
-  ps_bart <- CSM:::get_att_ps_bart(data, covs=c("X1", "X2"))
-
-  one_nn <- get_att_1nn( data, scaling = 1/num_bins )
-
-  if ( skip_slow ) {
-    tmle = NA
-    aipw = NA
-  } else {
-    # TODO: What are these libraries?  They don't seem to be defined.
-    SL.library1 = c("SL.glm", "tmle.SL.dbarts2", "SL.glmnet")
-
-    tmle <- CSM:::get_att_tmle(data %>%
-                                 mutate(X3 = X1*X2),
-                               covs=c("X1","X2","X3"),
-                               Q.SL.library = SL.library1,
-                               g.SL.library = SL.library1)
-
-    aipw <- CSM:::get_att_aipw(data %>%
-                                 mutate(X3 = X1*X2),
-                               covs=c("X1","X2","X3"),
-                               Q.SL.library = SL.library1,
-                               g.SL.library = SL.library1)
-  }
-
-  csm <- CSM:::get_att_csm(data, scaling = 1/num_bins, est_method="scm")
-
-  cem <- CSM:::get_att_cem(data, num_bins=num_bins, est_method="scm",
-                           extrapolate = extrapolate )
-
-  tibble(method = c("bal", "bal_int", "or_lm", "or_bart",
-                    "lm_ps", "ps_bart", "tmle", "aipw",
-                    "csm", "cem", "1nn"),
-         att = c(bal, bal_int, or_lm, or_bart,
-                 lm_ps, ps_bart, tmle, aipw,
-                 csm, cem, one_nn) )
-}
-
-
-if (FALSE) {
-  require(tidyverse)
-  require( CSM )
-
-  # data <- CSM:::gen_df_adv2d(nc=1000, nt=50,
-  #                    tx_effect=0.2,
-  #                    sd=0.03,
-  #                    effect_fun = function(x,y) {
-  #                      matrix(c(x,y), ncol=2) %>%
-  #                        mvtnorm::dmvnorm(mean = c(0.5,0.5),
-  #                                         sigma = matrix(c(1,0.8,0.8,1), nrow=2))
-  #                    })
-
-  # data <- CSM:::gen_df_full(nc=1000, nt=50, eps_sd=0,
-  #                   tx_effect = function(x,y) {(0.5*(x+y))},
-  #                   effect_fun = function(x,y) {x+y})
-
-  data <- CSM:::gen_one_toy()
-
-  data %>%
-    ggplot(aes(X1,X2)) +
-    geom_point(aes(pch=as.factor(Z), color=Y)) +
-    scale_color_continuous(low="orange", high="blue") +
-    theme_classic() +
-    labs(pch = "Treated",
-         color = latex2exp::TeX("$f_0(X)$"),
-         x = latex2exp::TeX("$X_1$"),
-         y = latex2exp::TeX("$X_2$")) +
-    facet_wrap(~Z)
-  data %>%
-    filter(Z) %>%
-    summarize(eff = mean(Y1-Y0))
-
-
-  run_all_methods( data )
-
 }
 
 
