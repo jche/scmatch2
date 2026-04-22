@@ -1,7 +1,13 @@
 # scripts/toy_large_or_lm.R
 #
-# Generate a single large toy dataset (same DGP as sims-bias_mse/toy) and
-# estimate the ATT using the full suite of methods.
+# Generate a single large toy dataset (same DGP as sims-bias_mse/toy)
+# and estimate the ATT using the full suite of methods.
+#
+# PURPOSE: Try to understand why the or_lm method had such good
+# properties in the sim results sent to PA.
+#
+# CURRENT THEORY: It had the interaction of X1 and X2 in the outcome
+# model.
 #
 # The DGP:
 #   - X1, X2 ~ Uniform(0,1), controls clustered near center; treated near edges

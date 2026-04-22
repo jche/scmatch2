@@ -5,13 +5,17 @@
 library(mvtnorm)
 
 # toy example -------------------------------------------------------------
+
+
 #' Generate covariates X1, X2 for the toy example
 #'
 #' @param n Number of samples
-#' @param X1_ctrs A vector of two elements, representing the two different
-#'  X1 locations
-#' @param X2_ctrs Same as X1_ctrs, but
-#' @param SD Std. deviation of the
+#' @param X1_ctrs A vector of two elements, representing the two
+#'   different X1 locations
+#' @param X2_ctrs Same as X1_ctrs, but for X2 locations.
+#' @param SD Std. deviation of the blobs around the centers. Lower
+#'   means tighter blobs and better separation between the two
+#'   clusters. Higher means more overlap.
 #'
 #' @return A tibble object with two columns X1, X2
 #' @export
@@ -21,37 +25,42 @@ library(mvtnorm)
 #' X2_ctrs <- c(0.25, 0.75)
 #' SD <- 0.1
 #' res <- gen_toy_covar(n, X1_ctrs, X2_ctrs, SD)
-gen_toy_covar <- function(n, X1_ctrs, X2_ctrs, SD){
+gen_toy_covar <- function(n, X1_ctrs, X2_ctrs, SD) {
+  nX1 = rbinom( 1, size = n, prob = 0.5 )
+
   tibble::tibble(
-    X1 = c(rnorm(n/2, mean=X1_ctrs[1], sd=SD),
-           rnorm(n/2, mean=X1_ctrs[2], sd=SD)),
-    X2 = c(rnorm(n/2, mean=X2_ctrs[1], sd=SD),
-           rnorm(n/2, mean=X2_ctrs[2], sd=SD))
+    X1 = c(rnorm(nX1, mean=X1_ctrs[1], sd=SD),
+           rnorm(n-nX1, mean=X1_ctrs[2], sd=SD)),
+    X2 = c(rnorm(nX1, mean=X2_ctrs[1], sd=SD),
+           rnorm(n-nX1, mean=X2_ctrs[2], sd=SD))
   )
 }
 
-# generate data mostly in grid (0,1) x (0,1)
 #' Generate toy data
+#'
+#' generate data mostly in grid (0,1) x (0,1)
 #'
 #' @param nc (something)
 #' @param nt (something)
-#' @param f0_sd (something)
+#' @param f0_sd degree of residual noise (default homoskedastic)
+#' @param f0_sd_fun Function to generate noise standard deviation.
+#'   Default is NULL. If not null, override f0_sd.
 #' @param f0_fun (something)
 #' @param tx_effect_fun (something)
-#' @param ctr_dist (something)
-#' @param prop_nc_unif (something)
+#' @param ctr_dist from 0 to 1; lower means better overlap
+#' @param prop_nc_unif proportion of uniform controls. lower means
+#'   worse overlap
 #'
 #' @return A tibble containing a toy dataset
 #' @export
 #'
 gen_df_adv <- function(nc, nt,
-                       f0_sd = 0.1,   # homoskedastic noise
+                       f0_sd = 0.1,
                        f0_fun = function(X1, X2) {1},
                        tx_effect_fun = function(X1, X2) {1},
-                       ctr_dist = 0.5, # from 0 to 1;
-                       #            lower means better overlap
-                       prop_nc_unif = 1/3 # proportion of uniform controls
-                       #            lower means worse overlap
+                       f0_sd_fun = NULL,
+                       ctr_dist = 0.5,
+                       prop_nc_unif = 1/3
 ) {
   require( tidyverse )
 
@@ -64,7 +73,7 @@ gen_df_adv <- function(nc, nt,
   #     which translates to X1_ctrs=(0.25,0.75) and X2_ctrs=(0.25,0.75)
   dat_txblobs <-
     gen_toy_covar(nt, X1_ctrs=c(c1,c2), X2_ctrs=c(c1,c2), SD)
-  dat_txblobs$Z <- T
+  dat_txblobs$Z <- 1
 
   nc_unif <- ceiling(nc * prop_nc_unif)
   # (nc-nc_unif) co units clustered at (0.75,0.25) and (0.25,0.75)
@@ -75,22 +84,32 @@ gen_df_adv <- function(nc, nt,
       X1_ctrs=c(c2,c1),
       X2_ctrs=c(c1,c2),
       SD)
-  dat_coblobs$Z <- F
+  dat_coblobs$Z <- 0
 
   # nc_unif co units uniformly scattered on (0,1) box to give some
   #   randomly good controls
   dat_conear <- tibble(
     X1 = runif(nc_unif),
     X2 = runif(nc_unif),
-    Z  = F
+    Z  = 0
   )
 
   dat <- bind_rows(dat_txblobs,
                    dat_coblobs,
                    dat_conear)
 
+  # Make residual variation function if none supplied
+  if ( is.null( f0_sd_fun ) ) {
+    f0_sd_fun <- function(X1, X2) { f0_sd }
+  } else {
+    stopifnot( length( formals( f0_sd_fun ) ) == 2 )
+  }
+
   res <- dat %>%
-    mutate(noise = rnorm(n(), mean=0, sd=f0_sd)) %>%
+    mutate(noise = rnorm(n(),
+                         mean=0,
+                         sd=f0_sd_fun(X1,X2)
+                           )) %>%
     mutate(Y0 = f0_fun(X1,X2) + noise) %>%
     mutate(Y1 = Y0 + tx_effect_fun(X1,X2),
            Y  = ifelse(Z, Y1, Y0)) %>%
@@ -323,35 +342,6 @@ gen_one_toy <- function( k = 2, # Added dimensionality parameter k, default 2
 }
 
 
-#'
-#' #' Generate a toy dataset with a single treatment effect
-#' #'
-#' #' @param ctr_dist Distance between the two control clusters
-#' #'
-#' #' @return A tibble with the toy dataset
-#' #' @export
-#' #'
-#' gen_one_toy <- function( nc = 500, nt = 100,
-#'                          ctr_dist = 0.5,
-#'                          prop_nc_unif = 1/3,
-#'                          f0_sd = 0.5 ){
-#'   if ( nc < 5 ) {
-#'     warning( "Very small control group in gen_one_toy!" )
-#'   }
-#'   gen_df_adv(
-#'     nc=nc,
-#'     nt=nt,
-#'     f0_sd = f0_sd,
-#'     tx_effect_fun = function(X1, X2) {3*X1+3*X2},
-#'     f0_fun = function(x,y) {
-#'       matrix(c(x,y), ncol=2) %>%
-#'         mvtnorm::dmvnorm( mean = c(0.5,0.5),
-#'                           sigma = matrix(c(1,0.8,0.8,1), nrow=2)) * 20   # multiply for more slope!
-#'     },
-#'     ctr_dist = ctr_dist,
-#'     prop_nc_unif = prop_nc_unif
-#'   )
-#' }
 
 
 
@@ -443,6 +433,19 @@ gen_df_hain <- function(nt = 50,
   return(df_final)
 }
 
+
+
+#' Generate data from the ACIC 2016 competition
+#'
+#' This function generates a dataset using the data generating process
+#' from the ACIC 2016 competition. It samples covariates from the
+#' input_2016 dataset and then applies the dgp_2016 function to
+#' generate potential outcomes and treatment assignments.
+#'
+#' @results A tibble containing the generated dataset with covariates,
+#'   treatment assignment, potential outcomes, and observed outcome.
+#'
+#' @export
 gen_df_acic <- function(model.trt="step",
                         root.trt=0.35,
                         overlap.trt="full",
