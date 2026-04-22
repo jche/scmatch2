@@ -13,18 +13,17 @@ The paper introduces CSM, a matching method that combines adaptive calipers with
 
 ```
 scripts/
+├── lib/                       # Shared function libraries (sourced by other scripts)
 ├── figs/                      # Figure generation (paper figures)
 ├── sims-bias_mse/             # Bias/MSE simulations (Section 5)
 ├── sims-variance/             # Variance/inference simulations (Section 5 / Online Supplement)
 ├── sims-variance-knn5avg/     # Variant: knn5avg aggregation (robustness check)
 ├── ferman-analysis/           # Empirical application: Brazilian education data (Section 6)
 ├── lalonde-analysis/          # Empirical application: LaLonde data (Online Supplement)
-├── analysis/                  # Shared helper scripts for plotting and analysis
 ├── datagen/                   # Data generation utilities
 ├── demo/                      # Package demos and usage examples
 ├── boot/                      # Bootstrap inference experiments (exploratory)
-├── draft-inference-scripts/   # Earlier draft inference scripts (superseded)
-└── new-inference/             # Placeholder for new inference work
+└── draft-inference-scripts/   # Earlier draft inference scripts (superseded)
 ```
 
 ---
@@ -46,7 +45,7 @@ Scripts that produce the figures appearing in the paper and supplement. Run thes
 | `fig_clt-verification.R` | CLT verification for variance estimator | Online Supplement |
 | `toy_demo.R` | Additional toy demo figure | Online Supplement |
 
-Most figure scripts read pre-computed outputs from `data/outputs/` and write PNGs to `figures/`.
+Most figure scripts read pre-computed outputs from `data/outputs/` and write PNGs to `figures/`. `generate_toy_background_df.R` is a small helper that pre-computes the background density grid for the toy figures; its output is cached as `data/inputs/toy_background_df.rds` and regenerated automatically if missing.
 
 ---
 
@@ -131,13 +130,16 @@ Older exploratory scripts (`old_lalonde_code.R`, `twang_exploration.R`, etc.) ar
 
 ---
 
-### `analysis/` — Shared helper scripts
+### `lib/` — Shared function libraries
 
-Utility scripts sourced by figure and simulation scripts:
+Scripts that define functions sourced by multiple other scripts. Nothing here is meant to be run directly.
 
-- `plot_sim.R` — plotting functions for simulation results (`acic_plot_sim_type()` etc.)
-- `plot_toy.R` — plotting functions for toy examples
-- `generate_toy_background_df.R` — generates the background grid for toy example figures; output cached as `data/inputs/toy_background_df.rds`
+| File | Purpose | Sourced by |
+|---|---|---|
+| `wrappers.R` | `get_att_*()` estimator wrappers; `parse_form()` | sims, figs, tests |
+| `sim_runner.R` | `run_all_methods()`, `expand_method_groups()`, `ALL_METHODS` | sims, tests |
+| `plot_sim.R` | Plotting functions for simulation results (`acic_plot_sim_type()` etc.) | `figs/fig_sim_*.R` |
+| `plot_toy.R` | Plotting functions for toy examples | `figs/fig_toy_example.R` |
 
 ---
 

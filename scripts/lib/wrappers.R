@@ -4,6 +4,24 @@
 #
 # This includes a set of functions that simply estimates and returns
 # the att as a single number, useful for the simulation studies.
+#
+# Convention: functions that need covariates accept a formula of the form
+#   Z ~ X1 + X2 + X3
+# where the LHS is the treatment variable and the RHS lists the covariates.
+# Use parse_form() to extract both from any such formula.
+
+
+#' Extract treatment variable name and covariate names from a formula.
+#'
+#' @param form Formula of the form treatment ~ cov1 + cov2 + ...
+#' @return Named list with elements:
+#'   \item{treatment}{Character string: name of the treatment variable (LHS).}
+#'   \item{covs}{Character vector: covariate names (RHS).}
+#' @export
+parse_form <- function(form) {
+  vars <- all.vars(form)
+  list(treatment = vars[1], covs = vars[-1])
+}
 
 
 
@@ -62,7 +80,7 @@ get_SL_pred <- function(SL_fit, df_test, X_names){
 
 get_att_diff <- function(d) {
   if ( is.csm_matches( d ) ) {
-    d <- result_table( d, "sc" )
+    d <- result_table( d, "sc", outcome="Y" )
   }
 
   d %>%
@@ -113,8 +131,9 @@ get_att_or_lm <- function(d,
 }
 
 get_att_or_bart <- function(d,
-                            covs) {
+                            form) {
   require( dbarts )
+  covs <- parse_form(form)$covs
 
   m_bart <- bart(x.train = d %>%
                    filter(Z==0) %>%
@@ -149,9 +168,10 @@ get_att_ps_lm <- function(d,
 }
 
 get_att_ps_bart <- function(d,
-                            covs) {
+                            form) {
 
   require( dbarts )
+  covs <- parse_form(form)$covs
 
   m_bart <- bart(x.train = d %>%
                    dplyr::select(all_of(covs)),
@@ -171,11 +191,12 @@ get_att_ps_bart <- function(d,
 }
 
 get_att_tmle <- function(d,
-                         covs,
+                         form,
                          Q.SL.library,
                          g.SL.library) {
 
   require( tmle )
+  covs <- parse_form(form)$covs
 
   tmle <- tmle(Y = d$Y,
                A = as.numeric(d$Z),
@@ -189,11 +210,13 @@ get_att_tmle <- function(d,
 }
 
 get_att_aipw <- function(d,
-                         covs,
+                         form,
                          Q.SL.library,
                          g.SL.library) {
 
   require( AIPW )
+  covs <- parse_form(form)$covs
+
   aipw <- AIPW$
     new(Y = d$Y,
         A = d$Z,
@@ -515,15 +538,16 @@ get_att_1nn <- function(d, scaling) {
 #' Estimate ATT using Causal Forests (grf package)
 #'
 #' @param d A data frame with treatment Z, outcome Y, and covariates
-#' @param covs A character vector of covariate names
+#' @param form Formula of the form Z ~ X1 + X2 + ... specifying treatment and covariates
 #'
 #' @return Estimated ATT
 #' @export
-get_att_causal_forest <- function(d, covs) {
+get_att_causal_forest <- function(d, form) {
   if (!requireNamespace("grf", quietly = TRUE)) {
     stop("Package 'grf' is needed for this function. Please install it with: install.packages('grf')",
          call. = FALSE)
   }
+  covs <- parse_form(form)$covs
 
   # Fit causal forest
   cf <- grf::causal_forest(
@@ -642,16 +666,17 @@ get_att_twang <- function(
 #' Estimate ATT using Kernel Balancing (kbal package)
 #'
 #' @param d A data frame with treatment Z, outcome Y, and covariates
-#' @param covs A character vector of covariate names
+#' @param form Formula of the form Z ~ X1 + X2 + ... specifying treatment and covariates
 #' @param numdims Fixed number of dimensions to use (default: NULL for auto-selection)
 #'
 #' @return Estimated ATT
 #' @export
-get_att_kbal <- function(d, covs, numdims = NULL) {
+get_att_kbal <- function(d, form, numdims = NULL) {
   if (!requireNamespace("kbal", quietly = TRUE)) {
     stop("Package 'kbal' is needed for this function. Please install it with: install.packages('kbal')",
          call. = FALSE)
   }
+  covs <- parse_form(form)$covs
 
   # Check for valid Treatment variable (0/1 or T/F)
   # This ensures the test case for 'df_bad' passes

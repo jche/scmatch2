@@ -81,65 +81,84 @@ SL.library3g <- c("SL.glm", "tmle.SL.dbarts.k.5", "SL.gam")
 #' df here. See run_single_iteration.R for the standard preparation steps.
 #'
 #' @param df         Data frame with columns Y, Z, id, and covariates.
-#' @param covs       Character vector of covariate column names (e.g. c("X1","X2")).
-#' @param zform1     PS formula with main effects (e.g. Z ~ X1 + X2).
-#' @param zform2     PS formula with interactions (e.g. Z ~ X1*X2).
-#' @param form2      Outcome formula for or_lm (e.g. Y ~ X1 + X2).
+#' @param form       Formula of the form \code{Z ~ X1 + X2 + ...} naming the
+#'                   treatment (LHS) and all covariates (RHS). All sub-formulas
+#'                   required by individual methods are derived from this:
+#'                   \itemize{
+#'                     \item PS main-effects (bal1, twang): \code{form} as-is.
+#'                     \item PS with interactions (bal2, ps_lm): \code{update(form, . ~ (.)^2)}.
+#'                     \item Outcome model (or_lm): \code{update(form, Y ~ (.)^2)}.
+#'                     \item Covariate matrix (or_bart, ps_bart, tmle, aipw, cf, kbal):
+#'                           RHS variables extracted via \code{parse_form(form)$covs}.
+#'                   }
 #' @param dist_scaling Named numeric vector/row giving per-covariate scaling
-#'                   (output of the summarize(across(...)) call in run_single_iteration.R).
+#'                   (output of the summarize(across(...)) call in
+#'                   run_single_iteration.R).
 #' @param nbins      Number of CEM bins (used for cem_scm / cem_avg).
-#' @param selected_methods Character vector of method names to run. Defaults to
-#'                   all fast methods. Pass expand_method_groups("all") for every
-#'                   method including slow ones.
+#' @param selected_methods Character vector of method names or group shorthands
+#'                   to run (see \code{expand_method_groups}). Defaults to all
+#'                   fast methods.
+#' @param verbose    Logical. If \code{TRUE} (default), print method names and
+#'                   estimates as they are computed. Set to \code{FALSE} to
+#'                   suppress all output (useful in tests or non-interactive
+#'                   scripts).
 #'
 #' @return Tibble with columns: method, ATT_est, secs.
 run_all_methods <- function(df,
-                            covs,
-                            zform1,
-                            zform2,
-                            form2,
+                            form,
                             dist_scaling,
                             nbins,
-                            selected_methods = "fast" ) {
+                            selected_methods = "fast",
+                            verbose = TRUE) {
 
   selected_methods <- expand_method_groups(selected_methods)
+
+  # Derive all sub-formulas from the single treatment formula
+  covs      <- parse_form(form)$covs
+  form_int  <- update(form, . ~ (.)^2)   # PS formula with all pairwise interactions
+  yform_int <- update(form, Y ~ (.)^2)   # outcome formula with interactions (for or_lm)
 
   safe_compute <- function(method_name, expr) {
     if (!(method_name %in% selected_methods)) {
       return(list(est = NA_real_, secs = NA_real_))
     }
-    cat(sprintf("  %-20s ... ", method_name))
+    if (verbose)
+      cat(sprintf("  %-20s ... ", method_name))
     t0 <- Sys.time()
+
     result <- tryCatch(expr, error = function(e) {
-      cat(sprintf("ERROR: %s\n", e$message))
+      if (verbose)
+        cat(sprintf("ERROR: %s\n", e$message))
       NA_real_
     })
+
     elapsed <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
-    if (!is.na(result)) cat(sprintf("%.4f  (%.1fs)\n", result, elapsed))
+    if (verbose && !is.na(result))
+      cat(sprintf("%.4f  (%.1fs)\n", result, elapsed))
     list(est = result, secs = elapsed)
   }
 
-  cat("Computing estimates:\n")
+  if (verbose) cat("Computing estimates:\n")
 
   r_diff    <- safe_compute("diff",    get_att_diff(df))
-  r_bal1    <- safe_compute("bal1",    get_att_bal(df, zform1, rep(0.01, length(covs))))
-  r_bal2    <- safe_compute("bal2",    get_att_bal(df, zform2, rep(0.1, length(covs) + choose(length(covs), 2))))
-  r_or_lm   <- safe_compute("or_lm",  get_att_or_lm(df, form = form2))
-  r_or_bart <- safe_compute("or_bart", get_att_or_bart(df, covs = covs))
-  r_ps_lm   <- safe_compute("ps_lm",  get_att_ps_lm(df, zform2))
-  r_ps_bart <- safe_compute("ps_bart", get_att_ps_bart(df, covs = covs))
+  r_bal1    <- safe_compute("bal1",    get_att_bal(df, form,     rep(0.01, length(covs))))
+  r_bal2    <- safe_compute("bal2",    get_att_bal(df, form_int, rep(0.1,  length(covs) + choose(length(covs), 2))))
+  r_or_lm   <- safe_compute("or_lm",  get_att_or_lm(df,  form = yform_int))
+  r_or_bart <- safe_compute("or_bart", get_att_or_bart(df, form = form))
+  r_ps_lm   <- safe_compute("ps_lm",  get_att_ps_lm(df,  form_int))
+  r_ps_bart <- safe_compute("ps_bart", get_att_ps_bart(df, form = form))
   r_csm_scm <- safe_compute("csm_scm", get_att_csm(df, scaling = dist_scaling, est_method = "scm",     rad_method = "fixed"))
   r_csm_avg <- safe_compute("csm_avg", get_att_csm(df, scaling = dist_scaling, est_method = "average", rad_method = "fixed"))
   r_cem_scm <- safe_compute("cem_scm", get_att_cem(df, num_bins = nbins, est_method = "scm",     estimand = "CEM-ATT"))
   r_cem_avg <- safe_compute("cem_avg", get_att_cem(df, num_bins = nbins, est_method = "average", estimand = "CEM-ATT"))
   r_onenn   <- safe_compute("onenn",   get_att_1nn(df, scaling = dist_scaling))
-  r_tmle1   <- safe_compute("tmle1",   get_att_tmle(df, covs = covs, Q.SL.library = SL.library1,  g.SL.library = SL.library1))
-  r_aipw1   <- safe_compute("aipw1",   get_att_aipw(df, covs = covs, Q.SL.library = SL.library1,  g.SL.library = SL.library1))
-  r_tmle2   <- safe_compute("tmle2",   get_att_tmle(df, covs = covs, Q.SL.library = SL.library3Q, g.SL.library = SL.library3g))
-  r_aipw2   <- safe_compute("aipw2",   get_att_aipw(df, covs = covs, Q.SL.library = SL.library2,  g.SL.library = SL.library2))
-  r_cf      <- safe_compute("causal_forest", get_att_causal_forest(df, covs = covs))
-  r_twang   <- safe_compute("twang",   get_att_twang(df, form = zform1))
-  r_kbal    <- safe_compute("kbal",    get_att_kbal(df, covs = covs))
+  r_tmle1   <- safe_compute("tmle1",   get_att_tmle(df, form = form, Q.SL.library = SL.library1,  g.SL.library = SL.library1))
+  r_aipw1   <- safe_compute("aipw1",   get_att_aipw(df, form = form, Q.SL.library = SL.library1,  g.SL.library = SL.library1))
+  r_tmle2   <- safe_compute("tmle2",   get_att_tmle(df, form = form, Q.SL.library = SL.library3Q, g.SL.library = SL.library3g))
+  r_aipw2   <- safe_compute("aipw2",   get_att_aipw(df, form = form, Q.SL.library = SL.library2,  g.SL.library = SL.library2))
+  r_cf      <- safe_compute("causal_forest", get_att_causal_forest(df, form = form))
+  r_twang   <- safe_compute("twang",   get_att_twang(df, form = form))
+  r_kbal    <- safe_compute("kbal",    get_att_kbal(df,  form = form))
 
   tibble::tibble(
     method  = ALL_METHODS,

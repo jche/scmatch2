@@ -9,7 +9,7 @@
 library(tidyverse)
 require(ggplot2)
 
-source("scripts/analysis/plot_toy.R")
+source("scripts/lib/plot_toy.R")
 
 # Load background ----------
 toy_background_df_path <- "data/inputs/toy_background_df.rds"
@@ -17,7 +17,7 @@ background_df <- tryCatch({
   readRDS(toy_background_df_path)
 }, error = function(err){
   message("The data file for background_df is not found. Generating one...")
-  source("scripts/analysis/generate_toy_background_df.R")
+  source("scripts/figs/generate_toy_background_df.R")
   readRDS(toy_background_df_path)
 }
 )
@@ -44,7 +44,7 @@ co_dat <- tibble(
 )
 four_points_df <- rbind(tx_dat, co_dat)
 
-source("scripts/analysis/plot_toy.R")
+source("scripts/lib/plot_toy.R")
 toy_example_four_points_plot <-
   create_toy_example_four_points_plot(
     background_plot, four_points_df)

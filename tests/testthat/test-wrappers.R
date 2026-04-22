@@ -1,5 +1,20 @@
 # tests/testthat/test-wrappers.R
-source(here::here("scripts/wrappers.R"))
+source(here::here("scripts/lib/wrappers.R"))
+
+## Make some data to test on ----
+
+set.seed(42)
+df <- CSM:::gen_one_toy(nc = 80, nt = 25, f0_sd = 0.5)
+form   <- Z ~ X1 + X2
+nbins  <- 6
+covs   <- parse_form(form)$covs
+
+dist_scaling <- df %>%
+  dplyr::summarize(dplyr::across(
+    dplyr::all_of(covs),
+    function(x) nbins / (max(x) - min(x))
+  ))
+
 
 ## ---------------------- FAST TESTS (always run) ----------------------
 
@@ -22,7 +37,7 @@ test_that("Causal Forest produces reasonable estimates (small, fast DGP)", {
     dplyr::summarize(att = mean(Y1 - Y0)) |>
     dplyr::pull(att)
 
-  att_cf <- get_att_causal_forest(df, covs = c("X1", "X2"))
+  att_cf <- get_att_causal_forest(df, form = Z ~ X1 + X2)
   expect_true(abs(att_cf - true_att) < 0.6)
   expect_type(att_cf, "double")
   expect_length(att_cf, 1)
@@ -76,13 +91,12 @@ test_that("tmle2 and aipw2 complete on toy (slow)", {
 
   set.seed(42)
   df <- CSM:::gen_one_toy(nc = 120, nt = 40, f0_sd = 0.2)  # keep small
-  covs <- c("X1","X2")
 
   # These call heavier SL libraries internally; keep dataset tiny
-  tmle2 <- get_att_tmle(df, covs = covs,
+  tmle2 <- get_att_tmle(df, form = Z ~ X1 + X2,
                         Q.SL.library = c("SL.glm","tmle.SL.dbarts2","SL.glmnet"),
                         g.SL.library = c("SL.glm","tmle.SL.dbarts.k.5","SL.gam"))
-  aipw2 <- get_att_aipw(df, covs = covs,
+  aipw2 <- get_att_aipw(df, form = Z ~ X1 + X2,
                         Q.SL.library = c("SL.glm","SL.glmnet","SL.randomForest","SL.xgboost"),
                         g.SL.library = c("SL.glm","SL.glmnet","SL.randomForest","SL.xgboost"))
   expect_true(is.numeric(tmle2) || is.numeric(aipw2))
@@ -138,7 +152,7 @@ test_that("Kbal estimates", {
     Y1 = Y0 + 1.8,
     Y  = ifelse(Z, Y1, Y0)
   )
-  att_kbal <- get_att_kbal(df, covs = c("X1","X2"), numdims = 20) # smaller numdims
+  att_kbal <- get_att_kbal(df, form = Z ~ X1 + X2, numdims = 20) # smaller numdims
   expect_type(att_kbal, "double")
   expect_length(att_kbal, 1)
 })

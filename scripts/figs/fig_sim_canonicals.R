@@ -1,7 +1,7 @@
 # Plotting script: scripts/figs/fig_sim_canonicals.R
 # full analysis of simulation results
 library(tidyverse)
-source("scripts/analysis/plot_sim.R")
+source("scripts/lib/plot_sim.R")
 
 # canonical sims-bias_mse ----------------------------------------------------------
 res_acic <- read_csv("data/outputs/sims-bias_mse/acic_combined.csv")

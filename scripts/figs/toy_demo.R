@@ -124,7 +124,7 @@ zform2 <- as.formula(paste0("Z ~ (", paste0(covs, collapse="+"), ")^2"))
 #                    estimand = "ATT")
 # m_bal$weights
 
-source( here::here( "scripts/wrappers.R" ) )
+source( here::here( "scripts/lib/wrappers.R" ) )
 
 bal2 = get_att_bal(df_six_points, zform2,
                    rep(0.1, length(covs) + choose(length(covs), 2)))

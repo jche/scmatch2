@@ -9,6 +9,8 @@ METHODS <- c("diff", "onenn", "csm_scm", "cem_avg", "bal1", "bal2",
              "aipw2", "tmle2",
              "causal_forest", "twang", "kbal")
 
+
+
 #' Prepare Method Comparison Data Frame
 #'
 #' Transforms the input data frame, which includes estimates from 14 different
@@ -31,6 +33,8 @@ prepare_method_comparison_df <- function(df) {
     pivot_longer(diff:last_col(), names_to="method") %>%
     summarize_bias_rmse()
 }
+
+
 
 #' Summarize Bias and RMSE for Each Method
 #'
@@ -74,6 +78,8 @@ RMSE_plot_outline <- function(org_df,
           legend.position = legend.position,
           legend.background = element_rect(linetype="solid", linewidth=0.5, color="black"))
 }
+
+
 
 modify_axis_to_RMSE_plot<-
   function(p_outline,title="",
@@ -144,6 +150,8 @@ acic_plot <- function(simname,
     filter(sim == simname)
   return(RMSE_plot(df,title,ylab,xlab,legend.position))
 }
+
+
 
 acic_plot_sim_type <- function(simname,
                       title="",

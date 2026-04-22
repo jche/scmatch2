@@ -39,8 +39,8 @@ suppressPackageStartupMessages({
   require(tictoc)
   require(CSM)
 })
-source(here::here("scripts/wrappers.R"))
-source(here::here("scripts/sim_runner.R"))
+source(here::here("scripts/lib/wrappers.R"))
+source(here::here("scripts/lib/sim_runner.R"))
 source(here::here("R/utils.R"))
 source(here::here("R/sim_data.R"))
 
@@ -70,34 +70,27 @@ cat("Generating data...\n"); data_start <- Sys.time()
 
 if (sim_type == "acic") {
   n <- 1000; p <- 10
-  df <- gen_df_acic(
+  df    <- gen_df_acic(
     model.trt="step", root.trt=0.35, overlap.trt="full",
     model.rsp="step", alignment=0.75, te.hetero="high",
     random.seed=current_seed, n=n, p=p
   )
-  covs   <- df %>% dplyr::select(starts_with("X")) %>% colnames()
-  zform1 <- as.formula(paste0("Z ~ ", paste0(covs, collapse = "+")))
-  zform2 <- as.formula(paste0("Z ~ (", paste0(covs, collapse = "+"), ")^2"))
-  form2  <- as.formula(paste0("Y ~ (", paste0(covs, collapse = "+"), ")^2"))
-  nbins  <- 5
+  covs  <- df %>% dplyr::select(starts_with("X")) %>% colnames()
+  form  <- as.formula(paste0("Z ~ ", paste0(covs, collapse = "+")))
+  nbins <- 5
 
 } else if (sim_type == "hainmueller") {
   nc <- 250; nt <- 50
-  df <- gen_df_hain(nc=nc, nt=nt, sigma_e="n100", outcome="nl2", sigma_y=1, ATE=0)
-  covs   <- c("X1","X2","X3","X4","X5","X6")
-  zform1 <- as.formula("Z ~ X1+X2+X3+X4+X5+X6")
-  zform2 <- as.formula("Z ~ (X1+X2+X3+X4+X5+X6)^2")
-  form2  <- as.formula("Y ~ (X1+X2+X3+X4+X5+X6)^2")
-  nbins  <- 5
+  df    <- gen_df_hain(nc=nc, nt=nt, sigma_e="n100", outcome="nl2", sigma_y=1, ATE=0)
+  form  <- as.formula("Z ~ X1 + X2 + X3 + X4 + X5 + X6")
+  nbins <- 5
 
 } else if (sim_type == "kang") {
   n <- 1000
-  df <- gen_df_kang(n=n)
-  covs   <- df %>% dplyr::select(starts_with("X")) %>% colnames()
-  zform1 <- as.formula(paste0("Z ~ ", paste0(covs, collapse = "+")))
-  zform2 <- as.formula(paste0("Z ~ (", paste0(covs, collapse = "+"), ")^2"))
-  form2  <- as.formula(paste0("Y ~ (", paste0(covs, collapse = "+"), ")^2"))
-  nbins  <- 5
+  df    <- gen_df_kang(n=n)
+  covs  <- df %>% dplyr::select(starts_with("X")) %>% colnames()
+  form  <- as.formula(paste0("Z ~ ", paste0(covs, collapse = "+")))
+  nbins <- 5
 
 } else if (sim_type == "toy") {
   nc <- 500; nt <- 100; f0_sd <- 0.5
@@ -109,21 +102,19 @@ if (sim_type == "acic") {
         dmvnorm(mean=c(0.5,0.5), sigma=matrix(c(1,0.8,0.8,1),2)) * 20
     }
   )
-  covs   <- c("X1","X2")
-  zform1 <- as.formula("Z ~ X1 + X2")
-  zform2 <- as.formula("Z ~ X1 + X2")
-  form2  <- as.formula("Y ~ X1 + X2")
-  nbins  <- 6
+  form  <- as.formula("Z ~ X1 + X2")
+  nbins <- 6
 
 } else {
   stop("sim_type must be one of: 'acic', 'hainmueller', 'kang', 'toy'")
 }
 
 # --- scaling + feasibility filter ---------------------------------------------
+covs <- parse_form(form)$covs
 dist_scaling <- df %>%
   summarize(across(
-    starts_with("X"),
-    function(x) if (is.numeric(x)) (if (sim_type=="toy") 2*nbins else nbins) / (max(x)-min(x)) else 1000
+    all_of(covs),
+    function(x) if (is.numeric(x)) nbins / (max(x) - min(x)) else 1000
   ))
 preds_csm <- get_cal_matches(data=df, metric="maximum", scaling=dist_scaling,
                              rad_method="fixed", est_method="average", k=25)
@@ -142,10 +133,7 @@ cat(sprintf("Data generated: n=%d, true_ATT=%.3f, time=%.2fs\n", nrow(df), true_
 # --- run methods --------------------------------------------------------------
 method_results <- run_all_methods(
   df               = df,
-  covs             = covs,
-  zform1           = zform1,
-  zform2           = zform2,
-  form2            = form2,
+  form             = form,
   dist_scaling     = dist_scaling,
   nbins            = nbins,
   selected_methods = SELECTED_METHODS
