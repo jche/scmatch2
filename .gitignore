@@ -40,6 +40,7 @@ vignettes/*.pdf
 /scripts/inference-scripts/logs/
 /scripts/sims-variance/logs/
 /scripts/sims-variance-knn5avg/logs/
+/scripts/sims-variance-fully-adaptive(1nn)/logs/
 
 # Research paper results
 /tables
@@ -49,6 +50,7 @@ vignettes/*.pdf
 /scripts/more-inference-applications/
 /scripts/replication_code_wang_zubizarreta_mabw/
 /figures
+/scripts/data/
 
 # Ongoing work
 bootstrap_failure_matching.png

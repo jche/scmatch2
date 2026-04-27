@@ -16,7 +16,7 @@
 
 ALL_METHODS <- c(
   "diff", "bal1", "bal2",
-  "or_lm", "or_bart",
+  "or_lm", "or_lm_main", "or_bart",
   "ps_lm", "ps_bart",
   "csm_scm", "csm_avg", "cem_scm", "cem_avg", "onenn",
   "tmle1", "aipw1", "tmle2", "aipw2",
@@ -40,7 +40,7 @@ expand_method_groups <- function(keys, drop_slow = FALSE) {
       new            = c("causal_forest", "twang", "kbal"),
       matching       = c("csm_scm", "csm_avg", "cem_scm", "cem_avg", "onenn"),
       ps             = c("ps_lm", "ps_bart"),
-      or             = c("or_lm", "or_bart"),
+      or             = c("or_lm", "or_lm_main", "or_bart"),
       bal            = ,
       balance        = c("bal1", "bal2"),
       dr             = ,
@@ -117,6 +117,7 @@ run_all_methods <- function(df,
   covs      <- parse_form(form)$covs
   form_int  <- update(form, . ~ (.)^2)   # PS formula with all pairwise interactions
   yform_int <- update(form, Y ~ (.)^2)   # outcome formula with interactions (for or_lm)
+  yform_main <- update(form, Y ~ .)      # outcome formula with main effects only (for or_lm_main)
 
   safe_compute <- function(method_name, expr) {
     if (!(method_name %in% selected_methods)) {
@@ -143,7 +144,8 @@ run_all_methods <- function(df,
   r_diff    <- safe_compute("diff",    get_att_diff(df))
   r_bal1    <- safe_compute("bal1",    get_att_bal(df, form,     rep(0.01, length(covs))))
   r_bal2    <- safe_compute("bal2",    get_att_bal(df, form_int, rep(0.1,  length(covs) + choose(length(covs), 2))))
-  r_or_lm   <- safe_compute("or_lm",  get_att_or_lm(df,  form = yform_int))
+  r_or_lm      <- safe_compute("or_lm",      get_att_or_lm(df, form = yform_int))
+  r_or_lm_main <- safe_compute("or_lm_main", get_att_or_lm(df, form = yform_main))
   r_or_bart <- safe_compute("or_bart", get_att_or_bart(df, form = form))
   r_ps_lm   <- safe_compute("ps_lm",  get_att_ps_lm(df,  form_int))
   r_ps_bart <- safe_compute("ps_bart", get_att_ps_bart(df, form = form))
@@ -163,13 +165,13 @@ run_all_methods <- function(df,
   tibble::tibble(
     method  = ALL_METHODS,
     ATT_est = c(r_diff$est, r_bal1$est, r_bal2$est,
-                r_or_lm$est, r_or_bart$est,
+                r_or_lm$est, r_or_lm_main$est, r_or_bart$est,
                 r_ps_lm$est, r_ps_bart$est,
                 r_csm_scm$est, r_csm_avg$est, r_cem_scm$est, r_cem_avg$est, r_onenn$est,
                 r_tmle1$est, r_aipw1$est, r_tmle2$est, r_aipw2$est,
                 r_cf$est, r_twang$est, r_kbal$est),
     secs    = c(r_diff$secs, r_bal1$secs, r_bal2$secs,
-                r_or_lm$secs, r_or_bart$secs,
+                r_or_lm$secs, r_or_lm_main$secs, r_or_bart$secs,
                 r_ps_lm$secs, r_ps_bart$secs,
                 r_csm_scm$secs, r_csm_avg$secs, r_cem_scm$secs, r_cem_avg$secs, r_onenn$secs,
                 r_tmle1$secs, r_aipw1$secs, r_tmle2$secs, r_aipw2$secs,

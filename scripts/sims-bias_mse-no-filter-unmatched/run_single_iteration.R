@@ -50,7 +50,7 @@ SELECTED_METHODS <- if (length(raw_methods) == 0) ALL_METHODS else expand_method
 cat(sprintf("\n=== Running %s simulation, iteration %d ===\n", sim_type, iteration_id))
 cat("Methods: ", paste(SELECTED_METHODS, collapse = ", "), "\n")
 
-output_dir <- file.path("data", "outputs", "sims-bias_mse", sim_type)
+output_dir <- file.path("data", "outputs", "sims-bias_mse-no-filter-unmatched", sim_type)
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 # --- seeds --------------------------------------------------------------------
@@ -121,7 +121,7 @@ preds_csm <- get_cal_matches(data=df, metric="maximum", scaling=dist_scaling,
 preds_cem <- get_cem_matches(data=df, num_bins=nbins, est_method="average", return="all")
 ninf      <- length(attr(preds_csm, "unmatched_units"))
 ninf_cem  <- sum(df$Z) - length(attr(preds_cem, "feasible_units"))
-df        <- df %>% filter(!id %in% attr(preds_csm, "unmatched_units"))
+# df        <- df %>% filter(!id %in% attr(preds_csm, "unmatched_units"))
 data_time <- as.numeric(difftime(Sys.time(), data_start, units = "secs"))
 
 true_ATT <- if (sim_type %in% c("acic","toy")) {
