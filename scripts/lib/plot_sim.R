@@ -3,7 +3,7 @@
 # various matching approaches.
 
 METHODS <- c("diff", "onenn", "csm_scm", "cem_avg", "bal1", "bal2",
-             "or_lm", "ps_lm",
+             "or_lm", "or_lm_main", "ps_lm",
              "or_bart", "ps_bart",
              "aipw1", "tmle1",
              "aipw2", "tmle2",
@@ -95,7 +95,8 @@ modify_axis_to_RMSE_plot<-
         "bal1" = "bal-SBW1",
         "bal2" = "bal-SBW2",
         "or_bart" = "or-BART",
-        "or_lm" = "or-LM",
+        "or_lm" = "or-LM-int",
+        "or_lm_main" = "or-LM",
         "ps_bart" = "ps-BART",
         "ps_lm" = "ps-LM",
         "onenn" = "match-1NN",
