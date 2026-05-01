@@ -360,27 +360,53 @@ I also ran the fully adaptive $k=2$ design ($\approx 393$ iterations completed) 
 \label{tab:toy_var_pooled_vs_het_VE_2nn}
 \end{table}
 
-\paragraph{Comparison across $k = 1, 2, 5$.}
+\paragraph{Comparison across $k = 1, 2, 5$: full results.}
 
-The key metric for the advocacy question is the heteroskedastic SATT estimator (\texttt{pooled\_het\_V\_E\_CI}) at very low overlap, where finite-sample instability is most visible:
+A direct comparison requires care because the same \texttt{deg\_overlap} label produces very different effective sample sizes across $k$ values.
+For $k=1$ and $k=2$, a small minimum $k$ produces a tight caliper in dense regions, so $\tilde{N}_C$ is small when controls are concentrated.
+For $k=5$, the larger minimum forces a wider caliper, so $\tilde{N}_C$ is large in the same concentrated setting and \emph{smaller} when controls are spread uniformly.
+Concretely, the five DGP scenarios produce $\tilde{N}_C \approx 13, 21, 31, 43, 53$ for $k=1$ and $k=2$, but the \emph{opposite ordering} $\tilde{N}_C \approx 53, 44, 34, 25, 17$ for $k=5$.
 
-\begin{center}
-\begin{tabular}{lccc}
+The fair comparison therefore aligns scenarios by similar $\tilde{N}_C$ rather than by label.
+Table~\ref{tab:compare_k125} reports the heteroskedastic and pooled SATT $\hat{V}_E$ coverage for matched-$\tilde{N}_C$ rows.
+
+\begin{table}[hbt!]
+\centering
+\begin{tabular}{ccccccc}
   \hline
-  Design & $\tilde{N}_C$ (Very Low) & Het $\hat{V}_E$ Coverage & Pooled $\hat{V}_E$ Coverage \\
+  & \multicolumn{2}{c}{$k=1$} & \multicolumn{2}{c}{$k=2$} & \multicolumn{2}{c}{$k=5$} \\
+  \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+  $\tilde{N}_C$ & Het Cov & Pooled Cov & Het Cov & Pooled Cov & Het Cov & Pooled Cov \\
   \hline
-  $k=1$ adaptive & 12.6 & 0.671 & 0.936 \\
-  $k=2$ adaptive & 13.3 & 0.899 & 0.932 \\
-  $k=5$ adaptive & 17.0 & 0.913 & 0.916 \\
+  $\approx 13$--17 & 0.671 & 0.936 & 0.899 & 0.932 & 0.913 & 0.916 \\
+  $\approx 20$--25 & 0.878 & 0.942 & 0.917 & 0.929 & 0.934 & 0.942 \\
+  $\approx 31$--34 & 0.925 & 0.943 & 0.927 & 0.937 & 0.941 & 0.941 \\
+  $\approx 43$--44 & 0.931 & 0.938 & 0.932 & 0.934 & 0.944 & 0.946 \\
+  $\approx 53$     & 0.943 & 0.946 & 0.952 & 0.952 & 0.945 & 0.950 \\
   \hline
 \end{tabular}
-\end{center}
+\caption{SATT-oriented $\hat{V}_E$ coverage for the heteroskedastic and pooled estimators across comparable effective sample sizes $\tilde{N}_C$, for $k=1$, $k=2$, and $k=5$ adaptive-caliper SCM matching. Each row pairs scenarios from the three designs at similar $\tilde{N}_C$. Nominal coverage is 0.95.}
+\label{tab:compare_k125}
+\end{table}
 
-The $k=1$ heteroskedastic SATT estimator collapses badly (coverage 0.671) because singleton matched sets make local variance estimation incoherent.
-Requiring $k=2$ recovers most of that stability (coverage 0.899), closing nearly the entire gap to $k=5$ (0.913) while still enforcing closer matches ($\tilde{N}_C = 13.3$ vs.\ $17.0$ under $k=5$).
-The pooled SATT estimator is well calibrated for all three designs and is not the differentiating factor.
+\paragraph{Fair conclusion on the $k=2$ hypothesis.}
 
-These results support advocating $k=2$ as the recommended minimum in practice: it avoids the near-singular variance estimation of $k=1$, produces heteroskedastic coverage comparable to $k=5$, and allows tighter calipers than the five-donor requirement currently stated in the paper.
+\begin{itemize}
+  \item \textbf{$k=2$ vs.\ $k=1$:} The improvement is dramatic and consistent across all $\tilde{N}_C$ levels.
+    The het estimator goes from collapsing at small $\tilde{N}_C$ (0.671 for $k=1$) to reasonable coverage (0.899 for $k=2$).
+    At larger $\tilde{N}_C$ the gap narrows, but $k=2$ is always better.
+    The pooled estimator is similarly stable for both; the het estimator is where $k=1$ fails.
+
+  \item \textbf{$k=2$ vs.\ $k=5$:} The het estimator for $k=2$ is consistently 1--2 percentage points below $k=5$ across \emph{all} $\tilde{N}_C$ levels, not only at the smallest sizes.
+    This is a systematic gap: 0.899 vs.\ 0.913 at $\tilde{N}_C\approx 13$--17, 0.917 vs.\ 0.934 at $\tilde{N}_C\approx 20$--25, narrowing only at $\tilde{N}_C\approx 53$ where both are near nominal.
+    The \textbf{pooled} estimator shows no meaningful difference between $k=2$ and $k=5$ at any $\tilde{N}_C$ level; all pooled coverages fall within $\pm$0.015 of nominal.
+
+  \item \textbf{Conclusion:} The hypothesis is \textbf{partially supported}.
+    $k=2$ avoids the near-singular variance failure of $k=1$ and is defensible in practice, but the het estimator still carries a systematic undercoverage gap relative to $k=5$.
+    If the paper advocates $k=2$, the recommendation should be paired with \emph{the pooled estimator}, which is well calibrated for all $k \geq 2$.
+    The het estimator at $k=2$ is acceptable at moderate-to-high overlap ($\tilde{N}_C \gtrsim 30$, coverage $\geq 0.927$), but is noticeably under-nominal when the effective donor pool is small ($\tilde{N}_C \lesssim 20$, coverage $\approx 0.90$--0.92).
+    The main justification for preferring $k=2$ over $k=5$ is the \emph{matching quality} argument (closer calipers), not the variance estimation argument.
+\end{itemize}
 
 \paragraph{Others}
 Two additional points may be worth noting in the appendix:
