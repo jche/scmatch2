@@ -97,10 +97,6 @@ res_hain <- collect_sim_results("hainmueller", n_expected = 1000)
 res_kang <- collect_sim_results("kang", n_expected = 1000)
 res_toy <- collect_sim_results("toy", n_expected = 1000)
 
-# write_csv(res_acic, "data/outputs/sim_canonical_results/res_acic.csv")
-# write_csv(res_hain, "data/outputs/sim_canonical_results/res_hain.csv")
-# write_csv(res_kang, "data/outputs/sim_canonical_results/res_kang.csv")
-# write_csv(res_toy, "data/outputs/sim_canonical_results/res_toy.csv")
 
 cat("\n", rep("=", 80), "\n", sep = "")
 cat("ALL RESULTS COLLECTED\n")

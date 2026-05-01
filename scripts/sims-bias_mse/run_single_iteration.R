@@ -103,7 +103,7 @@ if (sim_type == "acic") {
     }
   )
   form  <- as.formula("Z ~ X1 + X2")
-  nbins <- 6
+  nbins <- 5
 
 } else {
   stop("sim_type must be one of: 'acic', 'hainmueller', 'kang', 'toy'")
@@ -160,11 +160,9 @@ res <- tibble(
 output_file <- file.path(output_dir, sprintf("iter_%04d.csv", iteration_id))
 
 if (file.exists(output_file)) {
-  existing      <- read_csv(output_file, show_col_types = FALSE)
-  meta_cols     <- c("runid", "seed", "sim_type", "elapsed_time_secs", "ninf", "ninf_cem", "true_ATT")
-  new_method_cols <- setdiff(names(res), meta_cols)
-  cat(sprintf("Merging into existing file (updating: %s)\n", paste(new_method_cols, collapse = ", ")))
-  for (col in new_method_cols) existing[[col]] <- res[[col]]
+  existing <- read_csv(output_file, show_col_types = FALSE)
+  cat(sprintf("Merging into existing file (updating: %s)\n", paste(SELECTED_METHODS, collapse = ", ")))
+  for (col in SELECTED_METHODS) existing[[col]] <- res[[col]]
   res <- existing
 }
 
