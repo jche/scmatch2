@@ -1,5 +1,8 @@
 # scripts/sims-variance/3_summarize_results.R
 #!/usr/bin/env Rscript
+#
+# Usage: Rscript 3_summarize_results.R <output_name>
+#   output_name  subdirectory under data/outputs/ (default: sims-variance)
 
 suppressPackageStartupMessages({
   library(dplyr)
@@ -9,11 +12,14 @@ suppressPackageStartupMessages({
   library(stringr)
 })
 
+args <- commandArgs(trailingOnly = TRUE)
+output_name <- if (length(args) >= 1) args[[1]] else "sims-variance"
+
 # input
-in_csv <- here::here("data/outputs/sims-variance/combined_results.csv")
+in_csv <- here::here(file.path("data/outputs", output_name, "combined_results.csv"))
 
 # output dir
-out_dir <- here::here("tables/sims-variance")
+out_dir <- here::here(file.path("tables", output_name))
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # methods to report
