@@ -4,9 +4,11 @@ library(tidyverse)
 source("scripts/lib/plot_sim.R")
 
 # res_toy <- readr::read_csv("data/outputs/sims-bias_mse-no-filter-unmatched/toy_combined.csv")
-# res_toy <- readr::read_csv("data/outputs/sims-bias_mse/toy_combined.csv")
-res_toy <- readr::read_csv("data/outputs/sims-bias_mse-21Nov2025/toy_combined.csv") %>%
-  select(-bal2)
+res_toy <- readr::read_csv("data/outputs/sims-bias_mse/toy_combined.csv")
+# res_toy <- readr::read_csv("data/outputs/sims-bias_mse-21Nov2025/toy_combined.csv") %>%
+#   select(-bal2)
+# res_toy_26Apr <- readr::read_csv("data/outputs/sims-bias_mse-26Apr2026/toy_combined.csv") %>%
+#   select(-bal2)
 
 RMSE_plot(res_toy,
           title = "Toy Example",
@@ -29,7 +31,7 @@ res_toy_L <- res_toy %>%
 res_toy_L
 
 library( simhelpers )
-res_toy_L %>%
+tmp <- res_toy_L %>%
   group_by(method) %>%
   mutate( estimate = estimate - true_ATT,
           true_ATT = 0 ) %>%

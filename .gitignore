@@ -1,9 +1,12 @@
 # Write up
 /writeup/
+*.tex
 # Ferman analysis code
 /2021-Ferman-Stata-Code/
 # Results
 /sim_toy_results/
+# Claude files
+.claude/
 # History files
 .Rhistory
 .Rapp.history
