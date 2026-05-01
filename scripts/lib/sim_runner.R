@@ -19,6 +19,7 @@ ALL_METHODS <- c(
   "or_lm", "or_lm_main", "or_bart",
   "ps_lm", "ps_bart",
   "csm_scm", "csm_avg", "cem_scm", "cem_avg", "onenn",
+  "csm_scm_half", "csm_avg_half", "cem_scm_half", "cem_avg_half",
   "tmle1", "aipw1", "tmle2", "aipw2",
   "causal_forest", "twang", "kbal"
 )
@@ -39,6 +40,7 @@ expand_method_groups <- function(keys, drop_slow = FALSE) {
       old            = setdiff(ALL_METHODS, c("causal_forest", "twang", "kbal")),
       new            = c("causal_forest", "twang", "kbal"),
       matching       = c("csm_scm", "csm_avg", "cem_scm", "cem_avg", "onenn"),
+      matching_half  = c("csm_scm_half", "csm_avg_half", "cem_scm_half", "cem_avg_half"),
       ps             = c("ps_lm", "ps_bart"),
       or             = c("or_lm", "or_lm_main", "or_bart"),
       bal            = ,
@@ -149,11 +151,25 @@ run_all_methods <- function(df,
   r_or_bart <- safe_compute("or_bart", get_att_or_bart(df, form = form))
   r_ps_lm   <- safe_compute("ps_lm",  get_att_ps_lm(df,  form_int))
   r_ps_bart <- safe_compute("ps_bart", get_att_ps_bart(df, form = form))
-  r_csm_scm <- safe_compute("csm_scm", get_att_csm(df, scaling = dist_scaling, est_method = "scm",     rad_method = "fixed"))
-  r_csm_avg <- safe_compute("csm_avg", get_att_csm(df, scaling = dist_scaling, est_method = "average", rad_method = "fixed"))
+  # Fair comparison (Proposition §sec:compCEM): CSM caliper = range/(2*nbins),
+  # CEM bin-width = range/nbins = 2 × CSM caliper → equal catchment, CSM bias 2× tighter.
+  dist_scaling_csm <- df %>%
+    dplyr::summarize(dplyr::across(
+      dplyr::all_of(covs),
+      function(x) if (is.numeric(x)) (2 * nbins) / (max(x) - min(x)) else 1000
+    ))
+  r_csm_scm <- safe_compute("csm_scm", get_att_csm(df, scaling = dist_scaling_csm, est_method = "scm",     rad_method = "fixed"))
+  r_csm_avg <- safe_compute("csm_avg", get_att_csm(df, scaling = dist_scaling_csm, est_method = "average", rad_method = "fixed"))
   r_cem_scm <- safe_compute("cem_scm", get_att_cem(df, num_bins = nbins, est_method = "scm",     estimand = "CEM-ATT"))
   r_cem_avg <- safe_compute("cem_avg", get_att_cem(df, num_bins = nbins, est_method = "average", estimand = "CEM-ATT"))
   r_onenn   <- safe_compute("onenn",   get_att_1nn(df, scaling = dist_scaling))
+
+  # Half-bin variants at half granularity: CEM uses nbins/2, CSM uses 2*(nbins/2) = nbins
+  # (dist_scaling is already nbins/(max-min), so it gives CSM caliper = range/nbins = 2× CEM bin-width)
+  r_csm_scm_half <- safe_compute("csm_scm_half", get_att_csm(df, scaling = dist_scaling,      est_method = "scm",     rad_method = "fixed"))
+  r_csm_avg_half <- safe_compute("csm_avg_half", get_att_csm(df, scaling = dist_scaling,      est_method = "average", rad_method = "fixed"))
+  r_cem_scm_half <- safe_compute("cem_scm_half", get_att_cem(df, num_bins = nbins / 2, est_method = "scm",     estimand = "CEM-ATT"))
+  r_cem_avg_half <- safe_compute("cem_avg_half", get_att_cem(df, num_bins = nbins / 2, est_method = "average", estimand = "CEM-ATT"))
   r_tmle1   <- safe_compute("tmle1",   get_att_tmle(df, form = form, Q.SL.library = SL.library1,  g.SL.library = SL.library1))
   r_aipw1   <- safe_compute("aipw1",   get_att_aipw(df, form = form, Q.SL.library = SL.library1,  g.SL.library = SL.library1))
   r_tmle2   <- safe_compute("tmle2",   get_att_tmle(df, form = form, Q.SL.library = SL.library3Q, g.SL.library = SL.library3g))
@@ -168,12 +184,14 @@ run_all_methods <- function(df,
                 r_or_lm$est, r_or_lm_main$est, r_or_bart$est,
                 r_ps_lm$est, r_ps_bart$est,
                 r_csm_scm$est, r_csm_avg$est, r_cem_scm$est, r_cem_avg$est, r_onenn$est,
+                r_csm_scm_half$est, r_csm_avg_half$est, r_cem_scm_half$est, r_cem_avg_half$est,
                 r_tmle1$est, r_aipw1$est, r_tmle2$est, r_aipw2$est,
                 r_cf$est, r_twang$est, r_kbal$est),
     secs    = c(r_diff$secs, r_bal1$secs, r_bal2$secs,
                 r_or_lm$secs, r_or_lm_main$secs, r_or_bart$secs,
                 r_ps_lm$secs, r_ps_bart$secs,
                 r_csm_scm$secs, r_csm_avg$secs, r_cem_scm$secs, r_cem_avg$secs, r_onenn$secs,
+                r_csm_scm_half$secs, r_csm_avg_half$secs, r_cem_scm_half$secs, r_cem_avg_half$secs,
                 r_tmle1$secs, r_aipw1$secs, r_tmle2$secs, r_aipw2$secs,
                 r_cf$secs, r_twang$secs, r_kbal$secs)
   )
