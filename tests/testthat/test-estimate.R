@@ -666,3 +666,191 @@ test_that("het_var: handles subclasses with < 2 controls (var = NA)", {
   expect_equal(result$N_T, 2)
   expect_equal(result$ESS_C, 1)
 })
+
+
+# ---- Tests for calculate_s_j_sq -----------------------------------------
+
+test_that("calculate_s_j_sq: s_t_sq correct per subclass", {
+  # s1 controls: Y=c(2,4) -> var=2; s2 controls: Y=c(10,14) -> var=8
+  # s3 has only 1 control -> filtered out
+  result <- calculate_s_j_sq(mock_matches_het, outcome = "Y", treatment = "Z")
+
+  expect_named(result, c("s_t_sq", "s_j_sq"))
+  expect_equal(nrow(result$s_t_sq), 2)   # s1 and s2 only
+
+  s_t <- result$s_t_sq %>% arrange(subclass)
+  expect_equal(s_t$s_t_sq, c(2, 8))
+})
+
+test_that("calculate_s_j_sq: s_j_sq averages correctly when control in one subclass", {
+  result <- calculate_s_j_sq(mock_matches_het, outcome = "Y", treatment = "Z")
+  sj <- result$s_j_sq %>% mutate(id = as.character(id)) %>% arrange(id)
+
+  # id=2 (s1 only): s_j_sq = 2
+  # id=3 (s1 only): s_j_sq = 2
+  # id=5 (s2 only): s_j_sq = 8
+  # id=6 (s2 only): s_j_sq = 8
+  # id=8 (s3 only): all subclasses have NA -> NaN
+  expect_equal(sj$s_j_sq[sj$id == "2"], 2)
+  expect_equal(sj$s_j_sq[sj$id == "3"], 2)
+  expect_equal(sj$s_j_sq[sj$id == "5"], 8)
+  expect_equal(sj$s_j_sq[sj$id == "6"], 8)
+  expect_true(is.nan(sj$s_j_sq[sj$id == "8"]))
+})
+
+test_that("calculate_s_j_sq: control in multiple subclasses averages s_t_sq", {
+  # Control c1 appears in both s1 (s_t_sq=2) and s2 (s_t_sq=18)
+  # -> s_j_sq(c1) = (2+18)/2 = 10
+  multi_match <- tibble(
+    id       = c("t1", "c1", "c2",  "t2", "c1", "c3"),
+    subclass = c("s1", "s1", "s1",  "s2", "s2", "s2"),
+    Z        = c(1, 0, 0,  1, 0, 0),
+    Y        = c(10, 2, 4, 20, 2, 8),
+    weights  = c(1, 0.5, 0.5,  1, 0.3, 0.7)
+  )
+  result <- calculate_s_j_sq(multi_match, outcome = "Y", treatment = "Z")
+  sj <- result$s_j_sq
+
+  # var(c(2,4))=2, var(c(2,8))=18
+  expect_equal(result$s_t_sq %>% filter(subclass == "s1") %>% pull(s_t_sq), 2)
+  expect_equal(result$s_t_sq %>% filter(subclass == "s2") %>% pull(s_t_sq), 18)
+  expect_equal(sj$s_j_sq[sj$id == "c1"], 10)   # mean(2, 18)
+  expect_equal(sj$s_j_sq[sj$id == "c2"], 2)
+  expect_equal(sj$s_j_sq[sj$id == "c3"], 18)
+})
+
+
+# ---- Tests for calculate_S1_sq_treated_to_treated -----------------------
+
+test_that("calculate_S1_sq_treated_to_treated: hand-check with 2 treated units", {
+  # T1 at X1=0, Y=5; T2 at X1=10, Y=20; one control (irrelevant)
+  # K=1: T1 matches T2 (only other treated), s_1t = (5-20)^2 = 225
+  #       T2 matches T1,                     s_1t = (20-5)^2 = 225
+  # S1^2 = 225
+  set.seed(1)
+  df_test <- tibble(
+    id = c("t1", "t2", "c1"),
+    Z  = c(1L, 1L, 0L),
+    X1 = c(0, 10, 5),
+    Y  = c(5, 20, 12)
+  )
+  result <- calculate_S1_sq_treated_to_treated(
+    df = df_test, treatment = "Z", outcome = "Y",
+    K = 1, covs = "X1",
+    scaling = c(X1 = 1), metric = "maximum", id_name = "id"
+  )
+
+  expect_named(result, c("S1_sq", "s_1t_sq"))
+  expect_equal(result$S1_sq, 225)
+  expect_equal(nrow(result$s_1t_sq), 2)
+  expect_true(all(result$s_1t_sq$s_1t_sq == 225))
+})
+
+test_that("calculate_S1_sq_treated_to_treated: K=2 with 3 treated units", {
+  # T1 at X1=0, Y=0; T2 at X1=1, Y=2; T3 at X1=2, Y=4
+  # K=2: each unit uses its 2 nearest treated neighbours
+  # T1 -> T2(Y=2) and T3(Y=4); Y_hat = 3; s_1t = (0-3)^2 = 9
+  # T2 -> T1(Y=0) and T3(Y=4); Y_hat = 2; s_1t = (2-2)^2 = 0
+  # T3 -> T1(Y=0) and T2(Y=2); Y_hat = 1; s_1t = (4-1)^2 = 9
+  # S1^2 = (9+0+9)/3 = 6
+  set.seed(2)
+  df_test <- tibble(
+    id = c("t1", "t2", "t3", "c1"),
+    Z  = c(1L, 1L, 1L, 0L),
+    X1 = c(0, 1, 2, 1.5),
+    Y  = c(0, 2, 4, 1)
+  )
+  result <- calculate_S1_sq_treated_to_treated(
+    df = df_test, treatment = "Z", outcome = "Y",
+    K = 2, covs = "X1",
+    scaling = c(X1 = 1), metric = "maximum", id_name = "id"
+  )
+
+  expect_equal(result$S1_sq, 6)
+})
+
+
+# ---- Tests for get_measurement_error_variance_alt -----------------------
+
+# Hand-computed example:
+# subclass s1: T1 (Z=1, Y=10), C1 (Z=0, Y=2, w=0.5), C2 (Z=0, Y=4, w=0.5)
+# subclass s2: T2 (Z=1, Y=20), C1 (Z=0, Y=2, w=0.3), C3 (Z=0, Y=8, w=0.7)
+# s_t_sq(s1) = var(2,4) = 2;  s_t_sq(s2) = var(2,8) = 18
+# s_j_sq: C1 = mean(2,18)=10, C2=2, C3=18
+# w_j:   C1=0.8, C2=0.5, C3=0.7
+# S0^2 = (0.64*10 + 0.25*2 + 0.49*18) / (0.64+0.25+0.49)
+#       = (6.4 + 0.5 + 8.82) / 1.38  = 15.72/1.38
+# N_T=2, sum_w_j=2, sum_w_j_sq=0.64+0.25+0.49=1.38, ESS_C=4/1.38
+# S1^2 (common var) = mean(2,18) = 10
+# V_E_alt = 10/2 + (15.72/1.38)/(4/1.38) = 5 + 15.72/4 = 5 + 3.93 = 8.93
+
+mock_alt_matches <- tibble(
+  id       = c("T1","C1","C2", "T2","C1","C3"),
+  subclass = c("s1","s1","s1", "s2","s2","s2"),
+  Z        = c(1, 0, 0,  1, 0, 0),
+  Y        = c(10, 2, 4, 20, 2, 8),
+  weights  = c(1, 0.5, 0.5,  1, 0.3, 0.7)
+)
+
+test_that("get_measurement_error_variance_alt: common variance, hand-computed values", {
+  result <- get_measurement_error_variance_alt(
+    mock_alt_matches,
+    outcome = "Y", treatment = "Z",
+    use_common_variance = TRUE
+  )
+
+  expect_named(result, c("V_E_alt","S0_sq","S1_sq","s_j_sq",
+                          "s_t_sq","s_1t_sq","cov_w_s","N_T","ESS_C"))
+
+  expect_equal(result$N_T,   2)
+  expect_equal(result$ESS_C, 4 / 1.38, tolerance = 1e-6)
+  expect_equal(result$S1_sq, 10)                     # mean(2, 18)
+  expect_equal(result$S0_sq, 15.72 / 1.38, tolerance = 1e-6)
+
+  expected_V_E_alt <- 10 / 2 + (15.72 / 1.38) / (4 / 1.38)
+  expect_equal(result$V_E_alt, expected_V_E_alt, tolerance = 1e-6)
+
+  # s_1t_sq should be NULL under common-variance assumption
+  expect_null(result$s_1t_sq)
+
+  # cov_w_s: cov(c(0.8,0.5,0.7), c(10,2,18)) = 0.8
+  expect_equal(result$cov_w_s, 0.8, tolerance = 1e-6)
+})
+
+test_that("get_measurement_error_variance_alt: returns V_E_alt > 0", {
+  result <- get_measurement_error_variance_alt(
+    mock_matches_het,
+    outcome = "Y", treatment = "Z",
+    use_common_variance = TRUE
+  )
+  expect_true(result$V_E_alt > 0)
+  expect_equal(result$N_T, 3)
+})
+
+test_that("get_measurement_error_variance_alt: errors without df when use_common_variance=FALSE", {
+  expect_error(
+    get_measurement_error_variance_alt(
+      mock_alt_matches, df = NULL,
+      use_common_variance = FALSE
+    ),
+    regexp = "'df' is required"
+  )
+})
+
+test_that("calculate_S1_sq_treated_to_treated: returns list with correct names", {
+  set.seed(99)
+  df_small <- tibble(
+    id = c("t1", "t2", "c1"),
+    Z  = c(1L, 1L, 0L),
+    X1 = c(0, 5, 2),
+    Y  = c(3, 7, 5)
+  )
+  result <- calculate_S1_sq_treated_to_treated(
+    df_small, K = 1, covs = "X1",
+    scaling = c(X1 = 1)
+  )
+  expect_named(result, c("S1_sq", "s_1t_sq"))
+  expect_true(is.numeric(result$S1_sq))
+  expect_true(result$S1_sq >= 0)
+  expect_equal(nrow(result$s_1t_sq), 2)
+})
