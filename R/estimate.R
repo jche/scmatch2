@@ -1093,7 +1093,7 @@ calculate_S1_sq_treated_to_treated <- function(
     }
 
     Y_hat <- mean(neighbors[[outcome]])
-    s_1t_sq <- (t_Y - Y_hat)^2
+    s_1t_sq <- (t_Y - Y_hat)^2 * K / (K + 1L)
     tibble(!!id_sym := t_id, s_1t_sq = s_1t_sq)
   })
 

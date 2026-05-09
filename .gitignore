@@ -46,6 +46,7 @@ vignettes/*.pdf
 /scripts/sims-variance-fully-adaptive(1nn)/logs/
 /scripts/sims-variance-het-sigma/logs/
 /scripts/sims-variance-het-sigma-bimodal/logs/
+/scripts/sims-variance-het-sigma-bimodal-v2/logs/
 
 # Research paper results
 /tables
