@@ -1,3 +1,5 @@
 ^scmatch2\.Rproj$
 ^\.Rproj\.user$
 ^README\.Rmd$
+^\.positai$
+^\.claude$
