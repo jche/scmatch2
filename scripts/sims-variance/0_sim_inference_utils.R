@@ -38,8 +38,8 @@ save_res_to_csv <- function(curr_res, FNAME) {
   }
 }
 
-get_sim_paths <- function() {
-  output_dir_base <- here::here("data/outputs/sims-variance")
+get_sim_paths <- function(output_name = "sims-variance") {
+  output_dir_base <- here::here(file.path("data/outputs", output_name))
   dir.create(output_dir_base, showWarnings = FALSE, recursive = TRUE)
   list(
     output_dir_base = output_dir_base,
@@ -47,42 +47,6 @@ get_sim_paths <- function() {
     summary_csv = file.path(output_dir_base, "summary_table.csv"),
     combined_csv = file.path(output_dir_base, "combined_results.csv")
   )
-}
-
-# Collect rds results into one CSV (optional utility)
-collect_results_to_csv <- function(combined_csv = here::here("toy-sim/data/combined_results.csv")) {
-  paths <- get_sim_paths()
-  individual_dir <- paths$individual_dir
-  dir.create(individual_dir, showWarnings = FALSE, recursive = TRUE)
-
-  result_files <- list.files(
-    path = individual_dir,
-    pattern = "^toy_match_infer_iter_\\d+\\.rds$",
-    full.names = TRUE
-  )
-
-  if (length(result_files) == 0) {
-    stop("No result files found in: ", individual_dir, call. = FALSE)
-  }
-
-  combined_results <- tibble()
-  failed_files <- character()
-
-  for (fp in result_files) {
-    res <- tryCatch(readRDS(fp), error = function(e) NULL)
-    if (is.null(res)) {
-      failed_files <- c(failed_files, basename(fp))
-    } else {
-      combined_results <- bind_rows(combined_results, res)
-    }
-  }
-
-  if (nrow(combined_results) == 0) {
-    stop("No valid results were found.", call. = FALSE)
-  }
-
-  readr::write_csv(combined_results, combined_csv)
-  invisible(list(n_rows = nrow(combined_results), failed = failed_files))
 }
 
 # -------------------------------------------------------------------
@@ -173,6 +137,9 @@ toy_match_infer <- function(
     f0_sd = 0.5,
     ctr_dist = 0.5,
     nbins = 6,
+    rad_method = "adaptive",
+    k_match = 5,
+    est_method = "scm",
     include_bootstrap = TRUE,
     boot_mtd = "wild",
     B = 250,
@@ -193,20 +160,18 @@ toy_match_infer <- function(
     seed = seed_addition
   )
 
-  covs <- c("X1", "X2")
   scaling <- compute_toy_scaling(df, nbins = nbins)
 
-  # --- matching: mimic your snippet intent ---
-  # adaptive caliper w/ k=5 (shrink/expand) and est_method "scm"
+  # --- matching ---
   mtch <- tryCatch({
     get_cal_matches(
       data = df,
       Z ~ X1 + X2,
-      rad_method = "adaptive",
+      rad_method = rad_method,
       scaling = scaling,
-      k = 5,
+      k = k_match,
       warn = FALSE,
-      est_method = "scm"
+      est_method = est_method
     )
   }, error = function(e) {
     if (verbose) message("Matching failed iter ", i, ": ", e$message)
@@ -235,8 +200,6 @@ toy_match_infer <- function(
     message("DEBUG has Y? ", "Y" %in% names(rt))
     message("DEBUG has Z? ", "Z" %in% names(rt))
   }
-
-
 
   # overlap stats (optional; keep light)
   overlap_stats <- list()
@@ -275,12 +238,8 @@ toy_match_infer <- function(
     out
   }
 
-
   att_pooled <- if (!is.null(mtch)) get_one("pooled", get_ATT_estimate(mtch, variance_method = "pooled")) else NULL
   att_pooled_het <- if (!is.null(mtch)) get_one("pooled_het", get_ATT_estimate(mtch, variance_method = "pooled_het")) else NULL
-  att_ai06 <- if (!is.null(mtch)) {
-    get_one("ai06", get_ATT_estimate(mtch, variance_method = "ai06", df = df, M = 5, covs = covs))
-  } else NULL
 
   att_boot <- if (include_bootstrap && !is.null(mtch)) {
     get_one("bootstrap", get_ATT_estimate(mtch, variance_method = "bootstrap", boot_mtd = boot_mtd, B = B, seed_addition = seed_addition))
@@ -317,7 +276,6 @@ toy_match_infer <- function(
 
   results_list[["pooled"]] <- extract_tbl(att_pooled, "pooled")
   results_list[["pooled_het"]] <- extract_tbl(att_pooled_het, "pooled_het")
-  results_list[["ai06"]] <- extract_tbl(att_ai06, "ai06")
   if (include_bootstrap) results_list[["bootstrap"]] <- extract_tbl(att_boot, "bootstrap")
 
   rs <- bind_rows(results_list)
@@ -329,7 +287,6 @@ toy_match_infer <- function(
   make_VE_CI_row <- function(df_one_row, new_name) {
     if (is.null(df_one_row) || nrow(df_one_row) == 0) return(NULL)
 
-    # If V_E or att_est is missing, keep NA outputs (still append row)
     ve_se <- ifelse(is.na(df_one_row$V_E), NA_real_, sqrt(df_one_row$V_E))
     att   <- df_one_row$att_est
 
@@ -339,7 +296,6 @@ toy_match_infer <- function(
         SE = ve_se,
         CI_lower = att - 1.96 * ve_se,
         CI_upper = att + 1.96 * ve_se,
-        # optional: keep t consistent with this SE
         t = att / ve_se
       )
   }
@@ -352,10 +308,7 @@ toy_match_infer <- function(
 
   rs <- bind_rows(rs, pooled_VE_CI_row, pooled_het_VE_CI_row)
 
-
-  # True SATT (sample ATT among treated): mean(tau) in sample
-  # In gen_df_adv, Y1 = Y0 + tau, so tau = Y1 - Y0 (noise cancels)
-  # Here df has Y0, Y1 columns; use treated units Z==1
+  # True SATT (sample ATT among treated)
   true_satt <- df %>%
     filter(Z == 1) %>%
     summarise(att = mean(Y1 - Y0)) %>%
@@ -365,7 +318,6 @@ toy_match_infer <- function(
 
   # Post-match bias: weighted diff in Y0 between treated and controls in matched set
   bias_val <- NA_real_
-  full_units <- NULL
   if (!is.null(mtch)) {
     full_units <- tryCatch(result_table(mtch, nonzero_weight_only = TRUE), error = function(e) NULL)
     if (!is.null(full_units) && nrow(full_units) > 0 && all(c("Y0", "weights", "Z") %in% names(full_units))) {
@@ -396,6 +348,9 @@ toy_match_infer <- function(
       f0_sd = f0_sd,
       ctr_dist = ctr_dist,
       nbins = nbins,
+      rad_method = rad_method,
+      k_match = k_match,
+      est_method = est_method,
       status = ifelse(is.null(mtch), "Matching Failed", "Success")
     )
 
@@ -406,8 +361,11 @@ toy_match_infer <- function(
 # sim_master: wrapper called by parallel script
 # -------------------------------------------------------------------
 
-sim_master <- function(iteration, N = 600, overlap_label, error_label = "homoskedastic", k_dim = 2, grid_id = 1, ...) {
-  # Overlap knob: prop of uniform controls
+sim_master <- function(
+    iteration, N = 600, overlap_label, error_label = "homoskedastic",
+    rad_method = "adaptive", k_match = 5, est_method = "scm",
+    k_dim = 2, grid_id = 1, ...
+) {
   prop_nc_unif_values <- c(
     very_high   = 2/3,
     high        = 1/2,
@@ -418,11 +376,9 @@ sim_master <- function(iteration, N = 600, overlap_label, error_label = "homoske
   prop_nc_unif <- prop_nc_unif_values[[overlap_label]]
   if (is.null(prop_nc_unif)) stop("Unknown overlap_label: ", overlap_label)
 
-  # fixed sample size per your replication request
   nt <- 100
   nc <- 500
 
-  # seed scheme (stable across grid/labels)
   generate_seed <- function(i, overlap_label, error_label, N) {
     overlap_levels <- c("very_low", "low", "mid", "high", "very_high")
     error_levels <- c("homoskedastic", "covariate_dep", "treatment_dep")
@@ -453,6 +409,9 @@ sim_master <- function(iteration, N = 600, overlap_label, error_label = "homoske
       f0_sd = 0.5,
       ctr_dist = 0.5,
       nbins = 6,
+      rad_method = rad_method,
+      k_match = k_match,
+      est_method = est_method,
       include_bootstrap = TRUE,
       boot_mtd = "wild",
       B = 250,

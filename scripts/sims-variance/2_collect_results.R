@@ -1,5 +1,8 @@
 # scripts/sims-variance/2_collect_results.R
 #!/usr/bin/env Rscript
+#
+# Usage: Rscript 2_collect_results.R <output_name>
+#   output_name  subdirectory under data/outputs/ (default: sims-variance)
 
 suppressPackageStartupMessages({
   library(dplyr)
@@ -9,12 +12,15 @@ suppressPackageStartupMessages({
   library(here)
 })
 
-# Where your toy_match_infer saves individual results
+args <- commandArgs(trailingOnly = TRUE)
+output_name <- if (length(args) >= 1) args[[1]] else "sims-variance"
+
+out_base <- here::here(file.path("data/outputs", output_name))
 paths <- list(
-  out_base = here::here("data/outputs/sims-variance"),
-  individual_dir = here::here("data/outputs/sims-variance/individual"),
-  combined_csv = here::here("data/outputs/sims-variance/combined_results.csv"),
-  combined_rds = here::here("data/outputs/sims-variance/combined_results.rds")
+  out_base      = out_base,
+  individual_dir = file.path(out_base, "individual"),
+  combined_csv   = file.path(out_base, "combined_results.csv"),
+  combined_rds   = file.path(out_base, "combined_results.rds")
 )
 
 dir.create(paths$out_base, showWarnings = FALSE, recursive = TRUE)

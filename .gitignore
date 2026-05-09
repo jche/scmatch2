@@ -1,9 +1,12 @@
 # Write up
 /writeup/
+*.tex
 # Ferman analysis code
 /2021-Ferman-Stata-Code/
 # Results
 /sim_toy_results/
+# Claude files
+.claude/
 # History files
 .Rhistory
 .Rapp.history
@@ -40,6 +43,10 @@ vignettes/*.pdf
 /scripts/inference-scripts/logs/
 /scripts/sims-variance/logs/
 /scripts/sims-variance-knn5avg/logs/
+/scripts/sims-variance-fully-adaptive(1nn)/logs/
+/scripts/sims-variance-het-sigma/logs/
+/scripts/sims-variance-het-sigma-bimodal/logs/
+/scripts/sims-variance-het-sigma-bimodal-v2/logs/
 
 # Research paper results
 /tables
@@ -49,6 +56,7 @@ vignettes/*.pdf
 /scripts/more-inference-applications/
 /scripts/replication_code_wang_zubizarreta_mabw/
 /figures
+/scripts/data/
 
 # Ongoing work
 bootstrap_failure_matching.png

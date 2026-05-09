@@ -1,0 +1,24 @@
+Loading R/4.3.2
+  Loading requirement: gcc/9.2.0
+Loading required package: usethis
+ℹ Loading CSM
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats   1.0.0     ✔ purrr     1.0.4
+✔ ggplot2   4.0.2     ✔ stringr   1.5.1
+✔ lubridate 1.9.4     ✔ tidyr     1.3.1
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Starting iter=395 output=sims-variance-het-sigma overlaps={very_low,low,mid,high,very_high} sigma1_extras={0,0.5}
+Saved: /homes2/xmeng/scmatch2/data/outputs/sims-variance-het-sigma/individual/het_sigma_iter_0395_overlap_very_low_s1extra_0.00.rds
+Saved: /homes2/xmeng/scmatch2/data/outputs/sims-variance-het-sigma/individual/het_sigma_iter_0395_overlap_very_low_s1extra_0.50.rds
+Saved: /homes2/xmeng/scmatch2/data/outputs/sims-variance-het-sigma/individual/het_sigma_iter_0395_overlap_low_s1extra_0.00.rds
+Saved: /homes2/xmeng/scmatch2/data/outputs/sims-variance-het-sigma/individual/het_sigma_iter_0395_overlap_low_s1extra_0.50.rds
+Saved: /homes2/xmeng/scmatch2/data/outputs/sims-variance-het-sigma/individual/het_sigma_iter_0395_overlap_mid_s1extra_0.00.rds
+Saved: /homes2/xmeng/scmatch2/data/outputs/sims-variance-het-sigma/individual/het_sigma_iter_0395_overlap_mid_s1extra_0.50.rds
+Saved: /homes2/xmeng/scmatch2/data/outputs/sims-variance-het-sigma/individual/het_sigma_iter_0395_overlap_high_s1extra_0.00.rds
+Saved: /homes2/xmeng/scmatch2/data/outputs/sims-variance-het-sigma/individual/het_sigma_iter_0395_overlap_high_s1extra_0.50.rds
+Saved: /homes2/xmeng/scmatch2/data/outputs/sims-variance-het-sigma/individual/het_sigma_iter_0395_overlap_very_high_s1extra_0.00.rds
+Saved: /homes2/xmeng/scmatch2/data/outputs/sims-variance-het-sigma/individual/het_sigma_iter_0395_overlap_very_high_s1extra_0.50.rds
+Done iter=395

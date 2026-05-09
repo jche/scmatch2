@@ -103,7 +103,7 @@ if (sim_type == "acic") {
     }
   )
   form  <- as.formula("Z ~ X1 + X2")
-  nbins <- 6
+  nbins <- 5
 
 } else {
   stop("sim_type must be one of: 'acic', 'hainmueller', 'kang', 'toy'")
@@ -125,7 +125,7 @@ df        <- df %>% filter(!id %in% attr(preds_csm, "unmatched_units"))
 data_time <- as.numeric(difftime(Sys.time(), data_start, units = "secs"))
 
 true_ATT <- if (sim_type %in% c("acic","toy")) {
-  df %>% dplyr::filter(Z) %>% summarize(att = mean(Y1 - Y0)) %>% pull(att)
+  df %>% dplyr::filter(Z == 1) %>% summarize(att = mean(Y1 - Y0)) %>% pull(att)
 } else 0
 
 cat(sprintf("Data generated: n=%d, true_ATT=%.3f, time=%.2fs\n", nrow(df), true_ATT, data_time))
@@ -158,6 +158,14 @@ res <- tibble(
   )
 
 output_file <- file.path(output_dir, sprintf("iter_%04d.csv", iteration_id))
+
+if (file.exists(output_file)) {
+  existing <- read_csv(output_file, show_col_types = FALSE)
+  cat(sprintf("Merging into existing file (updating: %s)\n", paste(SELECTED_METHODS, collapse = ", ")))
+  for (col in SELECTED_METHODS) existing[[col]] <- res[[col]]
+  res <- existing
+}
+
 write_csv(res, output_file)
 cat(sprintf("\nIteration %d complete! Total time: %.2f seconds\n", iteration_id, total_time))
 cat(sprintf("Results saved to: %s\n", output_file))

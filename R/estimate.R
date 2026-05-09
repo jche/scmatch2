@@ -977,3 +977,226 @@ estimate_ATT <- function(
 }
 
 
+#' Compute per-subclass s_t^2 and per-control-unit s_j^2
+#'
+#' For each treated unit's matched set (subclass), computes the variance of
+#' control outcomes s_t^2.  Then, for each control unit j, averages the s_t^2
+#' values over all subclasses that j appears in to obtain s_j^2.
+#'
+#' @param matches_table Full matched table (output of full_unit_table or result_table)
+#' @param outcome Name of outcome variable (default "Y")
+#' @param treatment Name of treatment variable (default "Z")
+#' @return A list with:
+#'   \describe{
+#'     \item{s_t_sq}{Data frame with columns \code{subclass} and \code{s_t_sq}.
+#'       Only subclasses with at least 2 controls are included.}
+#'     \item{s_j_sq}{Data frame with columns \code{id} and \code{s_j_sq}.
+#'       One row per control unit.  Units whose subclasses all have fewer than 2
+#'       controls will have \code{NaN}.}
+#'   }
+#' @export
+calculate_s_j_sq <- function(matches_table, outcome = "Y", treatment = "Z") {
+  matches_table <- matches_table %>%
+    mutate(id = as.character(id))
+
+  s_t_sq_df <- matches_table %>%
+    filter(!!sym(treatment) == 0) %>%
+    group_by(subclass) %>%
+    filter(n() >= 2) %>%
+    summarise(s_t_sq = var(!!sym(outcome)), .groups = "drop")
+
+  s_j_sq_df <- matches_table %>%
+    filter(!!sym(treatment) == 0) %>%
+    left_join(s_t_sq_df, by = "subclass") %>%
+    group_by(id) %>%
+    summarise(s_j_sq = mean(s_t_sq, na.rm = TRUE), .groups = "drop")
+
+  list(s_t_sq = s_t_sq_df, s_j_sq = s_j_sq_df)
+}
+
+
+#' Compute S1^2 via treated-to-treated matching
+#'
+#' For each treated unit t, finds the K nearest treated units (using uniform
+#' weights 1/K), then computes s_{1t}^2 = (Y_t - mean_{K-NN} Y)^2.
+#' Returns S1^2 = mean_t(s_{1t}^2).
+#'
+#' @param df Full data frame (treated and control units).
+#' @param treatment Name of treatment variable.
+#' @param outcome Name of outcome variable.
+#' @param K Number of nearest treated neighbors.
+#' @param covs Character vector of covariate column names, or NULL to auto-detect
+#'   columns starting with "X" (default NULL).
+#' @param scaling Scaling vector passed to get_cal_matches.  If NULL, uses
+#'   default_scaling(df, covs).
+#' @param metric Distance metric passed to get_cal_matches (default "maximum").
+#' @param id_name Name of the unit ID column (default "id").
+#' @return A list with:
+#'   \describe{
+#'     \item{S1_sq}{Scalar: mean of s_{1t}^2 over treated units.}
+#'     \item{s_1t_sq}{Data frame with columns \code{id} and \code{s_1t_sq}.}
+#'   }
+#' @export
+calculate_S1_sq_treated_to_treated <- function(
+    df, treatment = "Z", outcome = "Y",
+    K = 1, covs = NULL,
+    scaling = NULL, metric = "maximum", id_name = "id") {
+
+  treatment_sym <- sym(treatment)
+  id_sym <- sym(id_name)
+
+  df <- df %>% mutate(!!id_sym := as.character(!!id_sym))
+  df_t <- df %>% filter(!!treatment_sym == 1)
+
+  # Resolve covariates to a character vector
+  if (is.null(covs)) {
+    covs <- get_x_vars(df)
+  }
+
+  df_t_pool <- df_t %>%
+    mutate(!!treatment_sym := 0L,
+           !!id_sym := paste0(!!id_sym, "_pool"))
+
+  df_fake <- bind_rows(df_t, df_t_pool)
+
+  if (is.null(scaling)) {
+    scaling <- default_scaling(df, covs)
+  }
+
+  matches_tt <- get_cal_matches(
+    data = df_fake,
+    covs = covs,
+    treatment = treatment,
+    metric = metric,
+    rad_method = "knn",
+    k = K + 1,
+    scaling = scaling,
+    id_name = id_name,
+    warn = FALSE,
+    est_method = "average"
+  )
+
+  s_1t_sq_list <- purrr::map(matches_tt$matches, function(match_df) {
+    t_id <- as.character(match_df$subclass[1])
+    t_Y <- df_t %>%
+      filter(!!id_sym == t_id) %>%
+      pull(!!sym(outcome))
+
+    neighbors <- match_df %>%
+      filter(!!treatment_sym == 0, dist > 1e-8) %>%
+      slice_head(n = K)
+
+    if (nrow(neighbors) < K) {
+      warning(paste("Treated unit", t_id, "has only", nrow(neighbors),
+                    "treated neighbours; s_1t_sq set to NA."))
+      return(tibble(!!id_sym := t_id, s_1t_sq = NA_real_))
+    }
+
+    Y_hat <- mean(neighbors[[outcome]])
+    s_1t_sq <- (t_Y - Y_hat)^2 * K / (K + 1L)
+    tibble(!!id_sym := t_id, s_1t_sq = s_1t_sq)
+  })
+
+  s_1t_sq_df <- bind_rows(s_1t_sq_list)
+  S1_sq <- mean(s_1t_sq_df$s_1t_sq, na.rm = TRUE)
+
+  list(S1_sq = S1_sq, s_1t_sq = s_1t_sq_df)
+}
+
+
+#' Alternative measurement error variance estimator (hat_V_E_alt)
+#'
+#' Implements the plug-in estimator
+#'   hat_V_E_alt = S1^2 / n_T  +  S0^2 / ESS(C)
+#' where S0^2 is the w_j^2-weighted average of s_j^2 across control units, and
+#' S1^2 is either the simple average of s_t^2 (common-variance assumption) or
+#' the average of s_{1t}^2 from treated-to-treated K-NN matching.
+#'
+#' Also returns the empirical covariance Cov_p(w_j, s_j^2):
+#'   hat_V_E_alt = S^2*(1/n_T + 1/ESS_C) + (1/n_T)*Cov_p(w_j, s_j^2)
+#'
+#' @param matches_table Full matched table (output of full_unit_table).
+#' @param df Full original data frame.  Required when
+#'   \code{use_common_variance = FALSE}.
+#' @param outcome Name of outcome variable (default "Y").
+#' @param treatment Name of treatment variable (default "Z").
+#' @param use_common_variance If TRUE (default), estimate S1^2 from the
+#'   control-side subclass variances (assuming sigma_1(x)=sigma_0(x)).
+#'   If FALSE, estimate S1^2 via treated-to-treated K-NN matching.
+#' @param K Number of treated neighbours for the treated-to-treated step
+#'   (used only when \code{use_common_variance = FALSE}).
+#' @param covs Character vector of covariate names, or NULL to auto-detect
+#'   columns starting with "X".
+#' @param scaling Scaling vector for distance computation.
+#' @param metric Distance metric (default "maximum").
+#' @param id_name Name of the unit ID column (default "id").
+#' @return A list with elements V_E_alt, S0_sq, S1_sq, s_j_sq (data frame with
+#'   id/w_j/s_j_sq), s_t_sq, s_1t_sq (NULL when use_common_variance=TRUE),
+#'   cov_w_s, N_T, ESS_C.
+#' @export
+get_measurement_error_variance_alt <- function(
+    matches_table,
+    df = NULL,
+    outcome = "Y",
+    treatment = "Z",
+    use_common_variance = TRUE,
+    K = 1,
+    covs = NULL,
+    scaling = NULL,
+    metric = "maximum",
+    id_name = "id") {
+
+  matches_table <- matches_table %>%
+    mutate(id = as.character(id))
+
+  sample_sizes <- calc_N_T_N_C(matches_table, treatment = treatment)
+  N_T   <- sample_sizes$N_T
+  ESS_C <- sample_sizes$N_C_tilde
+
+  sj_result <- calculate_s_j_sq(matches_table, outcome = outcome, treatment = treatment)
+  s_t_sq_df <- sj_result$s_t_sq
+  s_j_sq_df <- sj_result$s_j_sq
+
+  w_j_df <- matches_table %>%
+    filter(!!sym(treatment) == 0) %>%
+    group_by(id) %>%
+    summarise(w_j = sum(weights), .groups = "drop")
+
+  control_df <- w_j_df %>%
+    left_join(s_j_sq_df, by = "id")
+
+  sum_w_sq <- sum(control_df$w_j^2, na.rm = TRUE)
+  S0_sq    <- sum(control_df$w_j^2 * control_df$s_j_sq, na.rm = TRUE) / sum_w_sq
+
+  cov_w_s <- cov(control_df$w_j, control_df$s_j_sq, use = "complete.obs")
+
+  s_1t_sq_df <- NULL
+  if (use_common_variance) {
+    S1_sq <- mean(s_t_sq_df$s_t_sq, na.rm = TRUE)
+  } else {
+    if (is.null(df)) {
+      stop("'df' is required when use_common_variance = FALSE")
+    }
+    tt_result  <- calculate_S1_sq_treated_to_treated(
+      df = df, treatment = treatment, outcome = outcome,
+      K = K, covs = covs, scaling = scaling,
+      metric = metric, id_name = id_name
+    )
+    S1_sq      <- tt_result$S1_sq
+    s_1t_sq_df <- tt_result$s_1t_sq
+  }
+
+  V_E_alt <- S1_sq / N_T + S0_sq / ESS_C
+
+  list(
+    V_E_alt = V_E_alt,
+    S0_sq   = S0_sq,
+    S1_sq   = S1_sq,
+    s_j_sq  = control_df,
+    s_t_sq  = s_t_sq_df,
+    s_1t_sq = s_1t_sq_df,
+    cov_w_s = cov_w_s,
+    N_T     = N_T,
+    ESS_C   = ESS_C
+  )
+}

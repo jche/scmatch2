@@ -59,6 +59,41 @@ test_that("cem returns numeric", {
 })
 
 
+test_that("get_cem_matches average weights: treated unit gets 1, controls share equally", {
+  # Regression test for bug where treatment=NULL caused all units in a subclass
+  # to get weight 1/n_total instead of treated=1, controls=1/n_controls.
+  set.seed(42)
+  df <- CSM:::gen_one_toy(nc = 80, nt = 25, f0_sd = 0.5)
+
+  res_all <- get_cem_matches(data = df, num_bins = 6, est_method = "average",
+                             return = "all", warn = FALSE)
+
+  # Every treated unit must have weight exactly 1
+  tx_weights <- res_all %>% dplyr::filter(Z == 1) %>% dplyr::pull(weights)
+  expect_true(all(tx_weights == 1),
+              info = "Treated units must have weight 1 under est_method='average'")
+
+  # Within each subclass, control weights must sum to 1
+  co_weight_sums <- res_all %>%
+    dplyr::filter(Z == 0) %>%
+    dplyr::group_by(subclass) %>%
+    dplyr::summarize(wsum = sum(weights), .groups = "drop") %>%
+    dplyr::pull(wsum)
+  expect_true(all(abs(co_weight_sums - 1) < 1e-10),
+              info = "Control weights must sum to 1 within each subclass")
+
+  # Each individual control weight must equal 1/n_controls for that subclass
+  co_weights_check <- res_all %>%
+    dplyr::filter(Z == 0) %>%
+    dplyr::group_by(subclass) %>%
+    dplyr::mutate(expected_w = 1 / dplyr::n()) %>%
+    dplyr::ungroup()
+  expect_equal(co_weights_check$weights, co_weights_check$expected_w,
+               tolerance = 1e-10,
+               label = "Each control weight equals 1/(number of controls in subclass)")
+})
+
+
 
 test_that("get_matches works with different matching types", {
   test_df <- data.frame(Z = c(1,0,0,0,1),
