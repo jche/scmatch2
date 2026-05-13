@@ -1,11 +1,12 @@
-# scripts/lalonde-analysis/02-core-lalonde-analysis.R
-# Conduct the core analysis for prepping summary results
+
+# Conduct the core analysis of CSM applied to the lalonde data.
 
 library(CSM)
 library(tidyverse)
 library(here)
 
 lalonde_df <- readRDS(here::here("scripts/lalonde-analysis/data/lalonde_for_analysis.rds"))
+
 lalonde_df$HS = ifelse( lalonde_df$X6 >= 12, 1, 0 )
 lalonde_df$COLL = ifelse( lalonde_df$X6 >= 16, 1, 0 )
 
@@ -72,8 +73,13 @@ vip::vip(ps_fit)
 round( summary( lalonde_df$pscore_glm ), digits = 4 )
 
 lalonde_df$logit_p = predict( ps_fit, type="link" )
+
+# What is 0.2 standard deviations of the propensity score?
+sd( lalonde_df$logit_p )
+sd( lalonde_df$logit_p[ lalonde_df$Z==1] )
 0.2 * sd( lalonde_df$logit_p[ lalonde_df$Z==1] )
 
+# Overlap in the propensity scores is minimal:
 ggplot( lalonde_df, aes( x=logit_p, fill=as.factor(Z) ) ) +
   geom_boxplot( alpha=0.5 ) +
   theme_minimal() +
@@ -83,7 +89,7 @@ ggplot( lalonde_df, aes( x=logit_p, fill=as.factor(Z) ) ) +
 
 
 
-# MATCHING SETTINGS
+# MATCHING SETTINGS ----
 
 
 # Scaling setup matches the paper's V matrix:
@@ -97,7 +103,7 @@ DIST_SCALING <- tibble(
   X6 = 1/2,    # Average years of education (Caliper of 2 years)
   X7 = 1/5000, # Average earnings, 1974 (Caliper of $5,000)
   X8 = 1/1400,  # Average earnings, 1975 (Caliper of $5,000)
-  COLL = 1/2,
+  COLL = 1/0.5,  # College completion
   logit_p = 1 / 0.35
 )
 

@@ -1,6 +1,7 @@
 # Simulation Workflow Guide
 
-This folder (`scripts/sims-bias_mse/`) contains all scripts used to reproduce the simulation experiments in **CSM**.
+This folder (`scripts/sims-bias_mse/`) contains all scripts used to reproduce the simulation experiments of the performance of the point estimator in **CSM**.
+The variance folders have the simulations to assess the quality of the variance estimator.
 
 The workflow supports three usage modes:
 
@@ -61,7 +62,7 @@ Rscript scripts/sims-bias_mse/run_local_all.R 5
 ```
 
 - `5` = number of iterations (default = 5).  
-- Optional list of methods (space or comma separated):
+- Can add an optional list of methods (space or comma separated):
 
 ```
 Rscript scripts/sims-bias_mse/run_local_all.R 3 diff bal1 or_lm ps_lm

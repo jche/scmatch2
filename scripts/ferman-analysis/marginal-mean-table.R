@@ -1,4 +1,7 @@
 
+# Make balance table of covariates for Ferman data
+# (Pre-matching)
+
 source( here::here( "scripts/ferman-analysis/02-core-ferman-analysis.R" ) )
 data_ferman = ferman_for_analysis
 

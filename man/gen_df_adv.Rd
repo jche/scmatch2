@@ -14,6 +14,7 @@ gen_df_adv(
   tx_effect_fun = function(X1, X2) {
      1
  },
+  f0_sd_fun = NULL,
   ctr_dist = 0.5,
   prop_nc_unif = 1/3
 )
@@ -23,19 +24,23 @@ gen_df_adv(
 
 \item{nt}{(something)}
 
-\item{f0_sd}{(something)}
+\item{f0_sd}{degree of residual noise (default homoskedastic)}
 
 \item{f0_fun}{(something)}
 
 \item{tx_effect_fun}{(something)}
 
-\item{ctr_dist}{(something)}
+\item{f0_sd_fun}{Function to generate noise standard deviation.
+Default is NULL. If not null, override f0_sd.}
 
-\item{prop_nc_unif}{(something)}
+\item{ctr_dist}{from 0 to 1; lower means better overlap}
+
+\item{prop_nc_unif}{proportion of uniform controls. lower means
+worse overlap}
 }
 \value{
 A tibble containing a toy dataset
 }
 \description{
-Generate toy data
+generate data mostly in grid (0,1) x (0,1)
 }

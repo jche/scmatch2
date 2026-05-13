@@ -9,12 +9,14 @@ gen_toy_covar(n, X1_ctrs, X2_ctrs, SD)
 \arguments{
 \item{n}{Number of samples}
 
-\item{X1_ctrs}{A vector of two elements, representing the two different
-X1 locations}
+\item{X1_ctrs}{A vector of two elements, representing the two
+different X1 locations}
 
-\item{X2_ctrs}{Same as X1_ctrs, but}
+\item{X2_ctrs}{Same as X1_ctrs, but for X2 locations.}
 
-\item{SD}{Std. deviation of the}
+\item{SD}{Std. deviation of the blobs around the centers. Lower
+means tighter blobs and better separation between the two
+clusters. Higher means more overlap.}
 }
 \value{
 A tibble object with two columns X1, X2

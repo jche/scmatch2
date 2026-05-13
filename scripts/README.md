@@ -14,9 +14,10 @@ The paper introduces CSM, a matching method that combines adaptive calipers with
 ```
 scripts/
 ├── lib/                       # Shared function libraries (sourced by other scripts)
-├── figs/                      # Figure generation (paper figures)
+├── figs/                      # Generated figures
 ├── sims-bias_mse/             # Bias/MSE simulations (Section 5)
-├── sims-variance/             # Variance/inference simulations (Section 5 / Online Supplement)
+├── sims-variance-multi/       # Multifactor variance simulation (current paper, 5×2×2 design)
+├── sims-variance/             # Variance simulations (earlier, overlap-only; superseded)
 ├── sims-variance-knn5avg/     # Variant: knn5avg aggregation (robustness check)
 ├── ferman-analysis/           # Empirical application: Brazilian education data (Section 6)
 ├── lalonde-analysis/          # Empirical application: LaLonde data (Online Supplement)
@@ -86,11 +87,36 @@ Run script: `run-variance-sims.sh`
 
 ---
 
-### `sims-variance-knn5avg/` — Variance simulations (knn5avg variant)
+### `sims-variance-multi/` — **Multifactor variance simulation (current paper)**
 
-A parallel set of variance simulations using the `knn5avg` aggregation method instead of the default SCM aggregation. Same numbered pipeline as `sims-variance/`.
+The definitive 3-factor simulation evaluating all four variance estimators. Supersedes `sims-variance/` and `sims-variance-het-sigma-bimodal-v2/`.
 
-Run script: `run-variance-sims-knn5avg.sh`
+**Factors** (5 × 2 × 2 = 20 cells, 998 replications):
+
+| Factor | Levels |
+|---|---|
+| Overlap | very_low, low, mid, high, very_high |
+| Error structure | homo (σ₀ = 0.5 constant), het (bimodal σ₀) |
+| Common variance | common (σ₁ = σ₀), no_common (σ₁ = σ₀ + 2) |
+
+**Estimators:** `homo`, `het`, `alt_common`, `alt_tt`
+
+**Performance measure:** coverage of τ_SATT at 95%.
+
+Pipeline:
+
+1. `0_utils.R` — DGP, estimators, `one_iter()`, `sim_master_multi()`
+2. `1_run_iter.R` — SLURM entrypoint: one job runs one iteration × all 20 cells
+3. `2_collect.R` — collects per-iteration `.rds` files into a combined CSV
+4. `3_summarize.R` — computes coverage (with MCSEs via `simhelpers`) and saves the faceted coverage plot
+
+Run script: `run_slurm.sh` (array 1–998)
+
+---
+
+### `sims-variance/` — Variance simulations (earlier, overlap-only)
+
+Earlier simulation varying only overlap (homoskedastic DGP, two estimators). Superseded by `sims-variance-multi/` but retained for reference.
 
 ---
 

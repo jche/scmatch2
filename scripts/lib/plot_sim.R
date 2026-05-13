@@ -35,48 +35,174 @@ prepare_method_comparison_df <- function(df) {
 }
 
 
+my_calc_absolute <- function (data, estimates, true_param, criteria = c("bias", "variance",
+                                                    "stddev", "mse", "rmse"), winz = Inf)
+{
+  criteria <- match.arg(criteria, choices = c("bias", "variance",
+                                              "stddev", "mse", "rmse"), several.ok = TRUE)
+  if (!missing(data)) {
+    cl <- match.call()
+    true_param <- eval(cl$true_param, envir = data, enclos = parent.frame())
+    estimates <- eval(cl$estimates, envir = data, enclos = parent.frame())
+  }
+  true_param <- true_param[!is.na(estimates)]
+  estimates <- estimates[!is.na(estimates)]
+  if (winz < Inf)
+    estimates <- winsorize(estimates, winz)
+
+  errors = estimates - true_param
+
+  K <- length(errors)
+  t_bar <- mean(errors)
+  s_t <- sd(errors)
+  g_t <- sum((errors - t_bar)^3)/(K * s_t^3)
+  k_t <- sum((errors - t_bar)^4)/(K * s_t^4)
+  mse <- mean(errors^2)
+  t_bar_j <- (K * t_bar - errors)/(K - 1)
+  bias_j_sq <- t_bar_j^2
+  s_sq_t_j <- ((K - 1) * s_t^2 - (errors - t_bar)^2 * K/(K - 1))/(K - 2)
+  rmse_j <- sqrt(bias_j_sq + s_sq_t_j)
+  dat <- tibble::tibble(K_absolute = K)
+  if (winz < Inf) {
+    dat$winsor_pct <- attr(errors, "winsor_pct")
+    dat$winsor_pct_mcse <- sqrt(dat$winsor_pct * (1 - dat$winsor_pct)/K)
+  }
+
+  if ("bias" %in% criteria) {
+    dat$bias <- t_bar
+    dat$bias_mcse <- s_t/sqrt(K)
+  }
+  if ("variance" %in% criteria) {
+    dat$var <- s_t^2
+    dat$var_mcse <- s_t^2 * sqrt((k_t - 1)/K)
+  }
+  if ("stddev" %in% criteria) {
+    dat$stddev <- s_t
+    dat$stddev_mcse <- sqrt(((K - 1)/K) * sum((sqrt(s_sq_t_j) -
+                                                 s_t)^2))
+  }
+  if ("mse" %in% criteria) {
+    dat$mse <- mse
+    dat$mse_mcse <- sqrt((1/K) * (s_t^4 * (k_t - 1) + 4 *
+                                    s_t^3 * g_t * t_bar + 4 * s_t^2 * t_bar^2))
+  }
+  if ("rmse" %in% criteria) {
+    rmse <- sqrt(mse)
+    dat$rmse <- rmse
+    dat$rmse_mcse <- sqrt(((K - 1)/K) * sum((rmse_j - rmse)^2))
+  }
+  return(dat)
+}
+
 
 #' Summarize Bias and RMSE for Each Method
 #'
 #' Given a long-format data frame where each row represents a method's estimate
 #' for a run, this function calculates the bias and RMSE for each method across
-#' all runs. It reorders methods based on their RMSE values for easier comparison
+#' all runs, together with Monte Carlo standard errors (MCSEs) via the
+#' \pkg{simhelpers} package. Methods are reordered by RMSE for easier comparison
 #' and visualization.
 #'
 #' @param df_long A long format data frame with each row representing (run x method),
-#'   typically prepared by `prepare_method_comparison_df()`.
+#'   typically prepared by `prepare_method_comparison_df()`. Must contain columns
+#'   \code{method}, \code{value} (estimated ATT), and \code{true_ATT}.
 #'
-#' @return A data frame with methods as rows, including their RMSE and Bias,
-#'   reordered based on RMSE.
+#' @return A long data frame with columns:
+#'   \describe{
+#'     \item{method}{Factor, reordered by ascending RMSE.}
+#'     \item{name}{Character: \code{"RMSE"} or \code{"Bias"}.}
+#'     \item{value}{Numeric performance estimate (absolute bias or RMSE).}
+#'     \item{mcse}{Monte Carlo standard error for \code{value}. For
+#'       \code{"Bias"} this is the MCSE of the signed bias—an approximation
+#'       for absolute bias that is exact when bias is clearly non-zero.}
+#'   }
 #' @export
 #'
 #' @examples
 #' # Assuming df_long is your long-format dataset
 #' summary_df <- summarize_bias_rmse(df_long)
 summarize_bias_rmse <- function(df_long) {
-  df_long %>%
-    filter(method %in% METHODS) %>%
+  prep <- df_long %>%
+    filter(method %in% METHODS)
+
+  res <- prep %>%
     group_by(method) %>%
-    summarize(
-      RMSE = sqrt(mean((value-true_ATT)^2, na.rm=T)),
-      Bias = abs(mean(value-true_ATT, na.rm=T)),
+    reframe(
+      my_calc_absolute(     estimates  = value,
+                            true_param = true_ATT,
+                            criteria = c("bias","rmse" ) )
+    )
+
+  return( res )
+
+  a = filter( df_long, method == "diff" )
+  a
+  ggplot( df_long, aes( method, value - true_ATT ) ) +
+    geom_boxplot() +
+    coord_flip()
+  ggplot( a, aes( ))
+
+  bias_res <- prep %>%
+    group_by(method) %>%
+    reframe(
+      simhelpers::calc_bias(pick(everything()),
+                            estimates  = value,
+                            true_param = true_ATT,
+                            na.rm      = TRUE)
+    ) %>%
+    select(method, bias, bias_mcse)
+
+  rmse_res <- prep %>%
+    group_by(method) %>%
+    reframe(
+      simhelpers::calc_rmse(pick(everything()),
+                            estimates  = value,
+                            true_param = true_ATT,
+                            na.rm      = TRUE)
+    ) %>%
+    select(method, rmse, rmse_mcse)
+
+  left_join(bias_res, rmse_res, by = "method") %>%
+    transmute(
+      method,
+      Bias      = abs(bias),
+      Bias_mcse = bias_mcse,
+      RMSE      = rmse,
+      RMSE_mcse = rmse_mcse
     ) %>%
     mutate(method = fct_reorder(method, RMSE, min)) %>%
-    pivot_longer(c(RMSE, Bias))
+    pivot_longer(
+      cols      = c(RMSE, Bias),
+      names_to  = "name",
+      values_to = "value"
+    ) %>%
+    mutate(mcse = if_else(name == "RMSE", RMSE_mcse, Bias_mcse)) %>%
+    select(method, name, value, mcse)
 }
 
 
 
 RMSE_plot_outline <- function(org_df,
-                              legend.position="none"){
-  org_df %>%
-    ggplot() +
-    geom_point(aes(y=method,x=value, shape=name), size=1) +
+                              legend.position = "none",
+                              show_mcse = TRUE) {
+  p <- org_df %>%
+    ggplot(aes(y = method, x = value, shape = name))
+
+  if (show_mcse && "mcse" %in% names(org_df)) {
+    p <- p +
+      geom_linerange(aes(xmin = value - 2 * mcse,
+                         xmax = value + 2 * mcse),
+                     linewidth = 0.4, alpha = 0.5)
+  }
+
+  p +
+    geom_point(size = 1) +
     theme_classic() +
-    theme(axis.text.y = element_text(angle=0, vjust=0.5, hjust=1),
-          axis.title.y = element_text(vjust=-3),
+    theme(axis.text.y     = element_text(angle = 0, vjust = 0.5, hjust = 1),
+          axis.title.y    = element_text(vjust = -3),
           legend.position = legend.position,
-          legend.background = element_rect(linetype="solid", linewidth=0.5, color="black"))
+          legend.background = element_rect(linetype = "solid", linewidth = 0.5,
+                                           color = "black"))
 }
 
 
@@ -110,6 +236,8 @@ modify_axis_to_RMSE_plot<-
            pch = "Metric")
   }
 
+
+
 RMSE_plot <- function(df,
                       title="",
                       xlab="",
@@ -123,6 +251,8 @@ RMSE_plot <- function(df,
                        legend.position=legend.position)
   return(p_res)
 }
+
+
 
 plot_org_df <- function(org_df,
                   title="",

@@ -262,4 +262,99 @@ ferman_cem <- ferman_for_analysis %>%
 
 
 
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+# Histogram of number of controls used by treated units ----
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+feasible_subclasses <- feasible_unit_subclass(ferman_csm)
+n_feasible <- length(feasible_subclasses)
+n_feasible
+
+matched_controls <- result_table(ferman_csm, "all") %>%
+  group_by(subclass) %>%
+  summarise(n_controls = n()-1) %>%
+  filter(subclass %in% feasible_subclasses)
+
+sum(matched_controls$n_controls)
+hist_matched_controls <-
+  ggplot(matched_controls, aes(x = n_controls)) +
+  geom_histogram(binwidth = 3, fill = "skyblue", color = "white") +
+  labs(
+    title = "Number of controls used by treated units",
+    x = "Number of Matched Controls",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
+matched_controls_nonzero_weights <-
+  ferman_csm$matches %>%
+  bind_rows() %>%
+  filter(weights > 0) %>%
+  group_by(subclass) %>%
+  summarise(n_controls = n()-1) %>%
+  filter(subclass %in% feasible_subclasses)
+sum(matched_controls_nonzero_weights$n_controls)
+
+hist_matched_controls_nonzero_weights <-
+  ggplot(matched_controls_nonzero_weights, aes(x = n_controls)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "white") +
+  labs(
+    title = "Number post synthetic control step",
+    x = "Number of Matched Controls",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
+p <- gridExtra::grid.arrange(
+  hist_matched_controls,
+  hist_matched_controls_nonzero_weights,
+  ncol=2
+)
+p
+
+ggsave(
+  here::here("figures/hist-n-co.pdf"),
+  plot=p,
+  width=8.1,
+  height=5.3
+)
+
+
+
+
+
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+# Table: Number of used controls ----
+# -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+
+
+library(haven)
+
+options(list(dplyr.summarise.inform = FALSE))
+theme_set( theme_classic() )
+
+
+## Number of used controls
+d <- result_table(
+  ferman_csm,
+  feasible_only = TRUE
+)
+d
+
+(n_t_SCM <- length(unique(
+  (d %>% filter(Z==0, weights!=0))$id )))
+(n_t_avg <-length(unique(
+  (d %>% filter(Z==0))$id )))
+
+
+list_distinct_control_1nn <- d %>%
+  group_by(Z,subclass) %>%
+  filter(Z == 0) %>%
+  filter(dist == min(dist)) %>%
+  slice(1) %>%
+  mutate(weights = 1) %>%
+  ungroup() %>%
+  distinct(id)
+
+(n_t_1nn <- nrow(list_distinct_control_1nn))
 

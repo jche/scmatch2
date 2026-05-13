@@ -1,5 +1,6 @@
-# scripts/lalonde-analysis/01-clean-data-lalonde.R
-# Prep raw data for analysis by renaming variables to match example-lalonde.R logic
+
+# Prep raw data for analysis by renaming variables to match
+# example-lalonde.R logic
 
 library(tidyverse)
 library(here)
