@@ -6,51 +6,78 @@
 \usage{
 estimate_ATT(
   matches,
-  outcome = NULL,
+  outcome = "Y",
   treatment = "Z",
+  superpopulation = FALSE,
   var_weight_type = "ess_units",
   variance_method = "pooled",
   boot_mtd = "wild",
   B = 250,
   seed_addition = 11,
-  feasible_only = FALSE
+  cluster_comb_mtd = "average",
+  feasible_only = FALSE,
+  df = NULL,
+  ...
 )
 }
 \arguments{
-\item{outcome}{Name of the outcome variable (default "Y")}
+\item{matches}{The CSM match object (csm_matches), or a data frame
+of matched units (must contain treatment, outcome, and weights
+columns).}
 
-\item{treatment}{Name of the treatment variable (default "Z")}
+\item{outcome}{Name of the outcome variable (default "Y").}
 
-\item{var_weight_type}{The way that cluster variances are averaged
-(default "ess_units"): "num_units": weight by number of units in
-the subclass "ess_units": weight by effective sample size of
-units in the subclass "uniform": weight each cluster equally}
+\item{treatment}{Name of the treatment variable (default "Z").}
 
-\item{variance_method}{Method for calculating measurement error
-variance: "pooled": use get_measurement_error_variance (default)
-"bootstrap": use get_measurement_error_variance_OR}
+\item{superpopulation}{If TRUE (default), use the superpopulation
+variance estimator via \code{get_total_variance()}.  If FALSE,
+use the finite-sample estimator via \code{get_finite_variance()}.}
+
+\item{var_weight_type}{How cluster variances are averaged (default
+"ess_units"): "num_units" weights by number of units in the
+subclass; "ess_units" weights by effective sample size; "uniform"
+weights each cluster equally.}
+
+\item{variance_method}{Variance method passed to
+\code{get_total_variance()}: "pooled" (default), "pooled_het",
+"bootstrap", or "ai06".  Ignored when \code{superpopulation =
+  FALSE}.}
 
 \item{boot_mtd}{Bootstrap method when variance_method = "bootstrap"
-(default: "wild")}
+(default: "wild").}
 
-\item{B}{Number of bootstrap samples when variance_method =
-"bootstrap" (default: 250)}
+\item{B}{Number of bootstrap samples (default: 250).}
 
-\item{seed_addition}{Additional seed for bootstrap (default: 11)}
+\item{seed_addition}{Additional seed for bootstrap (default: 11).}
 
-\item{feasible_only}{Logical indicating whether to use only feasible
-matches (default: FALSE)}
+\item{cluster_comb_mtd}{How per-unit variances are combined when
+variance_method = "pooled_het" (default: "average").}
 
-\item{scmatch}{The CSM match object, an R S3 object, or a data
-frame of the full results.}
+\item{feasible_only}{Logical; use only feasible matches (default
+FALSE).}
+
+\item{df}{The \emph{full} original data frame. Required for 'ai06'
+method and for \code{get_finite_variance()} when
+\code{use_common_variance = FALSE}.}
+
+\item{...}{Additional arguments passed to the chosen variance
+function. For \code{get_total_variance()}: e.g. \code{M} for
+'ai06'. For \code{get_finite_variance()}: e.g.
+\code{use_common_variance}, \code{K}, \code{covs},
+\code{scaling}.}
 }
 \value{
 A tibble with ATT estimate (ATT), standard error (SE),
-total variance (V), measurement error variance (V_E), population
-heterogeneity variance (V_P), and other relevant statistics
+t-statistic (t), total variance (V), measurement error variance
+(V_E), population heterogeneity variance (V_P), and other
+relevant statistics.
 }
 \description{
-Calculate ATT and associated standard error using the total
-variance estimator from the paper that accounts for both
-measurement error and population heterogeneity.
+Calculate ATT and associated standard error using the specified
+variance estimator.
+}
+\details{
+This will implement both finite-sample and superpopulation variance
+estimation.  For superpopulation inference, it can also do the OR
+bootstrap, if specified.
 }

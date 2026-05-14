@@ -722,26 +722,42 @@ get_total_variance <- function(
 #' Calculate ATT and associated standard error using the specified
 #' variance estimator.
 #'
+#' This will implement both finite-sample and superpopulation variance
+#' estimation.  For superpopulation inference, it can also do the OR
+#' bootstrap, if specified.
+#'
 #' @param matches The CSM match object (csm_matches), or a data frame
-#'   of matched units (must contain treatment, outcome, and weights columns).
+#'   of matched units (must contain treatment, outcome, and weights
+#'   columns).
 #' @param outcome Name of the outcome variable (default "Y").
 #' @param treatment Name of the treatment variable (default "Z").
+#' @param superpopulation If TRUE (default), use the superpopulation
+#'   variance estimator via \code{get_total_variance()}.  If FALSE,
+#'   use the finite-sample estimator via \code{get_finite_variance()}.
 #' @param var_weight_type How cluster variances are averaged (default
 #'   "ess_units"): "num_units" weights by number of units in the
 #'   subclass; "ess_units" weights by effective sample size; "uniform"
 #'   weights each cluster equally.
-#' @param variance_method Method for the variance estimator: "pooled"
-#'   (default), "pooled_het", "bootstrap", or "ai06".
+#' @param variance_method Variance method passed to
+#'   \code{get_total_variance()}: "pooled" (default), "pooled_het",
+#'   "bootstrap", or "ai06".  Ignored when \code{superpopulation =
+#'   FALSE}.
 #' @param boot_mtd Bootstrap method when variance_method = "bootstrap"
 #'   (default: "wild").
 #' @param B Number of bootstrap samples (default: 250).
 #' @param seed_addition Additional seed for bootstrap (default: 11).
 #' @param cluster_comb_mtd How per-unit variances are combined when
 #'   variance_method = "pooled_het" (default: "average").
-#' @param feasible_only Logical; use only feasible matches (default FALSE).
-#' @param df The *full* original data frame. Required for 'ai06' method.
-#' @param ... Additional arguments passed to \code{get_total_variance()}
-#'   (e.g. \code{M} for the 'ai06' method).
+#' @param feasible_only Logical; use only feasible matches (default
+#'   FALSE).
+#' @param df The *full* original data frame. Required for 'ai06'
+#'   method and for \code{get_finite_variance()} when
+#'   \code{use_common_variance = FALSE}.
+#' @param ... Additional arguments passed to the chosen variance
+#'   function. For \code{get_total_variance()}: e.g. \code{M} for
+#'   'ai06'. For \code{get_finite_variance()}: e.g.
+#'   \code{use_common_variance}, \code{K}, \code{covs},
+#'   \code{scaling}.
 #' @return A tibble with ATT estimate (ATT), standard error (SE),
 #'   t-statistic (t), total variance (V), measurement error variance
 #'   (V_E), population heterogeneity variance (V_P), and other
@@ -751,8 +767,9 @@ get_total_variance <- function(
 #'
 estimate_ATT <- function(
     matches,
-    outcome = NULL,
+    outcome = "Y",
     treatment = "Z",
+    superpopulation = FALSE,
     var_weight_type = "ess_units",
     variance_method = "pooled",
     boot_mtd = "wild",
@@ -784,25 +801,40 @@ estimate_ATT <- function(
     ))
   }
 
+  if ( !( outcome %in% colnames(matches_df) ) ) {
+    stop( glue::glue( "Outcome variable {outcome} not found in data" ) )
+  }
+
   # Point estimate
   ATT <- get_att_point_est(matches_df,
                            treatment = treatment,
                            outcome   = outcome)
 
-  # Variance + SE
-  variance_results <- get_total_variance(
-    matches          = matches_df,
-    outcome          = outcome,
-    treatment        = treatment,
-    var_weight_type  = var_weight_type,
-    variance_method  = variance_method,
-    boot_mtd         = boot_mtd,
-    B                = B,
-    seed_addition    = seed_addition,
-    cluster_comb_mtd = cluster_comb_mtd,
-    df               = df,
-    ...
-  )
+
+  # Variance + SE — two paths
+  if (superpopulation) {
+    variance_results <- get_total_variance(
+      matches          = matches_df,
+      outcome          = outcome,
+      treatment        = treatment,
+      var_weight_type  = var_weight_type,
+      variance_method  = variance_method,
+      boot_mtd         = boot_mtd,
+      B                = B,
+      seed_addition    = seed_addition,
+      cluster_comb_mtd = cluster_comb_mtd,
+      df               = df,
+      ...
+    )
+  } else {
+    variance_results <- get_finite_variance(
+      matches   = matches_df,
+      outcome   = outcome,
+      treatment = treatment,
+      df        = df,
+      ...
+    )
+  }
 
   # Attach ATT and t-statistic
   variance_results %>%

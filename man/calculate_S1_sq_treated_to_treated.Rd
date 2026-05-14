@@ -24,13 +24,14 @@ calculate_S1_sq_treated_to_treated(
 
 \item{K}{Number of nearest treated neighbors.}
 
-\item{covs}{Character vector of covariate column names, or NULL to auto-detect
-columns starting with "X" (default NULL).}
+\item{covs}{Character vector of covariate column names, or NULL to
+auto-detect columns starting with "X" (default NULL).}
 
-\item{scaling}{Scaling vector passed to get_cal_matches.  If NULL, uses
-default_scaling(df, covs).}
+\item{scaling}{Scaling vector passed to get_cal_matches.  If NULL,
+uses default_scaling(df, covs).}
 
-\item{metric}{Distance metric passed to get_cal_matches (default "maximum").}
+\item{metric}{Distance metric passed to get_cal_matches (default
+"maximum").}
 
 \item{id_name}{Name of the unit ID column (default "id").}
 }
@@ -42,7 +43,7 @@ A list with:
 }
 }
 \description{
-For each treated unit t, finds the K nearest treated units (using uniform
-weights 1/K), then computes s_{1t}^2 = (Y_t - mean_{K-NN} Y)^2.
-Returns S1^2 = mean_t(s_{1t}^2).
+For each treated unit t, finds the K nearest treated units, then
+computes s_{1t}^2 = (Y_t - mean_{K-NN} Y)^2. Returns S1^2 =
+mean_t(s_{1t}^2).
 }

@@ -5,17 +5,24 @@
 \title{Finite-sample variance estimator}
 \usage{
 get_finite_variance(
-  scmatch,
+  matches,
   df = NULL,
   outcome = "Y",
   treatment = "Z",
   use_common_variance = TRUE,
-  K = 1
+  K = 1,
+  covs = NULL,
+  scaling = NULL,
+  metric = "maximum",
+  id_name = "id"
 )
 }
 \arguments{
+\item{matches}{Fitted CSM object (csm_matches) or a matched data frame
+(e.g. output of \code{full_unit_table()}).}
+
 \item{df}{Full original data frame.  Required when
-\code{use_common_variance = FALSE}.}
+\code{use_common_variance = FALSE} and \code{matches} is a data frame.}
 
 \item{outcome}{Name of outcome variable (default "Y").}
 
@@ -28,12 +35,26 @@ If FALSE, estimate S1^2 via treated-to-treated K-NN matching.}
 \item{K}{Number of treated neighbours for the treated-to-treated step
 (used only when \code{use_common_variance = FALSE}).}
 
-\item{csm}{Fitted CSM object}
+\item{covs}{Character vector of covariate names.  Ignored when
+\code{matches} is a CSM object (extracted from \code{params(matches)}).
+Required when \code{matches} is a data frame and
+\code{use_common_variance = FALSE}.}
+
+\item{scaling}{Per-covariate scaling vector.  Same rules as \code{covs}.}
+
+\item{metric}{Distance metric (default "maximum").  Same rules as \code{covs}.}
+
+\item{id_name}{Name of the unit ID column (default "id").  Same rules as
+\code{covs}.}
 }
 \value{
-A list with elements V_E_alt, S0_sq, S1_sq, s_j_sq (data frame with
-id/w_j/s_j_sq), s_t_sq, s_1t_sq (NULL when use_common_variance=TRUE),
-cov_w_s, N_T, ESS_C.
+A tibble with columns matching \code{get_total_variance()}:
+\code{V} (= V_E * N_T, for SE = sqrt(V)/sqrt(N_T) consistency),
+\code{V_E} (the finite-sample variance estimate S1^2/N_T + S0^2/ESS_C),
+\code{V_P} (NA — not decomposed by this estimator),
+\code{SE} (= sqrt(V_E)),
+\code{N_T}, \code{ESS_C}, \code{sigma_hat} (NA),
+plus diagnostics \code{S0_sq}, \code{S1_sq}, \code{cov_w_s}.
 }
 \description{
 Implements the plug-in estimator

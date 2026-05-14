@@ -442,7 +442,7 @@ gen_df_hain <- function(nt = 50,
 #' input_2016 dataset and then applies the dgp_2016 function to
 #' generate potential outcomes and treatment assignments.
 #'
-#' @results A tibble containing the generated dataset with covariates,
+#' @return A tibble containing the generated dataset with covariates,
 #'   treatment assignment, potential outcomes, and observed outcome.
 #'
 #' @export

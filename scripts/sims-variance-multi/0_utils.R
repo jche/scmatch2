@@ -222,7 +222,7 @@ one_iter <- function(
 
 
 
-  res_homo <- estimate_ATT(mtch, variance_method = "pooled")
+  res_homo <- estimate_ATT(mtch, variance_method = "pooled", outcome = "Y")
   #  make_row("homo", res$SE, res$V_E, res$V_P)
 
   # ── het: heteroskedastic ─────────────────────

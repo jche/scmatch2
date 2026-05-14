@@ -16,6 +16,10 @@ gen_df_acic(
   p = 10
 )
 }
+\value{
+A tibble containing the generated dataset with covariates,
+treatment assignment, potential outcomes, and observed outcome.
+}
 \description{
 This function generates a dataset using the data generating process
 from the ACIC 2016 competition. It samples covariates from the
