@@ -158,8 +158,12 @@ run_all_methods <- function(df,
       dplyr::all_of(covs),
       function(x) if (is.numeric(x)) (2 * nbins) / (max(x) - min(x)) else 1000
     ))
-  r_csm_scm <- safe_compute("csm_scm", get_att_csm(df, scaling = dist_scaling_csm, est_method = "scm",     rad_method = "fixed"))
-  r_csm_avg <- safe_compute("csm_avg", get_att_csm(df, scaling = dist_scaling_csm, est_method = "average", rad_method = "fixed"))
+  r_csm_scm <- safe_compute("csm_scm", get_att_csm(df, scaling = dist_scaling_csm, est_method = "scm",
+                                                   warn=FALSE,
+                                                   rad_method = "fixed"))
+  r_csm_avg <- safe_compute("csm_avg", get_att_csm(df, scaling = dist_scaling_csm, est_method = "average",
+                                                   warn=FALSE,
+                                                   rad_method = "fixed"))
   r_cem_scm <- safe_compute("cem_scm", get_att_cem(df, num_bins = nbins, est_method = "scm",     estimand = "CEM-ATT"))
   r_cem_avg <- safe_compute("cem_avg", get_att_cem(df, num_bins = nbins, est_method = "average", estimand = "CEM-ATT"))
   r_onenn   <- safe_compute("onenn",   get_att_1nn(df, scaling = dist_scaling))

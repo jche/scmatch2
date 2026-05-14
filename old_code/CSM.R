@@ -16,6 +16,7 @@ get_att_csm <- function(df,
                                              if (is.numeric(x)) 1/sd(x)
                                              else 1000
                                            })),
+                        warn = FALSE,
                         ...) {
   match_weighted_df <- df %>%
     get_cal_matches(
@@ -27,6 +28,7 @@ get_att_csm <- function(df,
       est_method = est_method,
       return = return,
       dist_scaling = dist_scaling,
+      warn = warn,
       ...
     )
   est <- get_att_point_est(match_weighted_df)

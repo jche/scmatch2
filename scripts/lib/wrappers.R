@@ -159,7 +159,7 @@ get_att_ps_lm <- function(d,
   m_lm_ps <- glm(form, data = d, family="binomial")
 
   d %>%
-    mutate(e = invlogit(predict(m_lm_ps, newdata=.)),
+    mutate(e = CSM:::invlogit(predict(m_lm_ps, newdata=.)),
            wt = ifelse(Z, 1, e/(1-e))) %>%   # for ATT
     summarize(ATThat =
                 sum(Z*wt*Y) / sum(Z*wt) -              # tx weighted mean
@@ -240,14 +240,16 @@ get_att_csm <- function(d,
                         metric = "maximum",
                         scaling,
                         rad_method = "adaptive",
-                        est_method = "scm") {
+                        est_method = "scm",
+                        warn = FALSE ) {
   preds_csm <- get_cal_matches(
     data = d,
     treatment = "Z",
     metric = metric,
     scaling = scaling,
     rad_method = rad_method,
-    est_method = est_method )
+    est_method = est_method,
+    warn = warn )
 
 
   if (F) {

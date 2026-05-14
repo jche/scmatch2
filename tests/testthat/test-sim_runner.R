@@ -34,7 +34,7 @@ test_that("expand_method_groups handles named group shorthands", {
   expect_equal(expand_method_groups("matching"),
                c("csm_scm", "csm_avg", "cem_scm", "cem_avg", "onenn"))
   expect_equal(expand_method_groups("ps"),   c("ps_lm", "ps_bart"))
-  expect_equal(expand_method_groups("or"),   c("or_lm", "or_bart"))
+  expect_equal(expand_method_groups("or"),   c("or_lm", "or_lm_main", "or_bart"))
   expect_equal(expand_method_groups("bal"),  c("bal1", "bal2"))
   expect_equal(expand_method_groups("balance"), c("bal1", "bal2"))
   expect_equal(expand_method_groups("dr"),
