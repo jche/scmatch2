@@ -1,5 +1,3 @@
-# R/estimate.R
-
 
 
 #' Estimate the ATT from a matched dataframe
@@ -44,8 +42,11 @@ get_att_point_est <- function(csm,
 }
 
 
-# get_att_ests_from_wt<-
-#   function(df, input_wt)
+
+
+
+
+
 
 
 
@@ -132,10 +133,14 @@ calculate_weighted_variance <-
 
 #' Calculate the standard error estimate
 #'
+#' This should be removed, I think.
+#'
 #' @param N_T number of treated
 #' @param ESS_C effective size of controls
 #' @param sigma_hat The estimated error standard deviation
 #' @return The plug-in standard error estimate of the matching estimator
+#'
+#' @noRd
 get_plug_in_SE <- function(N_T, ESS_C, sigma_hat) {
   sqrt((1 / N_T + 1 / ESS_C)) * sigma_hat
 }
@@ -709,95 +714,38 @@ get_total_variance <- function(
   return(result)
 }
 
-#' Estimate ATT with correct variance estimation
-#'
-#' Calculate ATT and associated standard error using the total variance estimator
-#' from the paper that accounts for both measurement error and population heterogeneity.
-#'
-#' @param scmatch The CSM match object, an R S3 object
-#' @param treatment Name of the treatment variable (default "Z")
-#' @param outcome Name of the outcome variable (default "Y")
-#' @param var_weight_type The way that cluster variances are averaged (default "ess_units")
-#' @param variance_method Method for calculating measurement error variance:
-#'   "pooled": use get_measurement_error_variance (default)
-#'   "bootstrap": use get_measurement_error_variance_OR
-#' @param boot_mtd Bootstrap method when variance_method = "bootstrap" (default: "wild")
-#' @param B Number of bootstrap samples when variance_method = "bootstrap" (default: 250)
-#' @param seed_addition Additional seed for bootstrap (default: 11)
-#' @param df The *full* original data frame. Required for 'ai06' method.
-#' @param ... Additional arguments passed to get_total_variance.
-#' @return A tibble with ATT estimate, standard error, t-statistic, and variance components
-#' @export
-get_ATT_estimate <- function(
-    scmatch,
-    treatment = "Z",
-    outcome = "Y",
-    var_weight_type = "ess_units",
-    variance_method = "pooled",
-    boot_mtd = "wild",
-    B = 250,
-    seed_addition = 11,
-    cluster_comb_mtd = "average",
-    df = NULL, # Add df
-    ...) {
 
-  # Calculate ATT point estimate
-  ATT <- get_att_point_est(scmatch,
-                           treatment = treatment,
-                           outcome = outcome)
-
-  # Calculate total variance and standard error
-  variance_results <- get_total_variance(
-    matches = scmatch,
-    treatment = treatment,
-    outcome = outcome,
-    var_weight_type = var_weight_type,
-    variance_method = variance_method,
-    boot_mtd = boot_mtd,
-    B = B,
-    seed_addition = seed_addition,
-    cluster_comb_mtd = cluster_comb_mtd,
-    df = df, # Pass df
-    ... # Pass ... (e.g., M)
-  )
-
-  # Add ATT to results and calculate t-statistic
-  variance_results %>%
-    mutate(ATT = ATT) %>%
-    relocate(ATT) %>%
-    mutate(t = ATT/SE)
-}
 
 
 #' Estimate ATT and SE
 #'
-#' Calculate ATT and associated standard error using the total
-#' variance estimator from the paper that accounts for both
-#' measurement error and population heterogeneity.
+#' Calculate ATT and associated standard error using the specified
+#' variance estimator.
 #'
-#' @param scmatch The CSM match object, an R S3 object, or a data
-#'   frame of the full results.
-#' @param treatment Name of the treatment variable (default "Z")
-#' @param outcome Name of the outcome variable (default "Y")
-#' @param var_weight_type The way that cluster variances are averaged
-#'   (default "ess_units"): "num_units": weight by number of units in
-#'   the subclass "ess_units": weight by effective sample size of
-#'   units in the subclass "uniform": weight each cluster equally
-#' @param variance_method Method for calculating measurement error
-#'   variance: "pooled": use get_measurement_error_variance (default)
-#'   "bootstrap": use get_measurement_error_variance_OR
+#' @param matches The CSM match object (csm_matches), or a data frame
+#'   of matched units (must contain treatment, outcome, and weights columns).
+#' @param outcome Name of the outcome variable (default "Y").
+#' @param treatment Name of the treatment variable (default "Z").
+#' @param var_weight_type How cluster variances are averaged (default
+#'   "ess_units"): "num_units" weights by number of units in the
+#'   subclass; "ess_units" weights by effective sample size; "uniform"
+#'   weights each cluster equally.
+#' @param variance_method Method for the variance estimator: "pooled"
+#'   (default), "pooled_het", "bootstrap", or "ai06".
 #' @param boot_mtd Bootstrap method when variance_method = "bootstrap"
-#'   (default: "wild")
-#' @param B Number of bootstrap samples when variance_method =
-#'   "bootstrap" (default: 250)
-#' @param seed_addition Additional seed for bootstrap (default: 11)
-#' @param feasible_only Logical indicating whether to use only feasible
-#'   matches (default: FALSE)
-#' @export
-#'
+#'   (default: "wild").
+#' @param B Number of bootstrap samples (default: 250).
+#' @param seed_addition Additional seed for bootstrap (default: 11).
+#' @param cluster_comb_mtd How per-unit variances are combined when
+#'   variance_method = "pooled_het" (default: "average").
+#' @param feasible_only Logical; use only feasible matches (default FALSE).
+#' @param df The *full* original data frame. Required for 'ai06' method.
+#' @param ... Additional arguments passed to \code{get_total_variance()}
+#'   (e.g. \code{M} for the 'ai06' method).
 #' @return A tibble with ATT estimate (ATT), standard error (SE),
-#'   total variance (V), measurement error variance (V_E), population
-#'   heterogeneity variance (V_P), and other relevant statistics
+#'   t-statistic (t), total variance (V), measurement error variance
+#'   (V_E), population heterogeneity variance (V_P), and other
+#'   relevant statistics.
 #'
 #' @export
 #'
@@ -810,171 +758,62 @@ estimate_ATT <- function(
     boot_mtd = "wild",
     B = 250,
     seed_addition = 11,
-    feasible_only = FALSE ) {
+    cluster_comb_mtd = "average",
+    feasible_only = FALSE,
+    df = NULL,
+    ... ) {
 
-  # Convert to data frame if needed
+  # Unpack CSM object or plain matched data frame
   if (is.csm_matches(matches)) {
-    matches_df <- result_table(matches, feasible_only = feasible_only )
-    treatment = params(matches)$treatment
+    matches_df <- result_table(matches, feasible_only = feasible_only)
+    treatment  <- params(matches)$treatment
   } else {
     matches_df <- matches
-    if ( feasible_only ) {
-      stopifnot( "feasible" %in% colnames( matches ) )
-      matches_df <- matches %>%
-        filter( feasible == 1 )
+    if (feasible_only) {
+      stopifnot("feasible" %in% colnames(matches))
+      matches_df <- matches %>% filter(feasible == 1)
     }
   }
 
-  # return blank results df if no units matched
-  if ( nrow(matches_df) == 0 ) {
-    result <- tibble(
-      ATT = NA,
-      SE = NA,
-      N_T = NA,
-      ESS_C = NA,
-      t = NA,
-      V = NA,
-      V_E = NA,
-      V_P = NA,
-      sigma_hat = NA
-    )
-    return(result)
+  # Return blank result if nothing matched
+  if (nrow(matches_df) == 0) {
+    return(tibble(
+      ATT = NA_real_, SE = NA_real_, t = NA_real_,
+      V = NA_real_, V_E = NA_real_, V_P = NA_real_,
+      N_T = NA_real_, ESS_C = NA_real_, sigma_hat = NA_real_
+    ))
   }
 
+  # Point estimate
+  ATT <- get_att_point_est(matches_df,
+                           treatment = treatment,
+                           outcome   = outcome)
 
-  if ( n_distinct( matches_df[[treatment]] ) != 2 ) {
-    stop(glue::glue( "treatment variable `{treatment}` must be binary (0/1)") )
-  }
-
-  if ( is.null(outcome) ) {
-    if ( variance_method != "pooled" ) {
-      stop( glue::glue( "outcome must be specified when using {variance_method} variance method") )
-    }
-
-    matches_df$Y = 0
-    v_e_result <- get_measurement_error_variance(
-      matches_table = matches_df,
-      outcome = "Y",
-      treatment = treatment,
-      var_weight_type = var_weight_type
-    )
-    tt <- tibble( N_T = v_e_result$N_T,
-                  ESS_C = v_e_result$ESS_C )
-    return( tt )
-  }
-
-
-  # Get measurement error variance estimate (V_E) using specified method
-  if (variance_method == "pooled") {
-    v_e_result <- get_measurement_error_variance(
-      matches_table = matches_df,
-      outcome = outcome,
-      treatment = treatment,
-      var_weight_type = var_weight_type
-    )
-    V_E <- v_e_result$V_E
-    sigma_hat_squared <- v_e_result$sigma_hat^2
-    N_T <- v_e_result$N_T
-    ESS_C <- v_e_result$ESS_C
-  } else if (variance_method == "bootstrap") {
-    v_e_result <- get_measurement_error_variance_OR(
-      matches = matches_df,
-      outcome = outcome,
-      treatment = treatment,
-      boot_mtd = boot_mtd,
-      B = B,
-      seed_addition = seed_addition
-    )
-    V_E <- v_e_result$V_E
-    # For bootstrap method, we don't have sigma_hat, so we approximate
-    sigma_hat_squared <- V_E * (v_e_result$N_T + v_e_result$ESS_C) /
-      (1/v_e_result$N_T + 1/v_e_result$ESS_C)
-    N_T <- v_e_result$N_T
-    ESS_C <- v_e_result$ESS_C
-  } else {
-    stop("variance_method must be either 'pooled' or 'bootstrap'")
-  }
-
-  # Calculate treatment effect estimate (tau_hat)
-  att_estimate <- get_att_point_est(
-    matches_df,
-    treatment = treatment,
-    outcome = outcome
+  # Variance + SE
+  variance_results <- get_total_variance(
+    matches          = matches_df,
+    outcome          = outcome,
+    treatment        = treatment,
+    var_weight_type  = var_weight_type,
+    variance_method  = variance_method,
+    boot_mtd         = boot_mtd,
+    B                = B,
+    seed_addition    = seed_addition,
+    cluster_comb_mtd = cluster_comb_mtd,
+    df               = df,
+    ...
   )
 
-  # Calculate individual treatment effects
-  # First, get the predicted counterfactual outcomes for each treated unit
-  tx_units <- matches_df %>%
-    filter(!!sym(treatment) == 1) %>%
-    dplyr::select(id, subclass, !!sym(outcome)) %>%
-    rename(Y_t = !!sym(outcome))
-
-  # Get the weighted control outcomes for each subclass (Y_hat(0))
-  control_outcomes <- matches_df %>%
-    filter(!!sym(treatment) == 0) %>%
-    group_by(subclass) %>%
-    summarize(
-      Y_hat_0 = sum(!!sym(outcome) * weights) / sum(weights),
-      .groups = "drop"
-    )
-
-  # Join to get individual treatment effects
-  individual_effects <- tx_units %>%
-    left_join(control_outcomes, by = "subclass") %>%
-    mutate(indiv_effect = Y_t - Y_hat_0)
-
-  # Calculate the first component of the total variance estimator
-  # (Empirical squared deviations)
-  squared_deviations <- sum((individual_effects$indiv_effect - att_estimate)^2) / N_T
-
-  # Calculate the correction term for control unit weights
-  control_weight_correction <- matches_df %>%
-    filter(!!sym(treatment) == 0) %>%
-    group_by(id) %>%
-    summarize(
-      sum_weights = sum(weights),
-      sum_squared_weights = sum(weights^2),
-      .groups = "drop"
-    ) %>%
-    summarize(
-      correction_term = sum((sum_weights^2 - sum_squared_weights)) / N_T
-    ) %>%
-    pull(correction_term)
-
-  # Calculate the total variance (V)
-  V <- squared_deviations + sigma_hat_squared * control_weight_correction
-
-  # Calculate population heterogeneity variance (V_P)
-  V_P <- V - N_T * V_E
-  if (variance_method == "bootstrap"){
-    V = N_T * V_E
-    V_P = 0
-  }
-
-  SE <- sqrt(V) * 1 / sqrt(N_T)
-
-  result <- tibble(
-    ATT = att_estimate,
-    SE = SE,
-    N_T = N_T,
-    ESS_C = ESS_C,
-    t = att_estimate / SE,
-    V = V,
-    V_E = V_E,
-    V_P = V_P
-  )
-
-  # Add sigma_hat if available (from pooled method we have, from OR method we impute)
-  if (variance_method == "pooled") {
-    result$sigma_hat <- v_e_result$sigma_hat
-  }else if (variance_method == "bootstrap") {
-    result$sigma_hat <- sqrt(sigma_hat_squared)
-  } else {
-    result$sigma_hat <- NA
-  }
-
-  return(result)
+  # Attach ATT and t-statistic
+  variance_results %>%
+    mutate(ATT = ATT) %>%
+    relocate(ATT) %>%
+    mutate(t = ATT / SE)
 }
+
+
+
+
 
 
 #' Compute per-subclass s_t^2 and per-control-unit s_j^2
@@ -1017,19 +856,20 @@ calculate_s_j_sq <- function(matches_table, outcome = "Y", treatment = "Z") {
 
 #' Compute S1^2 via treated-to-treated matching
 #'
-#' For each treated unit t, finds the K nearest treated units (using uniform
-#' weights 1/K), then computes s_{1t}^2 = (Y_t - mean_{K-NN} Y)^2.
-#' Returns S1^2 = mean_t(s_{1t}^2).
+#' For each treated unit t, finds the K nearest treated units, then
+#' computes s_{1t}^2 = (Y_t - mean_{K-NN} Y)^2. Returns S1^2 =
+#' mean_t(s_{1t}^2).
 #'
 #' @param df Full data frame (treated and control units).
 #' @param treatment Name of treatment variable.
 #' @param outcome Name of outcome variable.
 #' @param K Number of nearest treated neighbors.
-#' @param covs Character vector of covariate column names, or NULL to auto-detect
-#'   columns starting with "X" (default NULL).
-#' @param scaling Scaling vector passed to get_cal_matches.  If NULL, uses
-#'   default_scaling(df, covs).
-#' @param metric Distance metric passed to get_cal_matches (default "maximum").
+#' @param covs Character vector of covariate column names, or NULL to
+#'   auto-detect columns starting with "X" (default NULL).
+#' @param scaling Scaling vector passed to get_cal_matches.  If NULL,
+#'   uses default_scaling(df, covs).
+#' @param metric Distance metric passed to get_cal_matches (default
+#'   "maximum").
 #' @param id_name Name of the unit ID column (default "id").
 #' @return A list with:
 #'   \describe{
@@ -1104,20 +944,25 @@ calculate_S1_sq_treated_to_treated <- function(
 }
 
 
-#' Alternative measurement error variance estimator (hat_V_E_alt)
+#' Finite-sample variance estimator
 #'
 #' Implements the plug-in estimator
-#'   hat_V_E_alt = S1^2 / n_T  +  S0^2 / ESS(C)
+#'   hat_V = S1^2 / n_T  +  S0^2 / ESS(C)
 #' where S0^2 is the w_j^2-weighted average of s_j^2 across control units, and
 #' S1^2 is either the simple average of s_t^2 (common-variance assumption) or
 #' the average of s_{1t}^2 from treated-to-treated K-NN matching.
 #'
-#' Also returns the empirical covariance Cov_p(w_j, s_j^2):
-#'   hat_V_E_alt = S^2*(1/n_T + 1/ESS_C) + (1/n_T)*Cov_p(w_j, s_j^2)
+#' Also returns the estimated empirical covariance Cov_p(w_j, s_j^2)
+#' which goes with the alternate formulation of:
 #'
-#' @param matches_table Full matched table (output of full_unit_table).
+#'   hat_V_alt = S^2*(1/n_T + 1/ESS_C) + (1/n_T)*Cov_p(w_j, s_j^2)
+#'
+#' where S is a pooled estimate of S1 and S0
+#'
+#' @param matches Fitted CSM object (csm_matches) or a matched data frame
+#'   (e.g. output of \code{full_unit_table()}).
 #' @param df Full original data frame.  Required when
-#'   \code{use_common_variance = FALSE}.
+#'   \code{use_common_variance = FALSE} and \code{matches} is a data frame.
 #' @param outcome Name of outcome variable (default "Y").
 #' @param treatment Name of treatment variable (default "Z").
 #' @param use_common_variance If TRUE (default), estimate S1^2 from the
@@ -1125,17 +970,25 @@ calculate_S1_sq_treated_to_treated <- function(
 #'   If FALSE, estimate S1^2 via treated-to-treated K-NN matching.
 #' @param K Number of treated neighbours for the treated-to-treated step
 #'   (used only when \code{use_common_variance = FALSE}).
-#' @param covs Character vector of covariate names, or NULL to auto-detect
-#'   columns starting with "X".
-#' @param scaling Scaling vector for distance computation.
-#' @param metric Distance metric (default "maximum").
-#' @param id_name Name of the unit ID column (default "id").
-#' @return A list with elements V_E_alt, S0_sq, S1_sq, s_j_sq (data frame with
-#'   id/w_j/s_j_sq), s_t_sq, s_1t_sq (NULL when use_common_variance=TRUE),
-#'   cov_w_s, N_T, ESS_C.
+#' @param covs Character vector of covariate names.  Ignored when
+#'   \code{matches} is a CSM object (extracted from \code{params(matches)}).
+#'   Required when \code{matches} is a data frame and
+#'   \code{use_common_variance = FALSE}.
+#' @param scaling Per-covariate scaling vector.  Same rules as \code{covs}.
+#' @param metric Distance metric (default "maximum").  Same rules as \code{covs}.
+#' @param id_name Name of the unit ID column (default "id").  Same rules as
+#'   \code{covs}.
+#'
+#' @return A tibble with columns matching \code{get_total_variance()}:
+#'   \code{V} (= V_E * N_T, for SE = sqrt(V)/sqrt(N_T) consistency),
+#'   \code{V_E} (the finite-sample variance estimate S1^2/N_T + S0^2/ESS_C),
+#'   \code{V_P} (NA — not decomposed by this estimator),
+#'   \code{SE} (= sqrt(V_E)),
+#'   \code{N_T}, \code{ESS_C}, \code{sigma_hat} (NA),
+#'   plus diagnostics \code{S0_sq}, \code{S1_sq}, \code{cov_w_s}.
 #' @export
-get_measurement_error_variance_alt <- function(
-    matches_table,
+get_finite_variance <- function(
+    matches,
     df = NULL,
     outcome = "Y",
     treatment = "Z",
@@ -1146,8 +999,17 @@ get_measurement_error_variance_alt <- function(
     metric = "maximum",
     id_name = "id") {
 
-  matches_table <- matches_table %>%
-    mutate(id = as.character(id))
+  # Unpack CSM object or accept a plain matched data frame
+  if (is.csm_matches(matches)) {
+    pp          <- params(matches)
+    matches_table <- full_unit_table(matches) %>% mutate(id = as.character(id))
+    if (is.null(covs))    covs    <- pp$covs
+    if (is.null(scaling)) scaling <- pp$scaling
+    metric  <- pp$metric
+    id_name <- pp$id_name
+  } else {
+    matches_table <- matches %>% mutate(id = as.character(id))
+  }
 
   sample_sizes <- calc_N_T_N_C(matches_table, treatment = treatment)
   N_T   <- sample_sizes$N_T
@@ -1186,17 +1048,18 @@ get_measurement_error_variance_alt <- function(
     s_1t_sq_df <- tt_result$s_1t_sq
   }
 
-  V_E_alt <- S1_sq / N_T + S0_sq / ESS_C
+  V_E <- S1_sq / N_T + S0_sq / ESS_C
 
-  list(
-    V_E_alt = V_E_alt,
-    S0_sq   = S0_sq,
-    S1_sq   = S1_sq,
-    s_j_sq  = control_df,
-    s_t_sq  = s_t_sq_df,
-    s_1t_sq = s_1t_sq_df,
-    cov_w_s = cov_w_s,
-    N_T     = N_T,
-    ESS_C   = ESS_C
+  tibble(
+    V         = V_E * N_T,   # scaled so SE = sqrt(V) / sqrt(N_T), matching get_total_variance
+    V_E       = V_E,
+    V_P       = NA_real_,    # not decomposed by this estimator
+    SE        = sqrt(V_E),
+    N_T       = N_T,
+    ESS_C     = ESS_C,
+    sigma_hat = NA_real_,
+    S0_sq     = S0_sq,
+    S1_sq     = S1_sq,
+    cov_w_s   = cov_w_s
   )
 }

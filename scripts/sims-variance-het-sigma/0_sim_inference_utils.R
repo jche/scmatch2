@@ -204,7 +204,7 @@ toy_match_infer_het <- function(
 
     # ---- Method 1: homo (pooled S²) ----
     row_homo <- tryCatch({
-      res1 <- get_ATT_estimate(mtch, variance_method = "pooled")
+      res1 <- estimate_ATT(mtch, variance_method = "pooled")
       make_row("homo", res1$SE, res1$V_E, res1$V_P)
     }, error = function(e) {
       if (verbose) message("homo failed: ", e$message)
@@ -213,7 +213,7 @@ toy_match_infer_het <- function(
 
     # ---- Method 2: het (per-subclass variance) ----
     row_het <- tryCatch({
-      res2 <- get_ATT_estimate(mtch, variance_method = "pooled_het")
+      res2 <- estimate_ATT(mtch, variance_method = "pooled_het")
       make_row("het", res2$SE, res2$V_E, res2$V_P)
     }, error = function(e) {
       if (verbose) message("het failed: ", e$message)
@@ -226,7 +226,7 @@ toy_match_infer_het <- function(
     # ---- Method 3: alt_common (S1²=mean(s_t²), common-variance) ----
     row_alt_common <- tryCatch({
       if (is.null(matches_full)) stop("matches_full is NULL")
-      alt_res <- get_measurement_error_variance_alt(
+      alt_res <- get_finite_variance(
         matches_table       = matches_full,
         use_common_variance = TRUE
       )
@@ -241,7 +241,7 @@ toy_match_infer_het <- function(
     # ---- Method 4: alt_tt (S1² from treated-to-treated K-NN) ----
     row_alt_tt <- tryCatch({
       if (is.null(matches_full)) stop("matches_full is NULL")
-      alt_tt <- get_measurement_error_variance_alt(
+      alt_tt <- get_finite_variance(
         matches_table       = matches_full,
         df                  = df,
         use_common_variance = FALSE,

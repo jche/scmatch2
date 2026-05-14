@@ -10,22 +10,18 @@
 #                                  het   — σ₀(x) bimodal Gaussian bumps
 #   3. Common variance (2 levels): common    — σ₁ = σ₀  (sigma1_extra = 0)
 #                                  no_common — σ₁ = σ₀ + 2 (sigma1_extra = 2)
+#   4. k (min number of matches):  1 or 2
+
+# 5 × 2 × 2 x 2 = 40 design cells, 1000 replications.
 #
-# 5 × 2 × 2 = 20 design cells, 998 replications.
-#
-# Four variance estimators
+# Three variance estimators
 # ------------------------
-#   homo       get_ATT_estimate(variance_method = "pooled")
-#              SE = sqrt(V_E + V_P)   [total variance]
+#   homo       the full homoskedastic
 #
-#   het        get_ATT_estimate(variance_method = "pooled_het")
-#              SE = sqrt(V_E + V_P)   [total variance]
+#   het        assumes common variance, but allows for heteroskedasticity
 #
-#   alt_common get_measurement_error_variance_alt(use_common_variance = TRUE)
-#              SE = sqrt(V_E_alt)     [measurement error only]
-#
-#   alt_tt     get_measurement_error_variance_alt(use_common_variance = FALSE, K = 2)
-#              SE = sqrt(V_E_alt)     [measurement error only]
+#   ttmatch    Does treatment-treatment matching to estimate variance on
+#.             tx side
 #
 # Performance measure: coverage of τ_SATT
 #   covered = (CI_lower ≤ SATT) & (SATT ≤ CI_upper)
@@ -59,7 +55,8 @@ PROP_NC_UNIF <- c(
 DESIGN_GRID <- expand_grid(
   overlap_label = OVERLAP_LABELS,
   error_type    = c("homo", "het"),
-  sigma1_extra  = c(0, 2)
+  sigma1_extra  = c(0, 2),
+  k = c( 1, 2 )
 ) %>%
   mutate(
     common_label = if_else(sigma1_extra == 0, "common", "no_common"),
@@ -76,7 +73,7 @@ DESIGN_GRID <- expand_grid(
 # ─────────────────────────────────────────────────────────────────────────────
 
 sigma0_bimodal <- function(x1, x2,
-                            sigma_min = 0.2, A = 5.0, h_sq = 0.08) {
+                           sigma_min = 0.2, A = 5.0, h_sq = 0.08) {
   d1 <- (x1 - 0.25)^2 + (x2 - 0.25)^2
   d2 <- (x1 - 0.75)^2 + (x2 - 0.75)^2
   sigma_min + A * (exp(-d1 / h_sq) + exp(-d2 / h_sq))
@@ -142,9 +139,8 @@ make_df_multi <- function(
   sig1 <- sig0 + sigma1_extra
 
   eps0 <- rnorm(nrow(df_raw), 0, sig0)
-  # When common variance (sigma1_extra = 0): reuse eps0 so σ₁ = σ₀ exactly.
-  # When no-common (sigma1_extra > 0): draw independent treatment noise.
-  eps1 <- if (sigma1_extra == 0) eps0 else rnorm(nrow(df_raw), 0, sig1)
+  # rescale tx errors to match tx variances
+  eps1 <- eps0 * sig0 / sig1
 
   df_raw %>%
     mutate(
@@ -157,20 +153,9 @@ make_df_multi <- function(
     )
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Distance scaling  (2 * nbins / range, matching sims-variance-het convention)
-# ─────────────────────────────────────────────────────────────────────────────
-
-compute_scaling <- function(df, nbins = 6) {
-  df %>%
-    summarise(across(
-      starts_with("X"),
-      function(x) if (is.numeric(x)) (2 * nbins) / (max(x) - min(x)) else 1000
-    ))
-}
 
 # ─────────────────────────────────────────────────────────────────────────────
-# One iteration: match + four variance estimators
+# One iteration: match + variance estimators
 # ─────────────────────────────────────────────────────────────────────────────
 
 #' Run one simulation iteration for a single design cell.
@@ -180,7 +165,7 @@ compute_scaling <- function(df, nbins = 6) {
 #' @param prop_nc_unif  Looked up from PROP_NC_UNIF inside sim_master_multi;
 #'   passed directly here.
 #' @param seed_addition  Seed (unique per cell × replication).
-#' @param K_tt  Treated-to-treated neighbours for alt_tt (default 2).
+#' @param K_tt  Treated-to-treated neighbours for ttmatch (default 2).
 #' @param verbose  Print error messages from individual estimators.
 #' @return Tibble with 4 rows (one per estimator) and all metadata columns.
 one_iter <- function(
@@ -192,15 +177,22 @@ one_iter <- function(
     nc            = 500,
     nt            = 100,
     ctr_dist      = 0.5,
-    nbins         = 6,
+    caliper       = 0.2,
     k_match       = 2,
     K_tt          = 2,
     seed_addition,
     verbose       = FALSE
 ) {
+
   error_type <- match.arg(error_type)
   set.seed(seed_addition)
 
+  if ( verbose ) {
+    cat( glue::glue("Sim iter #{i}: over:{overlap_label} - error:{error_type} - sigma1:{sigma1_extra} - k={k_match}") )
+    cat( "\n" )
+  }
+
+  # Make the dataset
   df <- make_df_multi(
     nc = nc, nt = nt,
     prop_nc_unif = prop_nc_unif,
@@ -210,125 +202,81 @@ one_iter <- function(
     seed         = seed_addition
   )
 
-  scaling <- compute_scaling(df, nbins = nbins)
-
-  mtch <- tryCatch(
-    get_cal_matches(
-      data       = df,
-      Z ~ X1 + X2,
-      rad_method = "adaptive",
-      scaling    = scaling,
-      k          = k_match,
-      warn       = FALSE,
-      est_method = "scm"
-    ),
-    error = function(e) {
-      if (verbose) message("Matching failed iter ", i, ": ", e$message)
-      NULL
-    }
+  mtch <-  get_cal_matches(
+    data       = df,
+    Z ~ X1 + X2,
+    rad_method = "adaptive",
+    caliper = caliper,
+    scaling    = 1,
+    k          = k_match,
+    warn       = FALSE,
+    est_method = "scm"
   )
 
-  att_est   <- if (!is.null(mtch)) {
-    tryCatch(get_att_point_est(mtch), error = function(e) NA_real_)
-  } else NA_real_
+  att_est   <- get_att_point_est(mtch)
 
   true_satt <- df %>%
     filter(Z == 1) %>%
     summarise(att = mean(Y1 - Y0)) %>%
     pull(att)
 
-  # ── row constructors ────────────────────────────────────────────────────────
-  make_row <- function(method_name, SE, V_E, V_P = NA_real_) {
-    tibble(
-      runID            = i,
-      inference_method = method_name,
-      att_est          = att_est,
-      SE               = SE,
-      CI_lower         = att_est - 1.96 * SE,
-      CI_upper         = att_est + 1.96 * SE,
-      V_E              = V_E,
-      V_P              = V_P,
-      SATT             = true_satt
-    )
-  }
 
-  make_na_row <- function(method_name) {
-    make_row(method_name, SE = NA_real_, V_E = NA_real_, V_P = NA_real_)
-  }
 
-  methods_all <- c("homo", "het", "alt_common", "alt_tt")
+  res_homo <- estimate_ATT(mtch, variance_method = "pooled")
+  #  make_row("homo", res$SE, res$V_E, res$V_P)
 
-  if (is.null(mtch)) {
-    return(
-      bind_rows(lapply(methods_all, make_na_row)) %>%
-        add_metadata(i, overlap_label, error_type, sigma1_extra, nc, nt, k_match, "Matching Failed")
-    )
-  }
+  # ── het: heteroskedastic ─────────────────────
+  res_het <- estimate_ATT(mtch, variance_method = "pooled_het")
 
-  matches_full <- tryCatch(full_unit_table(mtch), error = function(e) NULL)
+  # ── ttmatch: treated-to-treated K-NN  ───────────────────
+  matches_full <- full_unit_table(mtch)
 
-  # ── homo: homoskedastic pooled, SE = sqrt(V_E + V_P) ──────────────────────
-  row_homo <- tryCatch({
-    res <- get_ATT_estimate(mtch, variance_method = "pooled")
-    make_row("homo", res$SE, res$V_E, res$V_P)
-  }, error = function(e) {
-    if (verbose) message("homo error: ", e$message)
-    make_na_row("homo")
-  })
-
-  # ── het: heteroskedastic pooled, SE = sqrt(V_E + V_P) ─────────────────────
-  row_het <- tryCatch({
-    res <- get_ATT_estimate(mtch, variance_method = "pooled_het")
-    make_row("het", res$SE, res$V_E, res$V_P)
-  }, error = function(e) {
-    if (verbose) message("het error: ", e$message)
-    make_na_row("het")
-  })
-
-  # ── alt_common: control-side cluster variances, SE = sqrt(V_E_alt) ─────────
-  row_alt_common <- tryCatch({
-    if (is.null(matches_full)) stop("full_unit_table unavailable")
-    alt <- get_measurement_error_variance_alt(matches_full,
-                                              use_common_variance = TRUE)
-    make_row("alt_common", sqrt(pmax(0, alt$V_E_alt)), alt$V_E_alt)
-  }, error = function(e) {
-    if (verbose) message("alt_common error: ", e$message)
-    make_na_row("alt_common")
-  })
-
-  # ── alt_tt: treated-to-treated K-NN, SE = sqrt(V_E_alt) ───────────────────
-  row_alt_tt <- tryCatch({
-    if (is.null(matches_full)) stop("full_unit_table unavailable")
-    alt_tt <- get_measurement_error_variance_alt(
-      matches_table       = matches_full,
-      df                  = df,
-      use_common_variance = FALSE,
-      K                   = K_tt,
-      covs                = c("X1", "X2"),
-      scaling             = scaling
-    )
-    make_row("alt_tt", sqrt(pmax(0, alt_tt$V_E_alt)), alt_tt$V_E_alt)
-  }, error = function(e) {
-    if (verbose) message("alt_tt error: ", e$message)
-    make_na_row("alt_tt")
-  })
-
-  sz <- tryCatch(
-    {
-      s <- calc_N_T_N_C(full_unit_table(mtch))
-      list(N_T = s$N_T, N_C_tilde = s$N_C_tilde)
-    },
-    error = function(e) list(N_T = NA_real_, N_C_tilde = NA_real_)
+  ttmatch <- get_finite_variance(
+    matches_table       = matches_full,
+    df                  = df,
+    use_common_variance = FALSE,
+    K                   = K_tt,
+    covs                = c("X1", "X2"),
+    scaling             = 1
   )
 
-  bind_rows(row_homo, row_het, row_alt_common, row_alt_tt) %>%
-    mutate(N_T = sz$N_T, ESS_C = sz$N_C_tilde) %>%
-    add_metadata(i, overlap_label, error_type, sigma1_extra, nc, nt, k_match, "Success")
+
+  s <- calc_N_T_N_C(full_unit_table(mtch))
+  sz <-    list(N_T = s$N_T, N_C_tilde = s$N_C_tilde)
+
+  res = tibble( method = c( "homo", "het", "ttmatch" ),
+                SE = c( res_homo$SE, res_het$SE, ttmatch$SE ) )
+
+  res %>%
+    mutate( N_T = sz$N_T,
+            ESS_C = sz$N_C_tilde ) %>%
+    add_metadata(i, overlap_label, error_type, sigma1_extra, nc, nt, k_match )
 }
+
+
+
+if ( FALSE ) {
+
+  debugonce(one_iter)
+  one_iter(
+    i             = 1,
+    overlap_label = "low",
+    error_type    = "homo",
+    sigma1_extra  = 2,
+    prop_nc_unif  = 0.3,
+    nc            = 500,
+    nt            = 100,
+    seed_addition = 423,
+    K_tt          = 2,
+    verbose = TRUE
+  )
+
+}
+
 
 # ── helper to attach design-cell metadata ───────────────────────────────────
 add_metadata <- function(df, i, overlap_label, error_type, sigma1_extra,
-                         nc, nt, k_match, status) {
+                         nc, nt, k_match) {
   df %>%
     mutate(
       runID        = i,
@@ -338,8 +286,7 @@ add_metadata <- function(df, i, overlap_label, error_type, sigma1_extra,
       common_label = if_else(sigma1_extra == 0, "common", "no_common"),
       nc           = nc,
       nt           = nt,
-      k_match      = k_match,
-      status       = status
+      k_match      = k_match
     )
 }
 
@@ -359,13 +306,14 @@ add_metadata <- function(df, i, overlap_label, error_type, sigma1_extra,
 #' @param iteration  Positive integer SLURM array task ID.
 #' @param grid  Design grid tibble (default: DESIGN_GRID).
 #' @param nc,nt  Sample sizes.
-#' @param K_tt  Treated-to-treated neighbours for alt_tt.
+#' @param K_tt  Treated-to-treated neighbours for ttmatch.
 #' @return Tibble with 20 × 4 = 80 rows (20 cells × 4 estimators).
-sim_master_multi <- function(iteration,
+sim_master_multi <- function( iteration,
                               grid  = DESIGN_GRID,
                               nc    = 500,
                               nt    = 100,
-                              K_tt  = 2) {
+                              K_tt  = 2,
+                              verbose = FALSE ) {
 
   make_seed <- function(iter, overlap_label, error_type, sigma1_extra) {
     overlap_idx <- match(as.character(overlap_label), OVERLAP_LABELS)
@@ -380,6 +328,7 @@ sim_master_multi <- function(iteration,
   results <- vector("list", nrow(grid))
 
   for (j in seq_len(nrow(grid))) {
+
     row  <- grid[j, ]
     seed <- make_seed(iteration,
                       row$overlap_label, row$error_type, row$sigma1_extra)
@@ -396,7 +345,8 @@ sim_master_multi <- function(iteration,
         nc            = nc,
         nt            = nt,
         seed_addition = seed,
-        K_tt          = K_tt
+        K_tt          = K_tt,
+        verbose = verbose
       ),
       error = function(e) {
         warning(sprintf(

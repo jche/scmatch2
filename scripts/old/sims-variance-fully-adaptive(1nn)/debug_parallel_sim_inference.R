@@ -149,11 +149,11 @@ if (!inherits(rt_sc, "error")) {
 }
 
 cat("\n====================\n")
-cat("DEBUG: try get_ATT_estimate\n")
+cat("DEBUG: try estimate_ATT\n")
 cat("====================\n")
 
 att_try <- tryCatch(
-  get_ATT_estimate(
+  estimate_ATT(
     mtch,
     treatment = "Z",
     outcome = "Y",
@@ -163,13 +163,13 @@ att_try <- tryCatch(
 )
 
 if (inherits(att_try, "error")) {
-  cat("\nERROR: get_ATT_estimate failed\n")
+  cat("\nERROR: estimate_ATT failed\n")
   cat("Message:", att_try$message, "\n")
   cat("\nTRACEBACK:\n")
   tb <- sys.calls()
   print(tb)
 } else {
-  cat("\nDEBUG: get_ATT_estimate succeeded:\n")
+  cat("\nDEBUG: estimate_ATT succeeded:\n")
   print(att_try)
 }
 

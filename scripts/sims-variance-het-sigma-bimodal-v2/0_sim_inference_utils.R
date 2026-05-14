@@ -211,12 +211,12 @@ toy_match_infer_bimodal_v2 <- function(
   matches_full <- tryCatch(full_unit_table(mtch), error = function(e) NULL)
 
   row_homo <- tryCatch({
-    res1 <- get_ATT_estimate(mtch, variance_method = "pooled")
+    res1 <- estimate_ATT(mtch, variance_method = "pooled")
     make_row("homo", res1$SE, res1$V_E, res1$V_P)
   }, error = function(e) { if (verbose) message("homo: ", e$message); make_na_row("homo") })
 
   row_het <- tryCatch({
-    res2 <- get_ATT_estimate(mtch, variance_method = "pooled_het")
+    res2 <- estimate_ATT(mtch, variance_method = "pooled_het")
     make_row("het", res2$SE, res2$V_E, res2$V_P)
   }, error = function(e) { if (verbose) message("het: ", e$message); make_na_row("het") })
 
@@ -224,14 +224,14 @@ toy_match_infer_bimodal_v2 <- function(
 
   row_alt_common <- tryCatch({
     if (is.null(matches_full)) stop("no matches_full")
-    alt <- get_measurement_error_variance_alt(matches_full, use_common_variance = TRUE)
+    alt <- get_finite_variance(matches_full, use_common_variance = TRUE)
     SE_c <- sqrt(pmax(0, alt$V_E_alt + V_P_ref))
     make_row("alt_common", SE_c, alt$V_E_alt, V_P_ref)
   }, error = function(e) { if (verbose) message("alt_common: ", e$message); make_na_row("alt_common") })
 
   row_alt_tt <- tryCatch({
     if (is.null(matches_full)) stop("no matches_full")
-    alt_tt <- get_measurement_error_variance_alt(
+    alt_tt <- get_finite_variance(
       matches_table = matches_full, df = df,
       use_common_variance = FALSE, K = K_tt,
       covs = c("X1", "X2"), scaling = scaling

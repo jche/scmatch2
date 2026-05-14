@@ -1,5 +1,5 @@
-# scripts/ferman-analysis/02-core-ferman-analysis.R
-# Conduct the core analysis for prepping summary results
+
+# Explore matching using the ferman data
 
 
 library(CSM)
@@ -39,4 +39,13 @@ ferman_csm <- ferman_for_analysis %>%
     est_method = "scm")
 
 
+
+ferman_csm
+
+debug( distance_density_plot )
+get_distance_table( ferman_csm, long_table = TRUE )
+get_distance_table( ferman_csm, long_table = FALSE )
+
+a <- distance_density_plot( ferman_csm )
+a
 

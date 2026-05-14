@@ -85,11 +85,11 @@ eval_params_once <- function(A, h_sq, sigma_min, seed) {
 
   # --- V_E: homo vs het ---
   V_E_homo <- tryCatch(
-    get_ATT_estimate(mtch, variance_method = "pooled")$V_E,
+    estimate_ATT(mtch, variance_method = "pooled")$V_E,
     error = function(e) NA_real_
   )
   V_E_het <- tryCatch(
-    get_ATT_estimate(mtch, variance_method = "pooled_het")$V_E,
+    estimate_ATT(mtch, variance_method = "pooled_het")$V_E,
     error = function(e) NA_real_
   )
 

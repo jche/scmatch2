@@ -225,7 +225,7 @@ toy_match_infer <- function(
       expr,
       error = function(e) {
         message("\n==============================")
-        message("DEBUG get_ATT_estimate failed for method: ", method_name)
+        message("DEBUG estimate_ATT failed for method: ", method_name)
         message("ERROR: ", conditionMessage(e))
         message("TRACEBACK:\n", paste(capture.output(traceback()), collapse = "\n"))
         message("==============================\n")
@@ -238,11 +238,11 @@ toy_match_infer <- function(
     out
   }
 
-  att_pooled <- if (!is.null(mtch)) get_one("pooled", get_ATT_estimate(mtch, variance_method = "pooled")) else NULL
-  att_pooled_het <- if (!is.null(mtch)) get_one("pooled_het", get_ATT_estimate(mtch, variance_method = "pooled_het")) else NULL
+  att_pooled <- if (!is.null(mtch)) get_one("pooled", estimate_ATT(mtch, variance_method = "pooled")) else NULL
+  att_pooled_het <- if (!is.null(mtch)) get_one("pooled_het", estimate_ATT(mtch, variance_method = "pooled_het")) else NULL
 
   att_boot <- if (include_bootstrap && !is.null(mtch)) {
-    get_one("bootstrap", get_ATT_estimate(mtch, variance_method = "bootstrap", boot_mtd = boot_mtd, B = B, seed_addition = seed_addition))
+    get_one("bootstrap", estimate_ATT(mtch, variance_method = "bootstrap", boot_mtd = boot_mtd, B = B, seed_addition = seed_addition))
   } else NULL
 
   extract_tbl <- function(att_tbl, method_name) {
