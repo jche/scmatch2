@@ -66,6 +66,14 @@ toc()
 plan(sequential)
 
 
+if ( FALSE ) {
+  #Testing
+  sim_master_multi( 4, save_path=save_path, overwrite = FALSE )
+  debugonce( sim_master_multi )
+  sim_master_multi( 11, save_path=save_path, overwrite = FALSE )
+
+}
+
 
 cat( "Simulation complete\n" )
 

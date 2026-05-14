@@ -319,8 +319,8 @@ sim_master_multi <- function( iteration,
                               overwrite = FALSE ) {
 
   if ( !is.null(save_path)  ) {
-    out_file <- file.path(save_path, sprintf("iter_%04d.rds", i))
-    if ( overwrite && file.exists(out_file) ) {
+    out_file <- file.path(save_path, sprintf("iter_%04d.rds", iteration))
+    if ( !overwrite && file.exists(out_file) ) {
       return( NA )
     }
   }
@@ -386,7 +386,9 @@ sim_master_multi <- function( iteration,
   results <- bind_rows(results)
 
   if ( !is.null(save_path) ) {
-    out_file <- file.path(save_path, sprintf("iter_%04d.rds", i))
+    out_file <- file.path(save_path, sprintf("iter_%04d.rds", iteration))
+    cat( "Saving to ", out_file, "  (", nrow(results), " rows, ",
+         round(sum(results$time_secs, na.rm = TRUE), 1), "s total)\n", sep = "" )
     saveRDS(results, out_file)
   }
 
