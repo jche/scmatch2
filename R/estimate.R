@@ -770,6 +770,8 @@ estimate_ATT <- function(
     outcome = "Y",
     treatment = "Z",
     superpopulation = FALSE,
+    homoskedastic = FALSE,
+    use_common_variance = TRUE,
     var_weight_type = "ess_units",
     variance_method = "pooled",
     boot_mtd = "wild",
@@ -840,6 +842,8 @@ estimate_ATT <- function(
       outcome   = outcome,
       treatment = treatment,
       df        = df,
+      homoskedastic = homoskedastic,
+      use_common_variance = use_common_variance,
       scaling = scaling,
       covs = covs,
       metric = metric,
@@ -1065,7 +1069,7 @@ get_finite_variance <- function(
   s_j_sq_df <- sj_result$s_j_sq
 
   if ( homoskedastic ) {
-    V_E = mean( s_t_sq_df ) * (1/N_T + 1/ESS_C)
+    V_E = mean( s_t_sq_df$s_t_sq ) * (1/N_T + 1/ESS_C)
     rs <- tibble(
       V_E       = V_E,
       SE        = sqrt(V_E),

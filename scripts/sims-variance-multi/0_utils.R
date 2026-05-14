@@ -139,7 +139,7 @@ make_df_multi <- function(
 
   eps0 <- rnorm(nrow(df_raw), 0, sig0)
   # rescale tx errors to match tx variances
-  eps1 <- eps0 * sig0 / sig1
+  eps1 <- eps0 * sig1 / sig0
 
   df_raw %>%
     mutate(
@@ -220,10 +220,12 @@ one_iter <- function(
 
   res_homo <- estimate_ATT(mtch, outcome = "Y",
                            superpopulation = FALSE,
+                           homoskedastic = TRUE,
                            use_common_variance = TRUE )
 
   res_het <- estimate_ATT(mtch, outcome = "Y",
                           superpopulation = FALSE,
+                          homoskedastic = FALSE,
                           use_common_variance = TRUE )
 
   res_tt <- estimate_ATT(mtch, outcome = "Y",
@@ -366,18 +368,7 @@ sim_master_multi <- function( iteration,
           iteration, row$overlap_label, row$error_type,
           row$sigma1_extra, e$message
         ), call. = FALSE)
-        tibble(
-          runID            = iteration,
-          inference_method = NA_character_,
-          att_est          = NA_real_, SE = NA_real_,
-          CI_lower         = NA_real_, CI_upper = NA_real_,
-          V_E = NA_real_, V_P = NA_real_, SATT = NA_real_,
-          overlap_label = as.character(row$overlap_label),
-          error_type    = as.character(row$error_type),
-          sigma1_extra  = row$sigma1_extra,
-          common_label  = as.character(row$common_label),
-          status        = "Iteration Failed"
-        )
+        NA
       }
     )
     results[[j]]$time_secs <- as.numeric(difftime(Sys.time(), start, units = "secs"))

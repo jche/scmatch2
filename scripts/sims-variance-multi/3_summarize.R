@@ -126,7 +126,7 @@ p_coverage <- ggplot(
   geom_hline(yintercept = 0.95, linetype = "dashed", colour = "grey40") +
   scale_x_discrete(labels = overlap_x_labels) +
   scale_y_continuous(
-    limits = c( 0, 1.1),
+    limits = c( 0.3, 1.1),
     labels = scales::percent_format(accuracy = 1)
   ) +
   scale_colour_manual(values = estimator_colours, name = "Estimator") +
