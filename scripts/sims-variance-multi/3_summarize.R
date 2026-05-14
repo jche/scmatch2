@@ -23,13 +23,16 @@ suppressPackageStartupMessages({
 args        <- commandArgs(trailingOnly = TRUE)
 output_name <- if (length(args) >= 1) args[[1]] else "sims-variance-multi"
 
+source( here::here( "scripts/lib/plot_sim.R" ) )
+
 source(here::here("scripts/sims-variance-multi/0_utils.R"))
 paths <- get_sim_paths(output_name)
 
 # ── Load combined results ────────────────────────────────────────────────────
 combined_path <- paths$combined_rds
-if (!file.exists(combined_path))
+if (!file.exists(combined_path)) {
   combined_path <- paths$combined_csv
+}
 
 stopifnot("Run 2_collect.R first" = file.exists(combined_path))
 
@@ -41,43 +44,31 @@ res <- if (grepl("\\.rds$", combined_path)) {
 
 cat("Loaded ", nrow(res), " rows from ", basename(combined_path), "\n", sep = "")
 
-# ── Coverage column ──────────────────────────────────────────────────────────
+# ── Generate Coverage statistics ----
+
 res <- res %>%
   mutate(
     CI_lower = att_est - 2 * SE,
     CI_upper = att_est + 2 * SE,
     covered = (!is.na(CI_lower) & !is.na(CI_upper) & !is.na(SATT)) &
-              (CI_lower <= SATT) & (SATT <= CI_upper),
-    # ordered factors for clean plots
-    overlap_label = factor(overlap_label, levels = OVERLAP_LABELS),
-    error_type    = factor(error_type,
-                           levels = c("homo", "het"),
-                           labels = c("Homoskedastic", "Heteroskedastic")),
-    common_label  = factor(common_label,
-                           levels = c("common", "no_common"),
-                           labels = c("Common variance\n(σ₁ = σ₀)",
-                                      "No common variance\n(σ₁ = σ₀ + 2)")),
-    method = factor(method,
-                              levels = c("homo", "het", "ttmatch" ),
-                              labels = c("homo", "het", "ttmatch" ) )
-  )
+      (CI_lower <= SATT) & (SATT <= CI_upper)
+    )
 
-
-# ── Compute coverage + MCSE by (estimator × design cell) ────────────────────
 coverage_tbl <- res %>%
-  group_by(method, overlap_label, error_type, common_label) %>%
+  group_by(method, overlap_label, error_type, common_label, k_match ) %>%
   reframe(
-    simhelpers::calc_coverage(
+    my_calc_coverage(
       pick(everything()),
       lower_bound = CI_lower,
       upper_bound = CI_upper,
       true_param  = SATT
     )
   ) %>%
-  rename(coverage = coverage, mcse = coverage_mcse)
+  rename(mcse = coverage_mcse)
+
 
 cat("\nCoverage summary (first rows):\n")
-print(head(coverage_tbl, 20))
+print(head(coverage_tbl, 10))
 
 # ── Save summary CSV ─────────────────────────────────────────────────────────
 out_dir <- here::here("tables", output_name)
@@ -86,6 +77,24 @@ write_csv(coverage_tbl, file.path(out_dir, "coverage_table.csv"))
 cat("Saved coverage table: ", file.path(out_dir, "coverage_table.csv"), "\n")
 
 # ── Coverage plot ─────────────────────────────────────────────────────────────
+
+coverage_tbl <- coverage_tbl %>%
+  mutate(     # ordered factors for clean plots
+    overlap_label = factor(overlap_label, levels = OVERLAP_LABELS),
+    error_type    = factor(error_type,
+                           levels = c("homo", "het"),
+                           labels = c("Homoskedastic", "Heteroskedastic")),
+    common_label  = factor(common_label,
+                           levels = c("common", "no_common"),
+                           labels = c("Common variance",
+                                      "No common variance")),
+    k_match = paste0( "k=", k_match ),
+    method = factor(method,
+                    levels = c("homo", "het", "ttmatch" ),
+                    labels = c("homo", "het", "ttmatch" ) )
+  )
+
+
 overlap_x_labels <- c(
   "very_low"  = "Very Low",
   "low"       = "Low",
@@ -97,8 +106,7 @@ overlap_x_labels <- c(
 estimator_colours <- c(
   "homo"    = "#E41A1C",
   "het"     = "#377EB8",
-  "alt-c"   = "#4DAF4A",
-  "alt-tt"  = "#984EA3"
+  "ttmatch"   = "#4DAF4A"
 )
 
 p_coverage <- ggplot(
@@ -106,7 +114,7 @@ p_coverage <- ggplot(
   aes(x = overlap_label, y = coverage,
       colour = method, group = method)
 ) +
-  # ±2 MCSE error bars
+  facet_grid( error_type ~ k_match + common_label ) +
   geom_linerange(
     aes(ymin = coverage - 2 * mcse,
         ymax = coverage + 2 * mcse),
@@ -116,10 +124,9 @@ p_coverage <- ggplot(
   geom_point(size = 2, position = position_dodge(width = 0.3)) +
   geom_line(position = position_dodge(width = 0.3), linewidth = 0.5) +
   geom_hline(yintercept = 0.95, linetype = "dashed", colour = "grey40") +
-  facet_grid(error_type ~ common_label) +
   scale_x_discrete(labels = overlap_x_labels) +
   scale_y_continuous(
-    limits = c(0.7, 1.0),
+    limits = c( 0, 1.1),
     labels = scales::percent_format(accuracy = 1)
   ) +
   scale_colour_manual(values = estimator_colours, name = "Estimator") +
@@ -134,6 +141,8 @@ p_coverage <- ggplot(
     legend.position = "bottom",
     strip.text      = element_text(size = 9)
   )
+p_coverage + coord_flip()
+
 
 fig_dir <- here::here("figures", output_name)
 dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)

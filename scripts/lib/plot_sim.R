@@ -35,6 +35,46 @@ prepare_method_comparison_df <- function(df) {
 }
 
 
+
+my_calc_coverage <- function (data, lower_bound, upper_bound, true_param, criteria = c("coverage",
+                                                                   "width"), winz = Inf)
+{
+  criteria <- match.arg(criteria, choices = c("coverage", "width"),
+                        several.ok = TRUE)
+  if (!missing(data)) {
+    cl <- match.call()
+    true_param <- eval(cl$true_param, envir = data, enclos = parent.frame())
+    lower_bound <- eval(cl$lower_bound, envir = data, enclos = parent.frame())
+    upper_bound <- eval(cl$upper_bound, envir = data, enclos = parent.frame())
+  }
+
+  not_miss <- !is.na(lower_bound) & !is.na(upper_bound)
+  lower_bound <- lower_bound[not_miss]
+  upper_bound <- upper_bound[not_miss]
+  K <- length(lower_bound)
+  width <- upper_bound - lower_bound
+  if (winz < Inf)
+    width <- winsorize(width, winz)
+  dat <- tibble::tibble(K_coverage = K)
+  if (winz < Inf) {
+    dat$width_winsor_pct <- attr(width, "winsor_pct")
+    dat$width_winsor_pct_mcse <- sqrt(dat$width_winsor_pct *
+                                        (1 - dat$width_winsor_pct)/K)
+  }
+  if ("coverage" %in% criteria) {
+    coverage <- mean(lower_bound <= true_param & true_param <=
+                       upper_bound)
+    dat$coverage <- coverage
+    dat$coverage_mcse = sqrt(coverage * (1 - coverage)/K)
+  }
+  if ("width" %in% criteria) {
+    dat$width <- mean(width)
+    dat$width_mcse <- sqrt(var(width)/K)
+  }
+  return(dat)
+}
+
+
 my_calc_absolute <- function (data, estimates, true_param, criteria = c("bias", "variance",
                                                     "stddev", "mse", "rmse"), winz = Inf)
 {
