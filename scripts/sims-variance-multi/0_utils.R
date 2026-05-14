@@ -314,7 +314,17 @@ sim_master_multi <- function( iteration,
                               nt    = 100,
                               K_tt  = 2,
                               k_match = 2,
-                              verbose = FALSE ) {
+                              verbose = FALSE,
+                              save_path = NULL,
+                              overwrite = FALSE ) {
+
+  if ( !is.null(save_path)  ) {
+    out_file <- file.path(save_path, sprintf("iter_%04d.rds", i))
+    if ( overwrite && file.exists(out_file) ) {
+      return( NA )
+    }
+  }
+
 
   make_seed <- function(iter, overlap_label, error_type, sigma1_extra) {
     overlap_idx <- match(as.character(overlap_label), OVERLAP_LABELS)
@@ -373,8 +383,16 @@ sim_master_multi <- function( iteration,
     results[[j]]$time_secs <- as.numeric(difftime(Sys.time(), start, units = "secs"))
   }
 
-  bind_rows(results)
+  results <- bind_rows(results)
+
+  if ( !is.null(save_path) ) {
+    out_file <- file.path(save_path, sprintf("iter_%04d.rds", i))
+    saveRDS(results, out_file)
+  }
+
+  results
 }
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Path helpers
