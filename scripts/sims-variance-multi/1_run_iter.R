@@ -50,7 +50,7 @@ if (nchar(.slurm_id) > 0) {
   # ── LOCAL DEFAULTS (interactive / source()) ─────────────────────────────────
   iter        <- 1L           # which replication to run
   output_name <- "sims-variance-multi"
-  save_output <- FALSE        # set TRUE to write iter_NNNN.rds to data/outputs/
+  save_output <- TRUE        # set TRUE to write iter_NNNN.rds to data/outputs/
   is_local    <- TRUE
   .mode       <- "local"
   verbose = TRUE
@@ -62,15 +62,21 @@ if (is.na(iter) || iter <= 0L)
 # ── Load utilities ────────────────────────────────────────────────────────────
 source(here::here("scripts/sims-variance-multi/0_utils.R"))
 
+
+
 # ── Run ───────────────────────────────────────────────────────────────────────
 message(sprintf("[%s] iter=%d  output=%s  cells=%d",
                 .mode, iter, output_name, nrow(DESIGN_GRID)))
 t0  <- Sys.time()
 
-res <- sim_master_multi(iteration = iter, verbose=verbose)
+res <- sim_master_multi(iteration = iter,
+                        grid = DESIGN_GRID,
+                        verbose=verbose)
 
 elapsed <- round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 1)
 message(sprintf("Done in %.1fs  (%d rows)", elapsed, nrow(res)))
+
+
 
 # ── Optionally save ───────────────────────────────────────────────────────────
 if (save_output) {
@@ -86,29 +92,31 @@ if (save_output) {
 
 # ── Local diagnostics (only when run interactively) ───────────────────────────
 if (is_local) {
+
   cat("\n── Design cells run ──\n")
   res %>%
     distinct(overlap_label, error_type, sigma1_extra, k_match) %>%
     arrange(overlap_label, error_type, sigma1_extra, k_match) %>%
     print(n = Inf)
 
-  cat("\n── Status counts ──\n")
-  print(table(res$status))
 
-  cat("\n── Coverage by estimator × error_type × common_label × k_match ──\n")
+
+  cat("\n── Coverage across all kinds of simulation by estimator  ──\n")
   res %>%
+    mutate( CI_lower = att_est - 2 * SE,
+            CI_upper = att_est + 2 * SE,
+            error = att_est - SATT ) %>%
     filter(!is.na(CI_lower), !is.na(SATT)) %>%
     mutate(covered = CI_lower <= SATT & SATT <= CI_upper) %>%
-    group_by(inference_method, error_type, common_label, k_match) %>%
+    group_by( method ) %>%
     summarise(
       n        = n(),
       coverage = mean(covered),
       mean_SE  = mean(SE, na.rm = TRUE),
+      RMSE = sqrt( mean( error^2 ) ),
       .groups  = "drop"
     ) %>%
     print(n = Inf)
 
-  cat("\n── ATT estimates (first few rows) ──\n")
-  print(head(res %>% select(runID, inference_method, overlap_label, error_type,
-                             common_label, k_match, att_est, SE, SATT), 20))
+
 }

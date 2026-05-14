@@ -186,7 +186,7 @@ gen_toy_covar_k <- function(n, centers, k, sd) {
   }
 
   # Then remove the rename operation later since columns are already named
-  df <- bind_rows(all_points_list)
+  df <- dplyr::bind_rows(all_points_list)
 
   return(df)
 }

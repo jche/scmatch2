@@ -26,7 +26,6 @@
 # Performance measure: coverage of τ_SATT
 #   covered = (CI_lower ≤ SATT) & (SATT ≤ CI_upper)
 
-devtools::load_all()
 
 suppressPackageStartupMessages({
   library(dplyr)
@@ -56,7 +55,7 @@ DESIGN_GRID <- expand_grid(
   overlap_label = OVERLAP_LABELS,
   error_type    = c("homo", "het"),
   sigma1_extra  = c(0, 2),
-  k = c( 1, 2 )
+  k_match = c( 1, 2 )
 ) %>%
   mutate(
     common_label = if_else(sigma1_extra == 0, "common", "no_common"),
@@ -213,82 +212,83 @@ one_iter <- function(
     est_method = "scm"
   )
 
-  att_est   <- get_att_point_est(mtch)
-
   true_satt <- df %>%
     filter(Z == 1) %>%
     summarise(att = mean(Y1 - Y0)) %>%
     pull(att)
 
 
+  res_homo <- estimate_ATT(mtch, outcome = "Y",
+                           superpopulation = FALSE,
+                           use_common_variance = TRUE )
 
-  res_homo <- estimate_ATT(mtch, variance_method = "pooled", outcome = "Y")
-  #  make_row("homo", res$SE, res$V_E, res$V_P)
+  res_het <- estimate_ATT(mtch, outcome = "Y",
+                          superpopulation = FALSE,
+                          use_common_variance = TRUE )
 
-  # ── het: heteroskedastic ─────────────────────
-  res_het <- estimate_ATT(mtch, variance_method = "pooled_het")
-
-  # ── ttmatch: treated-to-treated K-NN  ───────────────────
-  matches_full <- full_unit_table(mtch)
-
-  ttmatch <- get_finite_variance(
-    matches_table       = matches_full,
-    df                  = df,
-    use_common_variance = FALSE,
-    K                   = K_tt,
-    covs                = c("X1", "X2"),
-    scaling             = 1
+  res_tt <- estimate_ATT(mtch, outcome = "Y",
+                         superpopulation = FALSE,
+                         use_common_variance = FALSE,
+                         K                   = K_tt
   )
 
 
-  s <- calc_N_T_N_C(full_unit_table(mtch))
+  s <- CSM:::calc_N_T_N_C(CSM:::full_unit_table(mtch))
   sz <-    list(N_T = s$N_T, N_C_tilde = s$N_C_tilde)
 
   res = tibble( method = c( "homo", "het", "ttmatch" ),
-                SE = c( res_homo$SE, res_het$SE, ttmatch$SE ) )
+                SE = c( res_homo$SE, res_het$SE, res_tt$SE ) )
 
   res %>%
-    mutate( N_T = sz$N_T,
-            ESS_C = sz$N_C_tilde ) %>%
-    add_metadata(i, overlap_label, error_type, sigma1_extra, nc, nt, k_match )
+    mutate( att_est      = res_homo$ATT,
+            SATT         = true_satt,
+            N_T          = sz$N_T,
+            ESS_C        = sz$N_C_tilde,
+            runID        = i,
+            overlap_label = overlap_label,
+            error_type   = error_type,
+            sigma1_extra = sigma1_extra,
+            common_label = if_else(sigma1_extra == 0, "common", "no_common"),
+            nc           = nc,
+            nt           = nt,
+            k_match      = k_match
+    ) %>%
+    relocate( runID )
 }
 
 
 
 if ( FALSE ) {
 
+  # one_iter() testing code ----
   debugonce(one_iter)
+
   one_iter(
     i             = 1,
     overlap_label = "low",
     error_type    = "homo",
     sigma1_extra  = 2,
     prop_nc_unif  = 0.3,
-    nc            = 500,
-    nt            = 100,
+    nc           = 500,
+    nt           = 100,
     seed_addition = 423,
-    K_tt          = 2,
+    K_tt         = 2,
     verbose = TRUE
   )
-
+  one_iter(
+    i             = 2,
+    overlap_label = "low",
+    error_type    = "homo",
+    sigma1_extra  = 2,
+    prop_nc_unif  = 0.3,
+    nc           = 500,
+    nt           = 100,
+    seed_addition = 4243,
+    K_tt         = 2,
+    verbose = TRUE
+  )
 }
 
-
-# ── helper to attach design-cell metadata ───────────────────────────────────
-add_metadata <- function(df, i, overlap_label, error_type, sigma1_extra,
-                         nc, nt, k_match) {
-  df %>%
-    mutate(
-      runID        = i,
-      overlap_label = overlap_label,
-      error_type   = error_type,
-      sigma1_extra = sigma1_extra,
-      common_label = if_else(sigma1_extra == 0, "common", "no_common"),
-      nc           = nc,
-      nt           = nt,
-      k_match      = k_match
-    )
-}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # sim_master_multi: one SLURM job = one iteration × all 20 design cells
@@ -313,6 +313,7 @@ sim_master_multi <- function( iteration,
                               nc    = 500,
                               nt    = 100,
                               K_tt  = 2,
+                              k_match = 2,
                               verbose = FALSE ) {
 
   make_seed <- function(iter, overlap_label, error_type, sigma1_extra) {
@@ -346,6 +347,7 @@ sim_master_multi <- function( iteration,
         nt            = nt,
         seed_addition = seed,
         K_tt          = K_tt,
+        k_match       = row$k_match,
         verbose = verbose
       ),
       error = function(e) {

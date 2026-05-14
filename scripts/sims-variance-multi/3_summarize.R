@@ -44,6 +44,8 @@ cat("Loaded ", nrow(res), " rows from ", basename(combined_path), "\n", sep = ""
 # ── Coverage column ──────────────────────────────────────────────────────────
 res <- res %>%
   mutate(
+    CI_lower = att_est - 2 * SE,
+    CI_upper = att_est + 2 * SE,
     covered = (!is.na(CI_lower) & !is.na(CI_upper) & !is.na(SATT)) &
               (CI_lower <= SATT) & (SATT <= CI_upper),
     # ordered factors for clean plots
@@ -55,15 +57,15 @@ res <- res %>%
                            levels = c("common", "no_common"),
                            labels = c("Common variance\n(σ₁ = σ₀)",
                                       "No common variance\n(σ₁ = σ₀ + 2)")),
-    inference_method = factor(inference_method,
-                              levels = c("homo", "het", "alt_common", "alt_tt"),
-                              labels = c("homo", "het", "alt-c", "alt-tt"))
-  ) %>%
-  filter(!is.na(inference_method))
+    method = factor(method,
+                              levels = c("homo", "het", "ttmatch" ),
+                              labels = c("homo", "het", "ttmatch" ) )
+  )
+
 
 # ── Compute coverage + MCSE by (estimator × design cell) ────────────────────
 coverage_tbl <- res %>%
-  group_by(inference_method, overlap_label, error_type, common_label) %>%
+  group_by(method, overlap_label, error_type, common_label) %>%
   reframe(
     simhelpers::calc_coverage(
       pick(everything()),
@@ -102,7 +104,7 @@ estimator_colours <- c(
 p_coverage <- ggplot(
   coverage_tbl,
   aes(x = overlap_label, y = coverage,
-      colour = inference_method, group = inference_method)
+      colour = method, group = method)
 ) +
   # ±2 MCSE error bars
   geom_linerange(

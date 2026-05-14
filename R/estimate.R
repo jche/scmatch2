@@ -827,11 +827,23 @@ estimate_ATT <- function(
       ...
     )
   } else {
+    if ( is.csm_matches( matches ) ) {
+      df = full_unit_table(matches)
+      pp = params(matches)
+      scaling = pp$scaling
+      covs = pp$covs
+      metric = pp$metric
+      id_name = pp$id_name
+    }
     variance_results <- get_finite_variance(
       matches   = matches_df,
       outcome   = outcome,
       treatment = treatment,
       df        = df,
+      scaling = scaling,
+      covs = covs,
+      metric = metric,
+      id_name = id_name,
       ...
     )
   }
@@ -929,7 +941,7 @@ calculate_S1_sq_treated_to_treated <- function(
     mutate(!!treatment_sym := 0L,
            !!id_sym := paste0(!!id_sym, "_pool"))
 
-  df_fake <- bind_rows(df_t, df_t_pool)
+  df_fake <- dplyr::bind_rows(df_t, df_t_pool)
 
   if (is.null(scaling)) {
     scaling <- default_scaling(df, covs)
@@ -1025,6 +1037,7 @@ get_finite_variance <- function(
     outcome = "Y",
     treatment = "Z",
     use_common_variance = TRUE,
+    homoskedastic = FALSE,
     K = 1,
     covs = NULL,
     scaling = NULL,
@@ -1051,6 +1064,18 @@ get_finite_variance <- function(
   s_t_sq_df <- sj_result$s_t_sq
   s_j_sq_df <- sj_result$s_j_sq
 
+  if ( homoskedastic ) {
+    V_E = mean( s_t_sq_df ) * (1/N_T + 1/ESS_C)
+    rs <- tibble(
+      V_E       = V_E,
+      SE        = sqrt(V_E),
+      N_T       = N_T,
+      ESS_C     = ESS_C,
+      sigma_hat = NA_real_
+    )
+    return( rs )
+  }
+
   w_j_df <- matches_table %>%
     filter(!!sym(treatment) == 0) %>%
     group_by(id) %>%
@@ -1068,6 +1093,9 @@ get_finite_variance <- function(
   if (use_common_variance) {
     S1_sq <- mean(s_t_sq_df$s_t_sq, na.rm = TRUE)
   } else {
+    if ( is.csm_matches(matches) ) {
+      df = full_unit_table(matches)
+    }
     if (is.null(df)) {
       stop("'df' is required when use_common_variance = FALSE")
     }
@@ -1083,13 +1111,13 @@ get_finite_variance <- function(
   V_E <- S1_sq / N_T + S0_sq / ESS_C
 
   tibble(
-    V         = V_E * N_T,   # scaled so SE = sqrt(V) / sqrt(N_T), matching get_total_variance
-    V_E       = V_E,
-    V_P       = NA_real_,    # not decomposed by this estimator
     SE        = sqrt(V_E),
     N_T       = N_T,
     ESS_C     = ESS_C,
     sigma_hat = NA_real_,
+    V         = V_E * N_T,   # scaled so SE = sqrt(V) / sqrt(N_T), matching get_total_variance
+    V_E       = V_E,
+    V_P       = NA_real_,    # not decomposed by this estimator
     S0_sq     = S0_sq,
     S1_sq     = S1_sq,
     cov_w_s   = cov_w_s
