@@ -39,7 +39,8 @@ run_many <- function(sim, n_iter = 5L, method_suffix = "") {
                   sim, n_iter,
                   if (nzchar(method_suffix)) paste0(" with methods ", paste(methods, collapse = ", ")) else " (all methods)"))
   for (i in seq_len(n_iter)) {
-    cmd <- sprintf("Rscript scripts/sims-bias_mse/run_single_iteration.R %s %d%s", sim, i, method_suffix)
+    cmd <- sprintf("Rscript scripts/sims-bias_mse/run_single_iteration.R %s %d%s",
+                   sim, i, method_suffix)
     status <- system(cmd)
     if (status != 0) stop(sprintf("Failed on %s iteration %d", sim, i))
   }

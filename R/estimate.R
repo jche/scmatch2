@@ -875,13 +875,14 @@ estimate_ATT <- function(
 #' @param treatment Name of treatment variable (default "Z")
 #' @return A list with:
 #'   \describe{
-#'     \item{s_t_sq}{Data frame with columns \code{subclass} and \code{s_t_sq}.
+#'     \item{s_t_sq}{Treatment unit variances. Data frame with columns \code{subclass} and \code{s_t_sq}.
 #'       Only subclasses with at least 2 controls are included.}
-#'     \item{s_j_sq}{Data frame with columns \code{id} and \code{s_j_sq}.
+#'     \item{s_j_sq}{Control unit variances. Data frame with columns \code{id} and \code{s_j_sq}.
 #'       One row per control unit.  Units whose subclasses all have fewer than 2
 #'       controls will have \code{NaN}.}
 #'   }
-#' @export
+#' @noRd
+#'
 calculate_s_j_sq <- function(matches_table, outcome = "Y", treatment = "Z") {
   matches_table <- matches_table %>%
     mutate(id = as.character(id))
@@ -1050,12 +1051,7 @@ get_finite_variance <- function(
 
   # Unpack CSM object or accept a plain matched data frame
   if (is.csm_matches(matches)) {
-    pp          <- params(matches)
     matches_table <- full_unit_table(matches) %>% mutate(id = as.character(id))
-    if (is.null(covs))    covs    <- pp$covs
-    if (is.null(scaling)) scaling <- pp$scaling
-    metric  <- pp$metric
-    id_name <- pp$id_name
   } else {
     matches_table <- matches %>% mutate(id = as.character(id))
   }
@@ -1064,9 +1060,9 @@ get_finite_variance <- function(
   N_T   <- sample_sizes$N_T
   ESS_C <- sample_sizes$N_C_tilde
 
-  sj_result <- calculate_s_j_sq(matches_table, outcome = outcome, treatment = treatment)
-  s_t_sq_df <- sj_result$s_t_sq
-  s_j_sq_df <- sj_result$s_j_sq
+  sjs <- calculate_s_j_sq(matches_table, outcome = outcome, treatment = treatment)
+  s_t_sq_df <- sjs$s_t_sq
+  s_j_sq_df <- sjs$s_j_sq
 
   if ( homoskedastic ) {
     V_E = mean( s_t_sq_df$s_t_sq ) * (1/N_T + 1/ESS_C)
@@ -1075,7 +1071,9 @@ get_finite_variance <- function(
       SE        = sqrt(V_E),
       N_T       = N_T,
       ESS_C     = ESS_C,
-      sigma_hat = NA_real_
+      sigma_hat = NA_real_,
+      S0_sq     = mean( s_t_sq_df$s_t_sq ),
+      S1_sq    = S0_sq # under homoskedasticity, S1^2 = S0^2
     )
     return( rs )
   }
@@ -1093,12 +1091,16 @@ get_finite_variance <- function(
 
   cov_w_s <- cov(control_df$w_j, control_df$s_j_sq, use = "complete.obs")
 
-  s_1t_sq_df <- NULL
   if (use_common_variance) {
     S1_sq <- mean(s_t_sq_df$s_t_sq, na.rm = TRUE)
   } else {
     if ( is.csm_matches(matches) ) {
       df = full_unit_table(matches)
+      pp          <- params(matches)
+      covs    <- pp$covs
+      scaling <- pp$scaling
+      metric  <- pp$metric
+      id_name <- pp$id_name
     }
     if (is.null(df)) {
       stop("'df' is required when use_common_variance = FALSE")
@@ -1109,7 +1111,6 @@ get_finite_variance <- function(
       metric = metric, id_name = id_name
     )
     S1_sq      <- tt_result$S1_sq
-    s_1t_sq_df <- tt_result$s_1t_sq
   }
 
   V_E <- S1_sq / N_T + S0_sq / ESS_C
@@ -1119,9 +1120,7 @@ get_finite_variance <- function(
     N_T       = N_T,
     ESS_C     = ESS_C,
     sigma_hat = NA_real_,
-    V         = V_E * N_T,   # scaled so SE = sqrt(V) / sqrt(N_T), matching get_total_variance
     V_E       = V_E,
-    V_P       = NA_real_,    # not decomposed by this estimator
     S0_sq     = S0_sq,
     S1_sq     = S1_sq,
     cov_w_s   = cov_w_s

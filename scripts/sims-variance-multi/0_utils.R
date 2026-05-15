@@ -138,7 +138,7 @@ make_df_multi <- function(
   sig1 <- sig0 + sigma1_extra
 
   eps0 <- rnorm(nrow(df_raw), 0, sig0)
-  # rescale tx errors to match tx variances
+  # rescale tx errors to match target tx variances
   eps1 <- eps0 * sig1 / sig0
 
   df_raw %>%
@@ -151,6 +151,7 @@ make_df_multi <- function(
       sigma1 = sig1
     )
 }
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -176,7 +177,7 @@ one_iter <- function(
     nc            = 500,
     nt            = 100,
     ctr_dist      = 0.5,
-    caliper       = 0.2,
+    caliper       = 0.1,
     k_match       = 2,
     K_tt          = 2,
     seed_addition,
@@ -218,34 +219,32 @@ one_iter <- function(
     pull(att)
 
 
-  res_homo <- estimate_ATT(mtch, outcome = "Y",
-                           superpopulation = FALSE,
-                           homoskedastic = TRUE,
-                           use_common_variance = TRUE )
+  ATT <- CSM:::get_att_point_est(mtch,
+                                 treatment = "Z",
+                                 outcome   = "Y" )
 
-  res_het <- estimate_ATT(mtch, outcome = "Y",
-                          superpopulation = FALSE,
-                          homoskedastic = FALSE,
-                          use_common_variance = TRUE )
+  res_homo <- get_finite_variance(mtch, outcome = "Y",
+                                  homoskedastic = TRUE,
+                                  use_common_variance = TRUE )
 
-  res_tt <- estimate_ATT(mtch, outcome = "Y",
-                         superpopulation = FALSE,
-                         use_common_variance = FALSE,
-                         K                   = K_tt
+  res_het <- get_finite_variance(mtch, outcome = "Y",
+                                 homoskedastic = FALSE,
+                                 use_common_variance = TRUE )
+
+  res_tt <- get_finite_variance(mtch, outcome = "Y",
+                                homoskedastic = FALSE,
+                                use_common_variance = FALSE,
+                                K                   = K_tt
   )
 
+  res = bind_rows( homo = res_homo,
+                   het = res_het,
+                   ttmatch = res_tt, .id = "method" )
 
-  s <- CSM:::calc_N_T_N_C(CSM:::full_unit_table(mtch))
-  sz <-    list(N_T = s$N_T, N_C_tilde = s$N_C_tilde)
-
-  res = tibble( method = c( "homo", "het", "ttmatch" ),
-                SE = c( res_homo$SE, res_het$SE, res_tt$SE ) )
 
   res %>%
-    mutate( att_est      = res_homo$ATT,
+    mutate( att_est      = ATT,
             SATT         = true_satt,
-            N_T          = sz$N_T,
-            ESS_C        = sz$N_C_tilde,
             runID        = i,
             overlap_label = overlap_label,
             error_type   = error_type,
@@ -255,7 +254,10 @@ one_iter <- function(
             nt           = nt,
             k_match      = k_match
     ) %>%
-    relocate( runID )
+    relocate( runID,
+              overlap_label, error_type, common_label, k_match,
+              method,
+              SATT, att_est )
 }
 
 
@@ -264,10 +266,10 @@ if ( FALSE ) {
 
   # one_iter() testing code ----
   debugonce(one_iter)
-
+  debugonce()
   one_iter(
     i             = 1,
-    overlap_label = "low",
+    overlap_label = "mid",
     error_type    = "homo",
     sigma1_extra  = 2,
     prop_nc_unif  = 0.3,
@@ -277,6 +279,8 @@ if ( FALSE ) {
     K_tt         = 2,
     verbose = TRUE
   )
+
+
   one_iter(
     i             = 2,
     overlap_label = "low",
@@ -316,6 +320,7 @@ sim_master_multi <- function( iteration,
                               nt    = 100,
                               K_tt  = 2,
                               k_match = 2,
+                              caliper = 0.1,
                               verbose = FALSE,
                               save_path = NULL,
                               overwrite = FALSE ) {
@@ -355,6 +360,7 @@ sim_master_multi <- function( iteration,
         error_type    = as.character(row$error_type),
         sigma1_extra  = row$sigma1_extra,
         prop_nc_unif  = prop,
+        caliper = caliper,
         nc            = nc,
         nt            = nt,
         seed_addition = seed,
@@ -387,6 +393,12 @@ sim_master_multi <- function( iteration,
 }
 
 
+if ( FALSE ) {
+
+  sim_master_multi( 1, DESIGN_GRID[1:3,] )
+}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Path helpers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -400,4 +412,72 @@ get_sim_paths <- function(output_name = "sims-variance-multi") {
     combined_rds   = file.path(base, "combined_results.rds"),
     combined_csv   = file.path(base, "combined_results.csv")
   )
+}
+
+
+#' Collect per-iteration .rds files and combine into a single tibble.
+#'
+#' Reads every file matching \code{iter_NNNN.rds} in \code{individual_dir},
+#' binds them into one tibble, and (as a side effect) writes the combined
+#' result to \code{combined_results.rds} and \code{combined_results.csv}
+#' in the parent output directory.
+#'
+#' @param output_name  Name of the output subdirectory under
+#'   \code{data/outputs/} (default: "sims-variance-multi").  Used to
+#'   derive paths via \code{get_sim_paths()}.  Ignored if
+#'   \code{individual_dir} is supplied directly.
+#' @param individual_dir  Path to the directory containing the
+#'   \code{iter_NNNN.rds} files.  If NULL (default), derived from
+#'   \code{output_name} via \code{get_sim_paths()}.
+#' @param save  If TRUE (default), write the combined tibble to RDS + CSV.
+#' @return The combined tibble (invisibly when \code{save = TRUE}).
+collect_sim_results <- function(output_name   = "sims-variance-multi",
+                                individual_dir = NULL,
+                                save           = TRUE) {
+
+  paths <- get_sim_paths(output_name)
+  if (is.null(individual_dir)) individual_dir <- paths$individual_dir
+
+  cat("Collecting .rds files from:\n  ", individual_dir, "\n", sep = "")
+
+  files <- list.files(
+    path       = individual_dir,
+    pattern    = "^iter_\\d+\\.rds$",
+    full.names = TRUE
+  )
+
+  if (length(files) == 0)
+    stop("No iter_NNNN.rds files found in: ", individual_dir)
+
+  cat("Found ", length(files), " file(s).\n", sep = "")
+
+  read_one <- function(fp) {
+    out <- tryCatch(readRDS(fp), error = function(e) NULL)
+    if (is.null(out)) { warning("Could not read: ", fp); return(NULL) }
+    as_tibble(out)
+  }
+
+  res_list <- purrr::map(files, read_one)
+  failed   <- files[purrr::map_lgl(res_list, is.null)]
+  combined <- dplyr::bind_rows(res_list)
+
+  cat("Combined rows : ", nrow(combined), "\n", sep = "")
+  cat("Replications  : ", dplyr::n_distinct(combined$runID), "\n", sep = "")
+  cat("Design cells  : ", nrow(dplyr::distinct(
+    combined, overlap_label, error_type, sigma1_extra, k_match)), "\n", sep = "")
+
+  if (length(failed) > 0) {
+    cat("Failed to read ", length(failed), " file(s):\n", sep = "")
+    cat(paste("  -", basename(failed), collapse = "\n"), "\n")
+  }
+
+  if (save) {
+    readr::write_rds(combined, paths$combined_rds)
+    readr::write_csv(combined, paths$combined_csv)
+    cat("Saved:\n  RDS: ", paths$combined_rds,
+        "\n  CSV: ", paths$combined_csv, "\n", sep = "")
+    return(invisible(combined))
+  }
+
+  combined
 }

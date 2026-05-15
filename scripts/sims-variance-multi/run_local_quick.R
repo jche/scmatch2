@@ -55,8 +55,9 @@ tic()
 
 all_res <- future_map( 1:N_ITER,
                        .f = sim_master_multi,
+                       caliper       = 0.1,
                        save_path = save_path,
-                       overwrite = FALSE,
+                       overwrite = TRUE,
                        .options = furrr_options(seed = NULL),
                        .progress = TRUE
 )
@@ -74,16 +75,37 @@ if ( FALSE ) {
 }
 
 
-cat( "Quick Simulation complete\n" )
+cat( "\n\nQuick Simulation complete\n" )
+res <- collect_sim_results( OUTPUT_NAME )
 
-all_res = all_res[ !is.na( all_res ) ]
-res = bind_rows( all_res )
 res
 
 cov <- res %>%
   group_by( error_type, sigma1_extra, common_label, k_match,method ) %>%
   mutate( cover = SATT <= att_est+2*SE & SATT >= att_est-2*SE ) %>%
-  summarize( cover = mean( cover ), .groups = "drop" )
+  summarize( R = n(),
+             mean_S0 = sqrt( mean( S0_sq ) ),
+             cover = mean( cover ), .groups = "drop" )
+
+cov %>%
+  arrange( common_label, method )
+
+
+ggplot( cov, aes( error_type, cover, color=method, group=method ) ) +
+  facet_grid(  ~ common_label ) +
+  geom_point() +
+  geom_line() +
+  geom_hline( yintercept = 0.95 )
+
+
+
+res %>%
+  pivot_longer( cols = c("S0_sq", "S1_sq") ) %>%
+  mutate( value = sqrt( value ) ) %>%
+  ggplot( aes( error_type, value, col = name ) ) +
+  facet_grid(   ~ common_label ) +
+  geom_boxplot()
+
 
 
 

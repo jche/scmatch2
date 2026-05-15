@@ -13,6 +13,7 @@
 #   n_iter       Number of iterations to run (default: 10)
 #   output_name  Subdirectory under data/outputs/ (default: sims-variance-multi)
 
+
 suppressPackageStartupMessages({
   library(dplyr)
   library(tibble)
@@ -57,7 +58,8 @@ tic()
 all_res <- future_map( 1:N_ITER,
                        .f = sim_master_multi,
                        save_path = save_path,
-                       overwrite = FALSE,
+                       overwrite = TRUE,
+                       caliper = 0.1,
                        .options = furrr_options(seed = NULL),
                        .progress = TRUE
 )

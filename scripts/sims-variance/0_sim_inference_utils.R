@@ -87,7 +87,8 @@ make_csm_toy_df <- function(
 
   df <- if (isTRUE(mixture_fixed)) {
     gen_df_adv(
-      nc = nc, nt = nt, f0_sd = f0_sd,
+      nc = nc, nt = nt,
+      f0_sd = f0_sd,
       tx_effect_fun = tx_effect_fun_xy,
       f0_fun = f0_fun_xy,
       ctr_dist = ctr_dist,
