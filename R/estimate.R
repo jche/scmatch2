@@ -483,8 +483,10 @@ get_measurement_error_variance_het <- function(
 #'   "ess_units": weight by effective sample size of units in the subclass
 #'   "uniform": weight each cluster equally
 #' @param variance_method Method for calculating measurement error variance:
-#'   "pooled": use get_measurement_error_variance (default)
-#'   "bootstrap": use get_measurement_error_variance_OR
+#'   "pooled": use get_measurement_error_variance (default).
+#'   "bootstrap": use get_measurement_error_variance_OR.
+#'   "pooled_het": allow for heterogeneity.
+#'   "ai06": the estimator of Abadie and Imbens.
 #' @param boot_mtd Bootstrap method when variance_method = "bootstrap" (default: "wild")
 #' @param B Number of bootstrap samples when variance_method = "bootstrap" (default: 250)
 #' @param seed_addition Additional seed for bootstrap (default: 11)
@@ -496,13 +498,15 @@ get_total_variance <- function(
     outcome = "Y",
     treatment = "Z",
     var_weight_type = "ess_units",
-    variance_method = "pooled",
+    variance_method = c( "pooled", "pooled_het", "bootstrap", "ai06" ),
     boot_mtd = "wild",
     B = 250,
     seed_addition = 11,
     cluster_comb_mtd = "average",
     df = NULL,
     ...) {
+
+  variance_method = match.arg(variance_method)
 
   # Convert to data frame if needed
   if (is.csm_matches(matches)) {
@@ -526,6 +530,17 @@ get_total_variance <- function(
     sigma_hat_squared <- v_e_result$sigma_hat^2
     N_T <- v_e_result$N_T
     ESS_C <- v_e_result$ESS_C
+  } else if (variance_method == "pooled_het"){
+    v_e_result <- get_measurement_error_variance_het(
+      matches_table = matches_df,
+      outcome = outcome,
+      treatment = treatment,
+      cluster_comb_mtd = cluster_comb_mtd
+    )
+    V_E <- v_e_result$V_E
+    sigma_hat_squared <- v_e_result$sigma_hat^2
+    N_T <- v_e_result$N_T
+    ESS_C <- v_e_result$ESS_C
   } else if (variance_method == "bootstrap") {
     v_e_result <- get_measurement_error_variance_OR(
       matches = matches_df,
@@ -540,17 +555,6 @@ get_total_variance <- function(
     # Essentially we are using V_E as the whole V for bootstrap, which is desired.
     sigma_hat_squared <- V_E * (v_e_result$N_T + v_e_result$ESS_C) /
       (1/v_e_result$N_T + 1/v_e_result$ESS_C)
-    N_T <- v_e_result$N_T
-    ESS_C <- v_e_result$ESS_C
-  } else if (variance_method == "pooled_het"){
-    v_e_result <- get_measurement_error_variance_het(
-      matches_table = matches_df,
-      outcome = outcome,
-      treatment = treatment,
-      cluster_comb_mtd = cluster_comb_mtd
-    )
-    V_E <- v_e_result$V_E
-    sigma_hat_squared <- v_e_result$sigma_hat^2
     N_T <- v_e_result$N_T
     ESS_C <- v_e_result$ESS_C
   } else if (variance_method == "ai06") {
@@ -568,8 +572,10 @@ get_total_variance <- function(
       treatment = treatment,
       ... # Pass M, covs, scaling, metric, etc.
     )
+
     # Unpack complex object
-    v_e_result <- v_e_result_list %>% dplyr::select(-var_calc_df)
+    v_e_result <- v_e_result_list %>%
+      dplyr::select(-var_calc_df)
 
 
     V_E <- v_e_result_list$V_E

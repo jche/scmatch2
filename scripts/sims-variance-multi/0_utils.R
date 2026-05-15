@@ -237,9 +237,23 @@ one_iter <- function(
                                 K                   = K_tt
   )
 
+  # Now superpopulation ones
+  super_homo <- get_total_variance( mtch,
+                                    outcome = "Y",
+                                    treatment = "Z",
+                                    variance_method = "pooled" )
+
+  super_het <- get_total_variance( mtch,
+                                   outcome = "Y",
+                                   treatment = "Z",
+                                   variance_method = "pooled_het" )
+
   res = bind_rows( homo = res_homo,
                    het = res_het,
-                   ttmatch = res_tt, .id = "method" )
+                   ttmatch = res_tt,
+                   pop_homo = super_homo,
+                   pop_het = super_het,
+                   .id = "method" )
 
 
   res %>%

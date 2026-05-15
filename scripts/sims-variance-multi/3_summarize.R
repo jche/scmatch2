@@ -56,16 +56,18 @@ res <- res %>%
 
 coverage_tbl <- res %>%
   group_by(method, overlap_label, error_type, common_label, k_match ) %>%
-  reframe(
+  summarize(
     my_calc_coverage(
       pick(everything()),
       lower_bound = CI_lower,
       upper_bound = CI_upper,
       true_param  = SATT
-    )
+    ),
+    R = n(), .groups = "drop"
   ) %>%
   rename(mcse = coverage_mcse)
 
+coverage_tbl$R
 
 cat("\nCoverage summary (first rows):\n")
 print(head(coverage_tbl, 10))
@@ -88,10 +90,7 @@ coverage_tbl <- coverage_tbl %>%
                            levels = c("common", "no_common"),
                            labels = c("Common variance",
                                       "No common variance")),
-    k_match = paste0( "k=", k_match ),
-    method = factor(method,
-                    levels = c("homo", "het", "ttmatch" ),
-                    labels = c("homo", "het", "ttmatch" ) )
+    k_match = paste0( "k=", k_match )
   )
 
 
@@ -106,7 +105,9 @@ overlap_x_labels <- c(
 estimator_colours <- c(
   "homo"    = "#E41A1C",
   "het"     = "#377EB8",
-  "ttmatch"   = "#4DAF4A"
+  "ttmatch"   = "#4DAF4A",
+  "pop_het" = "#984EA3",
+  "pop_homo" = "#FF7F00"
 )
 
 p_coverage <- ggplot(
@@ -126,28 +127,31 @@ p_coverage <- ggplot(
   geom_hline(yintercept = 0.95, linetype = "dashed", colour = "grey40") +
   scale_x_discrete(labels = overlap_x_labels) +
   scale_y_continuous(
-    limits = c( 0.3, 1.1),
-    labels = scales::percent_format(accuracy = 1)
+    labels = scales::percent_format(accuracy = 1),
+    breaks = seq(0.7, 1.0, by = 0.1)
   ) +
   scale_colour_manual(values = estimator_colours, name = "Estimator") +
   labs(
     x     = "Degree of overlap",
-    y     = "Coverage of τ_SATT",
-    title = "Coverage of 95% CIs across overlap, error structure, and common-variance scenarios"
+    y     = "Coverage"
+#    title = "Coverage of 95% CIs across overlap, error structure, and common-variance scenarios"
   ) +
   theme_bw(base_size = 11) +
   theme(
     axis.text.x     = element_text(angle = 30, hjust = 1),
     legend.position = "bottom",
     strip.text      = element_text(size = 9)
-  )
-p_coverage + coord_flip()
+  ) +
+  coord_flip( ylim = c(0.7, 1.05 ) )
+
+print( p_coverage )
 
 
 fig_dir <- here::here("figures", output_name)
 dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
 fig_path <- file.path(fig_dir, "coverage_by_overlap.pdf")
-ggsave(fig_path, p_coverage, width = 8, height = 6)
+ggsave(fig_path,
+       p_coverage,
+       width = 8, height = 6)
 cat("Saved figure: ", fig_path, "\n")
 
-print(p_coverage)
