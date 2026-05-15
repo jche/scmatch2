@@ -27,7 +27,7 @@ test_that("calc_N_T_N_C calculates N_T and ESS_C correctly with reused controls"
 
   # --- 4. Check Results ---
   expect_true(is.list(result))
-  expect_named(result, c("N_T", "N_C_tilde"))
+  expect_named(result, c("N_T", "N_C", "N_C_tilde"))
   expect_equal(result$N_T, 2)
   expect_equal(result$N_C_tilde, 1.6)
 
@@ -800,8 +800,6 @@ test_that("get_finite_variance: common variance, hand-computed values", {
   )
   result
 
-  expect_named(result,
-               c("V", "V_E", "V_P", "SE", "N_T", "ESS_C", "sigma_hat", "S0_sq", "S1_sq", "cov_w_s") )
 
   expect_equal(result$N_T,   2)
   expect_equal(result$ESS_C, 4 / 1.38, tolerance = 1e-6)

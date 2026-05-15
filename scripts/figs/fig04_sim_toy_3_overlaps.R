@@ -1,3 +1,5 @@
+
+
 library( CSM )
 library(tidyverse)
 source("./R/diagnostic_plots.R")
@@ -41,6 +43,7 @@ combined_plot <- cowplot::plot_grid(
   ncol = 3, align = 'h',
   rel_widths = c(1, 1, 1.4)
 )
+
 print(combined_plot)
 ggsave("./figures/sim_toy_3_overlaps.png",
        combined_plot,

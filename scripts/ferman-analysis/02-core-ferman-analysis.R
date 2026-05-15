@@ -36,7 +36,9 @@ ferman_csm <- ferman_for_analysis %>%
     metric = "maximum",   # "maximum", "euclidean", "manhattan"
     rad_method = "adaptive",
     scaling = scaling,
+    k = 1,
     est_method = "scm")
 
 
 
+ferman_csm

@@ -3,7 +3,7 @@
 This directory contains all scripts used to generate the figures, simulations, and empirical analyses for:
 
 > **Caliper Synthetic Matching: Generalized Radius Matching with Local Synthetic Controls**
-> Che, Meng, and Miratrix. *Political Analysis* (2025).
+> Che, Meng, and Miratrix.  (2025).
 
 The paper introduces CSM, a matching method that combines adaptive calipers with local synthetic control reweighting. The scripts here reproduce every figure and result in the paper and its online supplement.
 

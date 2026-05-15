@@ -68,6 +68,7 @@ calc_N_T_N_C <- function(preds_csm, treatment = "Z"){
 
 
   return(list(N_T = N_T,
+              N_C = sum(tmp$w_i > 0.00000001),
               N_C_tilde = N_C_tilde))
 }
 
@@ -805,13 +806,14 @@ estimate_ATT <- function(
     return(tibble(
       ATT = NA_real_, SE = NA_real_, t = NA_real_,
       V = NA_real_, V_E = NA_real_, V_P = NA_real_,
-      N_T = NA_real_, ESS_C = NA_real_, sigma_hat = NA_real_
+      N_T = NA_real_, ESS_C = NA_real_, N_C = NA_real_, sigma_hat = NA_real_
     ))
   }
 
   if ( !( outcome %in% colnames(matches_df) ) ) {
     stop( glue::glue( "Outcome variable {outcome} not found in data" ) )
   }
+
 
   # Point estimate
   ATT <- get_att_point_est(matches_df,
@@ -858,7 +860,7 @@ estimate_ATT <- function(
     )
   }
 
-  # Attach ATT and t-statistic
+  # Attach ATT, t-statistic, and unique control count
   variance_results %>%
     mutate(ATT = ATT) %>%
     relocate(ATT) %>%
@@ -1064,9 +1066,11 @@ get_finite_variance <- function(
 
   sample_sizes <- calc_N_T_N_C(matches_table, treatment = treatment)
   N_T   <- sample_sizes$N_T
+  N_C <- sample_sizes$N_C
   ESS_C <- sample_sizes$N_C_tilde
 
   sjs <- calculate_s_j_sq(matches_table, outcome = outcome, treatment = treatment)
+  p_drop = (N_T - nrow(sjs$s_t_sq)) / N_T
   s_t_sq_df <- sjs$s_t_sq
   s_j_sq_df <- sjs$s_j_sq
 
@@ -1076,8 +1080,10 @@ get_finite_variance <- function(
       V_E       = V_E,
       SE        = sqrt(V_E),
       N_T       = N_T,
+      N_C      = N_C,
       ESS_C     = ESS_C,
       sigma_hat = NA_real_,
+      p_drop   = p_drop,
       S0_sq     = mean( s_t_sq_df$s_t_sq ),
       S1_sq    = S0_sq # under homoskedasticity, S1^2 = S0^2
     )
@@ -1094,8 +1100,11 @@ get_finite_variance <- function(
 
   sum_w_sq <- sum(control_df$w_j^2, na.rm = TRUE)
   S0_sq    <- sum(control_df$w_j^2 * control_df$s_j_sq, na.rm = TRUE) / sum_w_sq
-
-  cov_w_s <- cov(control_df$w_j, control_df$s_j_sq, use = "complete.obs")
+  if ( all( is.na( control_df$s_j_sq ) ) ) {
+    cov_w_s = NA
+  } else {
+    cov_w_s <- cov(control_df$w_j, control_df$s_j_sq, use = "complete.obs")
+  }
 
   if (use_common_variance) {
     S1_sq <- mean(s_t_sq_df$s_t_sq, na.rm = TRUE)
@@ -1124,9 +1133,11 @@ get_finite_variance <- function(
   tibble(
     SE        = sqrt(V_E),
     N_T       = N_T,
+    N_C       = N_C,
     ESS_C     = ESS_C,
     sigma_hat = NA_real_,
     V_E       = V_E,
+    p_drop  = p_drop,
     S0_sq     = S0_sq,
     S1_sq     = S1_sq,
     cov_w_s   = cov_w_s

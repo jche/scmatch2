@@ -18,7 +18,7 @@ if ( FALSE ) {
 
 df <- make_df_multi( error_type = "het",
                      sigma1_extra = 0,
-                     prop_nc_unif = 0.7 )
+                     prop_nc_unif = 0.05 )
 
 head( df )
 stats <- df %>%
@@ -40,7 +40,7 @@ mtch <-  get_cal_matches(
   rad_method = "adaptive",
   caliper = 0.1,
   scaling    = 1,
-  k          = 2,
+  k          = 1,
   warn       = FALSE,
   est_method = "scm"
 )

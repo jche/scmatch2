@@ -17,8 +17,9 @@ theme_set(theme_classic())
 source(here::here("scripts/ferman-analysis/02-core-ferman-analysis.R"))
 
 # Ensure figures directory exists
-if(!dir.exists(here::here("figures/"))) dir.create(here::here("figures/"), recursive = TRUE)
-
+if(!dir.exists(here::here("figures/"))) {
+  dir.create(here::here("figures/"), recursive = TRUE)
+}
 
 summary( ferman_csm )
 
@@ -44,7 +45,7 @@ ggsave(here::here("figures/ferman_love.pdf"), plot = p_love, height = 3, width =
 
 
 # -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
-# 1.(b) Look at how distances are distributed after matching ----
+# 1. Distance distribution after matching ----
 # -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
 
 dplt <- distance_density_plot( ferman_csm ) +
@@ -54,7 +55,8 @@ dplt
 
 attr( dplt, "table" )
 
-ggsave(here::here("figures/ferman_distance_density.pdf"), plot = dplt, width = 6, height = 2)
+ggsave(here::here("figures/ferman_distance_density.pdf"),
+       plot = dplt, width = 6, height = 2)
 
 
 
@@ -62,28 +64,54 @@ ggsave(here::here("figures/ferman_distance_density.pdf"), plot = dplt, width = 6
 # 2. Comparison of Methods Table ----
 # -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
 
+summary( ferman_csm, outcome="Y" )
+
+estimate_ATT( ferman_csm )
+
+ferman2 <- update_matches( ferman_csm, data=ferman_for_analysis, k = 2 )
+ferman2
+
+
 ss <- sensitivity_table( ferman_csm, outcome="Y",
                          include_distances = TRUE )
 
 ss
 
+ss2 <- sensitivity_table( ferman2, outcome="Y",
+                          include_distances = TRUE )
+ss2$Estimate = paste0( ss2$Estimate, " (k=2)" )
+
+# ESS table
+ss %>%
+  bind_rows(  ss2 ) %>%
+  dplyr::select( Estimate, mean_dist, median_dist, N_T, N_C, ESS_C, p_drop ) %>%
+  arrange( Estimate ) %>%
+  knitr::kable( digits = 3 )
+
+
+
 ferman_csm
 
-s_fin <- ss %>% dplyr::select( Estimate, ATT, SE ) %>%
+s_fin <- ss %>%
+  bind_rows( ss2[c(1,4),] ) %>%
+  dplyr::select( Estimate, ATT, SE ) %>%
   mutate( feasible = ifelse( grepl( "FATT", Estimate ),
                              "Feasible", "All" ),
           method = case_when(
             grepl( "1nn", Estimate ) ~ "1-NN",
             grepl( "raw", Estimate ) ~ "Average",
+            grepl( "k=2", Estimate ) ~ "CSM (k=2)",
             TRUE ~ "CSM"
           ) ) %>%
   dplyr::select( feasible, method, ATT, SE ) %>%
   pivot_wider( names_from = c( feasible ),
                values_from = c( ATT, SE ), names_vary = "slowest" )
 
+# Initial table of point estimates
 s_fin
 
-# Table of point estimates in the paper
+
+# Now add SEs for 1-nn
 
 # First calculate SEs for 1-nn
 library(Matching)
@@ -112,7 +140,39 @@ m_out <- Matching::Match(
 )
 summary( m_out )
 
-# Now do feasible
+# compare to our version
+ferman_1nn <- get_cal_matches( ferman_for_analysis,
+    covs = match_covs,
+    treatment = "Z",
+    caliper = c,
+    metric = "euclidean",
+    rad_method = "knn",
+    scaling = scaling,
+    k = 1,
+    est_method = "average")
+estimate_ATT( ferman_1nn )
+s_fin$ATT_All[ s_fin$method == "1-NN" ]
+
+
+matched_pairs <- tibble(
+  treated = ferman_for_analysis$id[m_out$index.treated],
+  control = ferman_for_analysis$id[ m_out$index.control]
+)
+matched_pairs
+fm = result_table( ferman_1nn ) %>%
+  dplyr::select( id, Z, subclass ) %>%
+  pivot_wider( names_from = Z, values_from=id )
+fm
+
+fmm = left_join( fm, matched_pairs, by = c("1" = "treated") )
+mean( fmm$`0` == fmm$control )
+dels <- filter( fmm, `0` != control )
+idd = c( dels$`1`, dels$`0`, dels$control )
+filter( ferman_for_analysis, id %in% as.character( dels[1,] ) )
+filter( ferman_for_analysis, id %in% as.character( dels[2,] ) )
+
+
+# Now subset to feasible units and then do nearest neighbor
 drop = bad_matches( ferman_csm, 0.35 ) %>%
   pull( subclass ) %>%
   unique()
@@ -133,15 +193,39 @@ m_out2 <- Matching::Match(
 )
 summary( m_out2 )
 
-m_out$est
-m_out$se.standard
 
+# compare to our version
+ferman_1nn <- get_cal_matches( ferman_for_analysis,
+                               covs = match_covs,
+                               treatment = "Z",
+                               caliper = c,
+                               metric = "maximum",
+                               rad_method = "knn-capped",
+                               scaling = scaling,
+                               k = 1,
+                               est_method = "scm")
+estimate_ATT( ferman_1nn )
+s_fin$ATT_All[ s_fin$method == "1-NN" ]
+
+
+
+m_out2$est
+m_out2$se.standard
+
+
+# Plug in the SEs
 s_fin$ATT_All[ s_fin$method == "1-NN" ] = m_out$est
 s_fin$SE_All[ s_fin$method == "1-NN" ] = m_out$se.standard
+s_fin$ATT_All[ s_fin$method == "1-NN" ] - m_out2$est
 s_fin$ATT_Feasible[ s_fin$method == "1-NN" ] = m_out2$est
 s_fin$SE_Feasible[ s_fin$method == "1-NN" ] = m_out2$se.standard
 
 
+## Table of treatment impacts by method ----
+
+s_fin
+
+# Make latex form
 library( xtable )
 
 print( xtable( s_fin, digits=3 ), include.rownames = FALSE )
@@ -163,7 +247,8 @@ plt
 p_dist_all <- caliper_distance_plot( ferman_csm, tops = c(1, 3, 6) )
 p_dist_all
 
-ggsave(here::here("figures/ferman_top_k_distances.pdf"), plot = p_dist_all, width = 7, height = 3.5)
+ggsave(here::here("figures/ferman_top_k_distances.pdf"),
+       plot = p_dist_all, width = 7, height = 3.5)
 
 
 
@@ -180,7 +265,8 @@ plot_max_cal = plot_max_cal$plot_max_caliper_size
 p_tradeoff_all <- gridExtra::grid.arrange(plot_max_cal, p_satt, ncol=2)
 
 
-ggsave(here::here("figures/ferman_fsatt_tradeoff.pdf"), plot = p_tradeoff_all, width = 10, height = 5)
+ggsave(here::here("figures/ferman_fsatt_tradeoff.pdf"),
+       plot = p_tradeoff_all, width = 10, height = 5)
 
 
 
@@ -212,7 +298,8 @@ tbl
 
 plt_stats <- caliper_sensitivity_plot_stats( plt )
 plt_stats
-ggsave( plt_stats, filename = here::here( "figures/ferman_caliper_sensitivity_plot_stats.pdf"),
+ggsave( plt_stats,
+        filename = here::here( "figures/ferman_caliper_sensitivity_plot_stats.pdf"),
         width = 7, height = 5 )
 
 
@@ -248,6 +335,7 @@ cem <- get_cem_matches( data = ferman_for_analysis,
                         Z_FORMULA = "Z",
                         est_method = "average",
                         return = "all" )
+cem
 
 
 ferman_cem <- ferman_for_analysis %>%

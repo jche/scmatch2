@@ -25,7 +25,7 @@
 #'
 #' @export
 sensitivity_table <- function( csm,
-                               outcome = NULL,
+                               outcome = "Y",
                                feasible_only = FALSE,
                                include_variances = FALSE,
                                include_distances = TRUE ) {
@@ -103,7 +103,7 @@ sensitivity_table <- function( csm,
 
   if ( !is.null(outcome) && !include_variances ) {
     rs <- rs %>%
-      dplyr::select( -V, -V_E, -V_P )
+      dplyr::select( -any_of( c( "V", "V_E", "V_P" ) ) )
   }
 
   if ( include_distances ) {

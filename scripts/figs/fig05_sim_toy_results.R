@@ -22,20 +22,50 @@ res_L %>% group_by( method ) %>%
 
 
 
-res_toy_L <- prepare_method_comparison_df(res_toy)
-res_toy_L
+if ( FALSE ) {
+  # Look at the distribution of estimates to see if we have outliers
+  ggplot( res_L, aes( method, value ) ) +
+    geom_boxplot() +
+    coord_flip()
+}
 
-RMSE_plot(res_toy,
-          title = "Toy Example",
-          xlab = "Value",
-          ylab = "Method",
-          legend.position = c(0.75, 0.25))
+# Windsorize
+iqr = IQR( res_L$value, na.rm=TRUE )
+iqr
+q25 = quantile(res_L$value, 0.25, na.rm=TRUE)
+q25
+res_L$value[ res_L$value < q25 - 2*iqr ] <- q25 - 2*iqr
 
-ggsave("figures/sim_toy_results.png", width = 3.5, height = 3.5)
+
+org_df <- summarize_bias_rmse( res_L )
+org_df <- org_df %>%
+  mutate( group = case_when(
+    method == "csm_scm" ~ "CSM",
+    method == "causal_forest" ~ "CF",
+    method == "cem_avg" ~ "CEM",
+  str_detect( method, "ipw" ) ~ "IPW",
+  TRUE ~ "Other" ) )
+org_df
+
+
+contour_plot( org_df, add_labels = FALSE )
+contour_plot(org_df, add_labels = FALSE, focus = c("csm_scm", "cem_avg"))
+
+# debugonce( RMSE_plot )
+RMSE_plot( org_df,
+           title = "Toy Example",
+           xlab = "Value",
+           ylab = "Method",
+           legend.position = c(0.75, 0.25),
+           table_long = TRUE )
+
+
+ggsave("figures/sim_toy_results.pdf", width = 3.5, height = 3.5)
+
 
 
 ########################################
-# diagnostic table view
+# scratch: diagnostic table ----
 ########################################
 res_toy_L <- res_toy %>%
   pivot_longer(
@@ -59,10 +89,4 @@ tmp <- res_toy_L %>%
   arrange(rmse)
 tmp
 
-# plot_org_df(org_df_toy,
-#             title="Toy Example",
-#             xlab="Value",
-#             ylab="Method",
-#             legend.position=c(0.75, 0.25))
-# ggsave("figures/sim_toy_results.png",
-#        width=3.5, height=3.5)
+

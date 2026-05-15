@@ -48,6 +48,7 @@ source("scripts/lib/plot_toy.R")
 toy_example_four_points_plot <-
   create_toy_example_four_points_plot(
     background_plot, four_points_df)
+toy_example_four_points_plot
 ggsave("figures/toyexample1.png", width=3, height=3)
 
 
@@ -64,17 +65,18 @@ six_points_df <-
 toy_example_six_points_plot <-
   create_toy_example_six_points_plot(
     background_plot, six_points_df,draw_circle=T)
-
+toy_example_six_points_plot
 ggsave("figures/toyexample2.png", width=3, height=3)
 
-toy_example_six_points_plot <-
-  create_toy_example_six_points_plot(
-    background_plot, six_points_df,draw_circle=F)
+if ( FALSE ) {
+  toy_example_six_points_plot <-
+    create_toy_example_six_points_plot(
+      background_plot, six_points_df,draw_circle=F)
 
-ggsave("figures/toyexample2_no_circle.png", width=3, height=3)
+  ggsave("figures/toyexample2_no_circle.png", width=3, height=3)
+}
 
-
-# plot dataset ------------------------------------------------------------
+# plot sample dataset ------------------------------------------------------------
 
 nc <- 500
 nt <- 100

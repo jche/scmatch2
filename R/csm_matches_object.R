@@ -192,7 +192,7 @@ summary.csm_matches <- function(x, outcome = NULL, ... ) {
     stopifnot( outcome %in% names(x$matches[[1]]) )
     cat( "ATT estimates and sample sizes:\n" )
     att <- estimate_ATT(x, outcome=outcome) %>%
-      dplyr::select( -V, -V_E, -V_P ) %>%
+      dplyr::select( -any_of( c("V","V_E","V_P" ) ) ) %>%
       as.data.frame()
     att %>%
       print( row.names = FALSE )
