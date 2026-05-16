@@ -29,6 +29,9 @@ N_ITER      <- if (length(.args) >= 1) as.integer(.args[[1]]) else 100L
 OUTPUT_NAME <- if (length(.args) >= 2) .args[[2]] else "sims-variance-multi"
 SAVE_OUTPUT <- TRUE
 
+N_ITER = 1000L
+
+
 # ── Load utilities ────────────────────────────────────────────────────────────
 source(here::here("scripts/sims-variance-multi/0_utils.R"))
 
@@ -58,7 +61,7 @@ tic()
 all_res <- future_map( 1:N_ITER,
                        .f = sim_master_multi,
                        save_path = save_path,
-                       overwrite = TRUE,
+                       overwrite = FALSE,
                        caliper = 0.1,
                        .options = furrr_options(seed = NULL),
                        .progress = TRUE

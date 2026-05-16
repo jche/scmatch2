@@ -84,7 +84,7 @@ ss2$Estimate = paste0( ss2$Estimate, " (k=2)" )
 # ESS table
 ss %>%
   bind_rows(  ss2 ) %>%
-  dplyr::select( Estimate, mean_dist, median_dist, N_T, N_C, ESS_C, p_drop ) %>%
+  dplyr::select( Estimate, mean_dist, median_dist, N_T, N_C, ESS_C ) %>%
   arrange( Estimate ) %>%
   knitr::kable( digits = 3 )
 

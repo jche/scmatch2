@@ -1,18 +1,20 @@
 # scripts/sims-variance-multi/0_utils.R
 #
-# Utilities for the 3-factor variance-estimator simulation study.
+# Utilities for the 4-factor variance-estimator simulation study.
 #
 # Factors
 # -------
-#   1. Overlap (5 levels):        very_low, low, mid, high, very_high
-#                                 controlled via prop_nc_unif
+#   1. Overlap (5 levels):         very_low, low, mid, high, very_high
+#                                  controlled via prop_nc_unif
 #   2. Error structure (2 levels): homo  — σ₀(x) = 0.5  (constant)
 #                                  het   — σ₀(x) bimodal Gaussian bumps
 #   3. Common variance (2 levels): common    — σ₁ = σ₀  (sigma1_extra = 0)
 #                                  no_common — σ₁ = σ₀ + 2 (sigma1_extra = 2)
 #   4. k (min number of matches):  1 or 2
+#   5. Treatment effect (2 levels): het      — τ(x) = 3·X₁ + 3·X₂  (heterogeneous)
+#                                   constant — τ(x) = TX_CONSTANT    (homogeneous)
 
-# 5 × 2 × 2 x 2 = 40 design cells, 1000 replications.
+# 5 × 2 × 2 × 2 × 2 = 80 design cells, 1000 replications.
 #
 # Three variance estimators
 # ------------------------
@@ -37,6 +39,9 @@ suppressPackageStartupMessages({
   library(mvtnorm)
 })
 
+library( CSM )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Design constants
 # ─────────────────────────────────────────────────────────────────────────────
@@ -51,18 +56,25 @@ PROP_NC_UNIF <- c(
   very_high = 2/3
 )
 
+# Constant treatment effect value: chosen to equal the approximate SATT of the
+# heterogeneous effect τ(x) = 3·X₁ + 3·X₂ when treated units cluster near
+# (0.25, 0.25) and (0.75, 0.75), giving an average of ~3.
+TX_CONSTANT <- 3.0
+
 DESIGN_GRID <- expand_grid(
   overlap_label = OVERLAP_LABELS,
   error_type    = c("homo", "het"),
   sigma1_extra  = c(0, 2),
-  k_match = c( 1, 2 )
+  k_match       = c(1, 2),
+  tx_type       = c("het", "constant")
 ) %>%
   mutate(
     common_label = if_else(sigma1_extra == 0, "common", "no_common"),
     # factor ordering for plots
     overlap_label = factor(overlap_label, levels = OVERLAP_LABELS),
     error_type    = factor(error_type,    levels = c("homo", "het")),
-    common_label  = factor(common_label,  levels = c("common", "no_common"))
+    common_label  = factor(common_label,  levels = c("common", "no_common")),
+    tx_type       = factor(tx_type,       levels = c("het", "constant"))
   )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -95,6 +107,8 @@ sigma0_bimodal <- function(x1, x2,
 #' @param error_type  "homo" (σ₀ = 0.5 constant) or "het" (bimodal σ₀).
 #' @param sigma1_extra  Extra treatment-side SD: σ₁ = σ₀ + sigma1_extra.
 #'   0 = common variance; 2 = no-common variance.
+#' @param tx_type  "het" (default) uses τ(x) = 3·X₁ + 3·X₂; "constant"
+#'   uses τ(x) = TX_CONSTANT for all units.
 #' @param seed  Optional seed (set before gen_df_adv_k call).
 #' @return Data frame with Y, Y0, Y1, Z, X1, X2, id, sigma0, sigma1.
 make_df_multi <- function(
@@ -103,9 +117,11 @@ make_df_multi <- function(
     ctr_dist     = 0.5,
     error_type   = c("homo", "het"),
     sigma1_extra = 0,
+    tx_type      = c("het", "constant"),
     seed         = NULL) {
 
   error_type <- match.arg(error_type)
+  tx_type    <- match.arg(tx_type)
   if (!is.null(seed)) set.seed(seed)
 
   f0_fun_mat <- function(X) {
@@ -113,13 +129,14 @@ make_df_multi <- function(
     mvtnorm::dmvnorm(X, mean = c(0.5, 0.5),
                      sigma = matrix(c(1, 0.8, 0.8, 1), 2, 2)) * 20
   }
-  tx_fun_mat <- function(X) {
-    X <- as.matrix(X)
-    3 * X[, 1] + 3 * X[, 2]
+  tx_fun_mat <- if (tx_type == "het") {
+    function(X) { X <- as.matrix(X); 3 * X[, 1] + 3 * X[, 2] }
+  } else {
+    function(X) rep(TX_CONSTANT, nrow(as.matrix(X)))
   }
 
   # Generate noiseless skeleton (f0_sd = 0 → Y0_denoised = f0_fun(X))
-  df_raw <- gen_df_adv_k(
+  df_raw <- CSM:::gen_df_adv_k(
     nc = nc, nt = nt, k = 2,
     f0_sd         = 0,
     tx_effect_fun = tx_fun_mat,
@@ -132,7 +149,7 @@ make_df_multi <- function(
   sig0 <- if (error_type == "homo") {
     rep(0.5, nrow(df_raw))
   } else {
-    sigma0_bimodal(df_raw$X1, df_raw$X2)
+    sigma0_bimodal(df_raw$X1, df_raw$X2) / 8
   }
 
   sig1 <- sig0 + sigma1_extra
@@ -161,18 +178,19 @@ make_df_multi <- function(
 #' Run one simulation iteration for a single design cell.
 #'
 #' @param i         Replication index (for runID column).
-#' @param overlap_label,error_type,sigma1_extra  Design cell identifiers.
+#' @param overlap_label,error_type,sigma1_extra,tx_type  Design cell identifiers.
 #' @param prop_nc_unif  Looked up from PROP_NC_UNIF inside sim_master_multi;
 #'   passed directly here.
 #' @param seed_addition  Seed (unique per cell × replication).
 #' @param K_tt  Treated-to-treated neighbours for ttmatch (default 2).
 #' @param verbose  Print error messages from individual estimators.
-#' @return Tibble with 4 rows (one per estimator) and all metadata columns.
+#' @return Tibble with 5 rows (one per estimator) and all metadata columns.
 one_iter <- function(
     i,
     overlap_label,
     error_type    = c("homo", "het"),
     sigma1_extra  = 0,
+    tx_type       = c("het", "constant"),
     prop_nc_unif,
     nc            = 500,
     nt            = 100,
@@ -185,10 +203,11 @@ one_iter <- function(
 ) {
 
   error_type <- match.arg(error_type)
+  tx_type    <- match.arg(tx_type)
   set.seed(seed_addition)
 
   if ( verbose ) {
-    cat( glue::glue("Sim iter #{i}: over:{overlap_label} - error:{error_type} - sigma1:{sigma1_extra} - k={k_match}") )
+    cat( glue::glue("Sim iter #{i}: over:{overlap_label} - error:{error_type} - sigma1:{sigma1_extra} - tx:{tx_type} - k={k_match}") )
     cat( "\n" )
   }
 
@@ -199,6 +218,7 @@ one_iter <- function(
     ctr_dist     = ctr_dist,
     error_type   = error_type,
     sigma1_extra = sigma1_extra,
+    tx_type      = tx_type,
     seed         = seed_addition
   )
 
@@ -255,6 +275,14 @@ one_iter <- function(
                    pop_het = super_het,
                    .id = "method" )
 
+  # Strip the two large distance matrices from the match object now that all
+  # estimates are in hand.  dm_trimmed and dm_uncapped are nt×nc matrices
+  # (~800 KB each at nt=100, nc=500) and are the main source of heap growth
+  # in long overnight runs: they go out of scope but R's GC doesn't reclaim
+  # them immediately, so the worker's heap steadily enlarges.
+  mtch$dm_trimmed  <- NULL
+  mtch$dm_uncapped <- NULL
+  rm(mtch, df)
 
   res %>%
     mutate( att_est      = ATT,
@@ -264,12 +292,13 @@ one_iter <- function(
             error_type   = error_type,
             sigma1_extra = sigma1_extra,
             common_label = if_else(sigma1_extra == 0, "common", "no_common"),
+            tx_type      = tx_type,
             nc           = nc,
             nt           = nt,
             k_match      = k_match
     ) %>%
     relocate( runID,
-              overlap_label, error_type, common_label, k_match,
+              overlap_label, error_type, common_label, tx_type, k_match,
               method,
               SATT, att_est )
 }
@@ -319,15 +348,16 @@ if ( FALSE ) {
 #' Seeds are constructed to be unique per (iteration × cell) while remaining
 #' reproducible.  The formula is:
 #'   seed = iteration
-#'        + 1000  * (overlap_idx - 1)
-#'        + 10000 * (error_idx   - 1)   [1=homo, 2=het]
-#'        + 50000 * (sigma1_idx  - 1)   [1=common, 2=no_common]
+#'        + 1000   * (overlap_idx - 1)
+#'        + 10000  * (error_idx   - 1)   [1=homo, 2=het]
+#'        + 50000  * (sigma1_idx  - 1)   [1=common, 2=no_common]
+#'        + 100000 * (tx_idx      - 1)   [1=het, 2=constant]
 #'
 #' @param iteration  Positive integer SLURM array task ID.
 #' @param grid  Design grid tibble (default: DESIGN_GRID).
 #' @param nc,nt  Sample sizes.
 #' @param K_tt  Treated-to-treated neighbours for ttmatch.
-#' @return Tibble with 20 × 4 = 80 rows (20 cells × 4 estimators).
+#' @return Tibble with 40 × 5 = 200 rows (40 cells × 5 estimators).
 sim_master_multi <- function( iteration,
                               grid  = DESIGN_GRID,
                               nc    = 500,
@@ -347,14 +377,16 @@ sim_master_multi <- function( iteration,
   }
 
 
-  make_seed <- function(iter, overlap_label, error_type, sigma1_extra) {
+  make_seed <- function(iter, overlap_label, error_type, sigma1_extra, tx_type) {
     overlap_idx <- match(as.character(overlap_label), OVERLAP_LABELS)
     error_idx   <- if (as.character(error_type) == "homo") 1L else 2L
     sigma1_idx  <- if (sigma1_extra == 0) 1L else 2L
+    tx_idx      <- if (as.character(tx_type) == "het") 1L else 2L
     iter +
-      1000L  * (overlap_idx - 1L) +
-      10000L * (error_idx   - 1L) +
-      50000L * (sigma1_idx  - 1L)
+      1000L   * (overlap_idx - 1L) +
+      10000L  * (error_idx   - 1L) +
+      50000L  * (sigma1_idx  - 1L) +
+      100000L * (tx_idx      - 1L)
   }
 
   results <- vector("list", nrow(grid))
@@ -363,7 +395,8 @@ sim_master_multi <- function( iteration,
 
     row  <- grid[j, ]
     seed <- make_seed(iteration,
-                      row$overlap_label, row$error_type, row$sigma1_extra)
+                      row$overlap_label, row$error_type,
+                      row$sigma1_extra,  row$tx_type)
     prop <- PROP_NC_UNIF[as.character(row$overlap_label)]
 
     start <- Sys.time()
@@ -373,26 +406,34 @@ sim_master_multi <- function( iteration,
         overlap_label = as.character(row$overlap_label),
         error_type    = as.character(row$error_type),
         sigma1_extra  = row$sigma1_extra,
+        tx_type       = as.character(row$tx_type),
         prop_nc_unif  = prop,
-        caliper = caliper,
+        caliper       = caliper,
         nc            = nc,
         nt            = nt,
         seed_addition = seed,
         K_tt          = K_tt,
         k_match       = row$k_match,
-        verbose = verbose
+        verbose       = verbose
       ),
       error = function(e) {
         warning(sprintf(
-          "one_iter failed: iter=%d overlap=%s error=%s sigma1=%.1f — %s",
+          "one_iter failed: iter=%d overlap=%s error=%s sigma1=%.1f tx=%s — %s",
           iteration, row$overlap_label, row$error_type,
-          row$sigma1_extra, e$message
+          row$sigma1_extra, row$tx_type, e$message
         ), call. = FALSE)
         NA
       }
     )
     results[[j]]$time_secs <- as.numeric(difftime(Sys.time(), start, units = "secs"))
   }
+
+  # Single GC after all cells are done. Calling gc() inside the loop
+  # (once per cell) was expensive — each call scans the entire live heap
+  # regardless of how much is freed. One call per iteration is sufficient
+  # since one_iter() already strips the large distance matrices before
+  # returning.
+  gc(verbose = FALSE)
 
   results <- bind_rows(results)
 
@@ -468,7 +509,8 @@ collect_sim_results <- function(output_name   = "sims-variance-multi",
   read_one <- function(fp) {
     out <- tryCatch(readRDS(fp), error = function(e) NULL)
     if (is.null(out)) { warning("Could not read: ", fp); return(NULL) }
-    as_tibble(out)
+    as_tibble(out) %>%
+      dplyr::mutate(when_run = file.mtime(fp))
   }
 
   res_list <- purrr::map(files, read_one)
@@ -478,7 +520,7 @@ collect_sim_results <- function(output_name   = "sims-variance-multi",
   cat("Combined rows : ", nrow(combined), "\n", sep = "")
   cat("Replications  : ", dplyr::n_distinct(combined$runID), "\n", sep = "")
   cat("Design cells  : ", nrow(dplyr::distinct(
-    combined, overlap_label, error_type, sigma1_extra, k_match)), "\n", sep = "")
+    combined, overlap_label, error_type, sigma1_extra, k_match, tx_type)), "\n", sep = "")
 
   if (length(failed) > 0) {
     cat("Failed to read ", length(failed), " file(s):\n", sep = "")

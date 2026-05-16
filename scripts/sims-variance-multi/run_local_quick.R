@@ -9,6 +9,8 @@ suppressPackageStartupMessages({
   library(furrr)
   library(tictoc)
   library(here)
+  library(tidyverse)
+
 })
 
 N_ITER      <- 100
@@ -31,6 +33,7 @@ DESIGN_GRID <- expand_grid(
   overlap_label = "mid",
   error_type    = c("homo", "het"),
   sigma1_extra  = c(0, 2),
+  tx_type       = c("het", "constant"),
   k_match = c( 2 )
 ) %>%
   mutate(
@@ -75,13 +78,16 @@ if ( FALSE ) {
 }
 
 
+cat("══════════════════════════════════════════════════════════════════════\n")
 cat( "\n\nQuick Simulation complete\n" )
+cat("══════════════════════════════════════════════════════════════════════\n")
+
 res <- collect_sim_results( OUTPUT_NAME )
 
 res
 
 cov <- res %>%
-  group_by( error_type, sigma1_extra, common_label, k_match,method ) %>%
+  group_by( error_type, sigma1_extra, common_label, k_match, tx_type, method ) %>%
   mutate( cover = SATT <= att_est+2*SE & SATT >= att_est-2*SE ) %>%
   summarize( R = n(),
              mean_S0 = sqrt( mean( S0_sq ) ),
@@ -92,7 +98,7 @@ cov %>%
 
 
 ggplot( cov, aes( error_type, cover, color=method, group=method ) ) +
-  facet_grid(  ~ common_label ) +
+  facet_grid(  tx_type ~ common_label ) +
   geom_point() +
   geom_line() +
   geom_hline( yintercept = 0.95 )

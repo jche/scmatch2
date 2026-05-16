@@ -110,7 +110,7 @@ p_toy + p_kang + p_hain + p_acic +
   plot_layout(guides = "collect", nrow=2) &
   theme(legend.position = "bottom")
 
-ggsave("figures/sim_canonical_contour.pdf", width = 10, height = 10, units = "in")
+ggsave("figures/sim_canonical_contour.pdf", width = 8, height = 8, units = "in")
 
 
 

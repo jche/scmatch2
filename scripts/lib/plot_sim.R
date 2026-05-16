@@ -350,7 +350,7 @@ CONTOUR_GROUP_COLOURS <- c(
   "IPW"   = "#FF7F00",   # orange
   "LM"   = "#16D6E8",
   "TMLE"  = "#984EA3",   # purple
-  "Other" = "grey70",
+  "Other" = "grey30",
   "all"   = "grey50"
 )
 

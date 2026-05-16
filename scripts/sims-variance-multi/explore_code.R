@@ -18,9 +18,10 @@ if ( FALSE ) {
 
 df <- make_df_multi( error_type = "het",
                      sigma1_extra = 0,
-                     prop_nc_unif = 0.05 )
+                     prop_nc_unif = 0.15 )
 
-head( df )
+df
+
 stats <- df %>%
   mutate( err0 = Y0 - Y0_denoised,
           err1 = Y1 - Y1_denoised ) %>%
@@ -30,7 +31,16 @@ stats <- df %>%
              mn_sigma0 = sqrt( mean( sigma0^2 ) ) )
 stats
 
+ggplot( df, aes( sigma0 ) ) +
+  facet_wrap( ~ Z ) +
+  geom_histogram()
+df$X2c = cut( df$X2, 5 )
+ggplot( df, aes( X1, sigma0 ) ) +
+  geom_point( alpha = 0.5 ) +
+  facet_grid( X2c ~ Z )
 
+mean( df$sigma0 )
+mean( df$sigma0^2 )
 
 
 # Match data ---
